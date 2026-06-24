@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d9e75">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Custodi 451</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --surface:#ffffff; --line:rgba(0,0,0,.12); --line2:rgba(0,0,0,.22);
+    --txt:#1c1c1a; --muted:#5f5e5a; --hint:#8a8980;
+    --ok:#0f6e56; --okbg:#e1f5ee; --bad:#a32d2d; --badbg:#fceaea; --todo:#85705a; --todobg:#f1efe8;
+    --info:#185fa5; --infobg:#e6f1fb; --r:10px; --r2:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased;font-size:17px;line-height:1.5}
+  .wrap{max-width:440px;margin:0 auto;padding:14px 14px 90px}
+  header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .logo{width:38px;height:38px;border-radius:var(--r);background:var(--okbg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
+  h1{font-size:21px;font-weight:600;margin:0}
+  .sub{font-size:15px;color:var(--muted);margin:0}
+  .card{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:12px 14px;margin-bottom:9px}
+  label{font-size:15px;color:var(--muted)}
+  select,input,textarea,button{font:inherit}
+  select,input[type=text],input[type=email],textarea{width:100%;padding:13px 13px;border:.5px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--txt);margin-top:5px;font-size:17px}
+  button{cursor:pointer;border:.5px solid var(--line2);background:var(--surface);color:var(--txt);border-radius:var(--r);padding:13px 16px;font-size:17px}
+  button:active{transform:scale(.98)}
+  .btn-primary{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:600;width:100%}
+  .row{display:flex;align-items:center;gap:10px}
+  .pill{font-size:14px;padding:2px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:4px}
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:11px}
+  .metric{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r);padding:9px 11px}
+  .metric .n{font-size:27px;font-weight:600;margin:2px 0 0}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .tile{padding:9px 10px;border-radius:var(--r);border:.5px solid;text-align:left;display:flex;flex-direction:column;gap:3px}
+  .src{font-size:14px;color:var(--hint)}
+  nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:.5px solid var(--line);display:flex;max-width:440px;margin:0 auto}
+  nav button{flex:1;border:none;background:none;border-radius:0;padding:10px 4px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav button.active{color:var(--ok)}
+  nav .ic{font-size:24px}
+  .hide{display:none}
+  .seg{flex:none;padding:10px 16px;font-size:16px}
+  .photo-thumb{width:46px;height:46px;border-radius:var(--r);object-fit:cover;border:.5px solid var(--line)}
+  .empty{color:var(--hint);font-size:16px;text-align:center;padding:18px}
+  .spin{color:var(--hint);font-size:16px;text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">◍</div>
+    <div style="flex:1">
+      <h1>Custodi 451</h1>
+      <p class="sub" id="hsub">il controllo del capitolato è di tutti</p>
+    </div>
+    <div id="user-badge" class="hide" style="display:flex;align-items:center;gap:7px;flex:none"></div>
+  </header>
+  <div id="view-zona"><div class="spin">Carico…</div></div>
+  <div id="view-bacheca" class="hide"></div>
+  <div id="view-dossier" class="hide"></div>
+</div>
+
+<nav id="nav" style="display:none">
+  <button data-v="zona" class="active"><span class="ic">◎</span>Controlla</button>
+  <button data-v="bacheca"><span class="ic">▦</span>Bacheca</button>
+  <button data-v="dossier"><span class="ic">▤</span>Dossier</button>
+</nav>
+
+<script src="config.js"></script>
+<script src="capitolato-verde.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
+const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
+
+let userId=null, userNome=null, userUnita=null, reports=[], comments=[], openThreads={}, curArea='Pal. E';
+const meseOggi=new Date().getMonth()+1;
+const $=function(id){return document.getElementById(id)};
+function esc(s){return (s||'').replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+function fmt(iso){var d=new Date(iso);return d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
+function oggiLabel(){return new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}
+function applicabile(s){return !s.mesi||s.mesi.indexOf(meseOggi)>=0}
+function setApp(on){$('nav').style.display=on?'flex':'none'; if(!on)$('user-badge').classList.add('hide')}
+
+/* ---------- AUTH / INIT ---------- */
+async function init(){
+  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8'}; $('hsub').textContent='MODALITÀ PROVA (senza login)'; showBadge(); setApp(true); renderAll(); return; }
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ setApp(false); renderLogin(); return; }
+  userId=session.user.id;
+  userNome=(session.user.user_metadata && session.user.user_metadata.nome) || null;
+  if(!userNome){ setApp(false); renderNome(); return; }
+  $('hsub').textContent='il controllo del capitolato è di tutti';
+  userUnita = await findUnita(userNome);
+  showBadge();
+  await loadReports(); await loadComments(); setApp(true); renderAll();
+}
+
+async function findUnita(nome){
+  var toks=(nome||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(function(t){return t.length>2});
+  if(!toks.length) return null;
+  toks.sort(function(a,b){return b.length-a.length});
+  var res=await sb.from('proprietari').select('unita,palazzina,interno,nome').ilike('nome','%'+toks[0]+'%');
+  var data=res.data||[]; if(!data.length) return null;
+  function norm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
+  function score(pn){var pt=norm(pn).split(/[\s\-]+/);return toks.filter(function(t){return pt.some(function(p){return p.indexOf(t)>=0||t.indexOf(p)>=0})}).length}
+  data.sort(function(a,b){return score(b.nome)-score(a.nome)});
+  return score(data[0].nome)>0 ? data[0] : null;
+}
+function showBadge(){
+  var ub=$('user-badge');
+  var ini=(userNome||'?').trim().split(/\s+/).map(function(w){return w[0]}).slice(0,2).join('').toUpperCase();
+  var sub = userUnita ? ('Pal. '+userUnita.palazzina+' · int '+userUnita.interno) : 'unità non associata';
+  ub.innerHTML='<div style="text-align:right;line-height:1.2"><div style="font-size:15px;font-weight:500">'+esc(userNome.split(' ')[0])+'</div>'+
+    '<div style="font-size:14px;color:var(--hint)">'+sub+'</div></div>'+
+    '<div style="width:34px;height:34px;border-radius:50%;background:var(--infobg);color:var(--info);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">'+esc(ini)+'</div>';
+  ub.classList.remove('hide');
+}
+sb.auth.onAuthStateChange(function(_e,sess){ if(sess) init(); });
+
+function renderLogin(){
+  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Accedi come condòmino</p>'+
+    '<p class="sub" style="margin:0 0 12px">Nome e email: ti arriva un link per entrare. Le tue verifiche saranno firmate col tuo nome e valgono come prova.</p>'+
+    '<label>Nome e cognome</label><input id="l-nome" type="text" placeholder="es. Mario Rossi" autocapitalize="words">'+
+    '<label style="margin-top:8px;display:block">Email</label><input id="l-email" type="email" placeholder="tu@email.it" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false">'+
+    '<button class="btn-primary" style="margin-top:12px" id="l-go">Ricevi il link di accesso</button>'+
+    '<p id="l-msg" class="sub" style="margin-top:10px;display:none"></p></div>';
+  $('l-go').onclick=async function(){
+    const nome=$('l-nome').value.trim(); const email=$('l-email').value.trim();
+    if(!nome){$('l-nome').focus();return} if(!email){$('l-email').focus();return}
+    $('l-go').disabled=true; $('l-go').textContent='Invio…';
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ data:{ nome:nome }, emailRedirectTo: location.origin+location.pathname } });
+    const m=$('l-msg'); m.style.display='block';
+    if(error){ m.style.color='var(--bad)'; m.textContent='Errore: '+error.message; $('l-go').disabled=false; $('l-go').textContent='Ricevi il link di accesso'; }
+    else { m.style.color='var(--ok)'; m.textContent='Ti ho mandato un link a '+email+'. Aprilo da questo telefono per entrare.'; $('l-go').textContent='Link inviato ✓'; }
+  };
+}
+
+function renderNome(){
+  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Come ti chiami?</p>'+
+    '<p class="sub" style="margin:0 0 12px">Serve solo a firmare le tue verifiche.</p>'+
+    '<label>Nome e cognome</label><input id="o-nome" type="text" placeholder="es. Mario Rossi" autocapitalize="words">'+
+    '<button class="btn-primary" style="margin-top:12px" id="o-go">Entra</button></div>';
+  $('o-go').onclick=async function(){
+    const n=$('o-nome').value.trim(); if(!n){$('o-nome').focus();return}
+    $('o-go').disabled=true;
+    const { error } = await sb.auth.updateUser({ data:{ nome:n } });
+    if(error){ $('o-go').disabled=false; alert('Errore: '+error.message); return; }
+    init();
+  };
+}
+
+/* ---------- DATI ---------- */
+async function loadReports(){
+  if(DEMO) return;  // in demo i report restano in memoria
+  const { data, error } = await sb.from('segnalazioni').select('*').order('created_at',{ascending:false});
+  reports = error? [] : (data||[]);
+}
+async function loadComments(){
+  if(DEMO) return;
+  const { data, error } = await sb.from('commenti').select('*').order('created_at',{ascending:true});
+  comments = error? [] : (data||[]);
+}
+async function addComment(rid, testo){
+  if(!testo.trim()) return false;
+  if(DEMO){ comments.push({id:'c'+Date.now(),segnalazione_id:rid,autore_nome:userNome,testo:testo.trim(),created_at:new Date().toISOString()}); return true; }
+  const { error } = await sb.from('commenti').insert({ segnalazione_id:rid, autore_id:userId, autore_nome:userNome, testo:testo.trim() });
+  if(error){ alert('Errore: '+error.message); return false; }
+  await loadComments(); return true;
+}
+function latest(area,sid){var r=reports.filter(function(x){return x.area===area&&x.servizio===sid});return r[0]||null}
+function statoOf(area,sid){var l=latest(area,sid);return l?l.stato:'todo'}
+function supersededOk(r){return reports.some(function(x){return x.area===r.area&&x.servizio===r.servizio&&x.stato==='ok'&&new Date(x.created_at)>new Date(r.created_at)})}
+
+/* ---------- VIEW: ZONA ---------- */
+function renderZona(){
+  var v=$('view-zona');
+  var apri=CAPITOLATO_VERDE.filter(function(s){return statoOf(curArea,s.id)==='problema'}).length;
+  var totApri=reports.filter(function(r){return r.stato==='problema'&&!supersededOk(r)}).length;
+  var html='<label>Dove sei ora</label><select id="z-area">'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+a+'</option>'}).join('')+'</select>'+
+    '<div class="metrics" style="margin-top:11px"><div class="metric"><label>Qui, aperti</label><div class="n" style="color:var(--bad)">'+apri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">problemi</span></div></div>'+
+    '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
+    '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:12px 2px 8px">Cosa controllare in '+esc(curArea)+' · '+oggiLabel()+'</p>';
+  CAPITOLATO_VERDE.forEach(function(s){
+    if(!applicabile(s))return;
+    var st=statoOf(curArea,s.id),c=st==='ok'?'ok':st==='problema'?'bad':'todo',ic=st==='ok'?'✓':st==='problema'?'!':'?';
+    var l=latest(curArea,s.id);
+    html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
+      '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):'')+'</div></div>'+
+      '<button class="seg" data-s="'+s.id+'">Segnala</button></div><div class="src" style="margin-top:6px">'+esc(s.fonte)+'</div></div>';
+  });
+  v.innerHTML=html;
+  $('z-area').onchange=function(e){curArea=e.target.value;renderAll()};
+  v.querySelectorAll('.seg').forEach(function(b){b.onclick=function(){openSegnala(b.dataset.s)}});
+}
+
+/* ---------- SEGNALA ---------- */
+function openSegnala(sid){
+  var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid});
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600">'+esc(s.nome)+'</div>'+
+    '<div style="font-size:15px;color:var(--hint);margin:2px 0 12px">'+esc(curArea)+' · dovuto: '+esc(s.freq)+' · '+esc(s.fonte)+'</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
+      '<button id="b-ok" style="border-color:var(--ok);color:var(--ok)">✓ Fatto</button>'+
+      '<button id="b-no" style="border-color:var(--bad);color:var(--bad)">! Problema</button></div>'+
+    '<label style="margin-top:12px;display:block">Foto (consigliata = prova)</label>'+
+    '<input id="b-foto" type="file" accept="image/*" capture="environment" style="margin-top:4px">'+
+    '<img id="b-prev" class="hide" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--r);margin-top:8px">'+
+    '<label style="margin-top:8px;display:block">Nota (facoltativa)</label><textarea id="b-nota" rows="2" placeholder="es. prato secco, irrigazione ferma da giorni"></textarea>'+
+    '<div style="font-size:14px;color:var(--hint);margin-top:8px">firma: '+esc(userNome)+' · '+new Date().toLocaleDateString('it-IT')+' · zona '+esc(curArea)+'</div>'+
+    '<div id="b-warn" style="color:var(--bad);font-size:15px;margin-top:8px;display:none">Indica prima se è Fatto o Problema</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button id="b-x">Annulla</button>'+
+    '<button class="btn-primary" id="b-send">Invia segnalazione</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  var stato=null, fotoBlob=null;
+  function pick(el,col){$('b-ok').style.outline='';$('b-no').style.outline='';el.style.outline='2px solid '+col}
+  $('b-ok').onclick=function(){stato='ok';pick(this,'var(--ok)')};
+  $('b-no').onclick=function(){stato='problema';pick(this,'var(--bad)')};
+  $('b-foto').onchange=function(e){var f=e.target.files[0];if(!f)return;downscale(f,function(blob){fotoBlob=blob;var p=$('b-prev');p.src=URL.createObjectURL(blob);p.classList.remove('hide')})};
+  $('b-x').onclick=function(){m.remove()};
+  $('b-send').onclick=async function(){
+    if(!stato){$('b-warn').style.display='block';return}
+    if(DEMO){ reports.unshift({id:'d'+Date.now(),area:curArea,servizio:s.id,servizio_nome:s.nome,fonte:s.fonte,stato:stato,nota:$('b-nota').value.trim(),foto_url:(fotoBlob?URL.createObjectURL(fotoBlob):null),autore_nome:userNome,created_at:new Date().toISOString()}); m.remove(); renderAll(); return; }
+    var btn=$('b-send'); btn.disabled=true; btn.textContent='Invio…';
+    try{
+      var fotoUrl=null;
+      if(fotoBlob){
+        var path=userId+'/'+Date.now()+'.jpg';
+        var up=await sb.storage.from('foto').upload(path, fotoBlob, {contentType:'image/jpeg'});
+        if(up.error) throw up.error;
+        fotoUrl=sb.storage.from('foto').getPublicUrl(path).data.publicUrl;
+      }
+      var ins=await sb.from('segnalazioni').insert({
+        area:curArea, servizio:s.id, servizio_nome:s.nome, fonte:s.fonte,
+        stato:stato, nota:$('b-nota').value.trim(), foto_url:fotoUrl,
+        autore_id:userId, autore_nome:userNome
+      });
+      if(ins.error) throw ins.error;
+      m.remove(); await loadReports(); renderAll();
+    }catch(err){ $('b-warn').textContent='Errore: '+err.message; $('b-warn').style.display='block'; btn.disabled=false; btn.textContent='Invia segnalazione'; }
+  };
+}
+function downscale(file,cb){var img=new Image();var rd=new FileReader();rd.onload=function(){img.onload=function(){var mx=1280,sc=Math.min(1,mx/Math.max(img.width,img.height));var cv=document.createElement('canvas');cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);cv.toBlob(function(b){cb(b)},'image/jpeg',0.75)};img.src=rd.result};rd.readAsDataURL(file)}
+
+/* ---------- VIEW: BACHECA ---------- */
+function renderBacheca(){
+  var v=$('view-bacheca');
+  var probByArea={};reports.forEach(function(r){if(r.stato==='problema'&&!supersededOk(r)){probByArea[r.area]=(probByArea[r.area]||0)+1}});
+  var okAree=AREE.filter(function(a){return !probByArea[a]}).length;
+  var totProb=Object.keys(probByArea).reduce(function(t,k){return t+probByArea[k]},0);
+  var html='<div class="metrics"><div class="metric"><label>Aree in ordine</label><div class="n">'+okAree+' <span style="font-size:15px;font-weight:400;color:var(--hint)">/'+AREE.length+'</span></div></div>'+
+    '<div class="metric"><label>Problemi aperti</label><div class="n" style="color:var(--bad)">'+totProb+'</div></div></div>'+
+    '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 8px">Mappa del complesso · '+oggiLabel()+'</p><div class="grid">';
+  AREE.forEach(function(a){var p=probByArea[a]||0,good=p===0;
+    html+='<div class="tile" style="border-color:var(--'+(good?'ok':'bad')+');background:var(--'+(good?'ok':'bad')+'bg);color:var(--'+(good?'ok':'bad')+')">'+
+      '<span style="font-size:15px;font-weight:600">'+a+'</span><span style="font-size:14px">'+(good?'✓ ok':'! '+p+(p>1?' problemi':' problema'))+'</span></div>';
+  });
+  v.innerHTML=html+'</div>';
+}
+
+/* ---------- VIEW: DOSSIER ---------- */
+function renderDossier(){
+  var v=$('view-dossier');
+  var probs=reports.filter(function(r){return r.stato==='problema'&&!supersededOk(r)});
+  var bySrv={};probs.forEach(function(r){(bySrv[r.servizio]=bySrv[r.servizio]||[]).push(r)});
+  var html='<div class="card"><div class="row"><span style="font-size:28px">▤</span><div><div style="font-weight:600;font-size:18px">Dossier — esecuzione capitolato verde</div><div class="sub">generato il '+new Date().toLocaleDateString('it-IT')+' · si aggiorna da solo</div></div></div>'+
+    '<div class="metrics" style="margin-top:12px"><div class="metric"><label>segnalazioni</label><div class="n">'+reports.length+'</div></div><div class="metric"><label>inadempienze aperte</label><div class="n" style="color:var(--bad)">'+Object.keys(bySrv).length+'</div></div></div></div>';
+  if(!probs.length){ v.innerHTML=html+'<div class="empty">Nessuna inadempienza aperta. Le segnalazioni di "problema" compariranno qui, pronte per il legale o l\'assemblea.</div>'; return; }
+  Object.keys(bySrv).forEach(function(sid){
+    var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid}),rs=bySrv[sid];
+    html+='<div class="card"><div style="font-weight:600;font-size:17px">'+esc(s?s.nome:sid)+'</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:7px 0">'+
+      '<span class="pill" style="background:var(--todobg);color:var(--todo)">dovuto: '+esc(s?s.freq:'')+'</span>'+
+      '<span class="pill" style="background:var(--badbg);color:var(--bad)">! '+rs.length+' segnalazioni · '+esc(rs[0].fonte)+'</span></div>';
+    rs.forEach(function(r){
+      var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
+      html+='<div style="border-top:.5px solid var(--line);padding:8px 0">'+
+        '<div class="row">'+
+        (r.foto_url?'<img class="photo-thumb" src="'+esc(r.foto_url)+'">':'<div class="photo-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--hint);background:var(--todobg)">—</div>')+
+        '<div style="flex:1;min-width:0"><div style="font-size:16px">'+esc(r.area)+(r.nota?' — '+esc(r.nota):'')+'</div>'+
+        '<div style="font-size:14px;color:var(--hint)">'+esc(r.autore_nome)+' · '+fmt(r.created_at)+'</div></div></div>'+
+        '<button class="th-tog" data-rid="'+r.id+'" style="margin-top:6px;font-size:14px;padding:7px 12px">Discussione'+(cms.length?' ('+cms.length+')':'')+'</button>'+
+        '<div class="th" data-tid="'+r.id+'" style="display:none;margin-top:8px;padding-left:8px;border-left:2px solid var(--line)">'+
+          cms.map(function(c){return '<div style="margin-bottom:7px"><div style="font-size:14px"><span style="font-weight:500">'+esc(c.autore_nome)+'</span> <span style="color:var(--hint)">'+new Date(c.created_at).toLocaleDateString('it-IT')+'</span></div><div style="font-size:15px">'+esc(c.testo)+'</div></div>'}).join('')+
+          '<div style="display:flex;gap:6px;margin-top:6px"><input type="text" class="th-in" data-rid="'+r.id+'" placeholder="Scrivi un commento…" style="flex:1;margin-top:0"><button class="th-send" data-rid="'+r.id+'" style="flex:none">Invia</button></div>'+
+        '</div></div>';
+    });
+    html+='</div>';
+  });
+  v.innerHTML=html+'<button class="btn-primary" style="margin-top:6px" onclick="this.textContent=\'Versione finale: PDF firmato con foto e date\'">Esporta PDF firmato</button>';
+  v.querySelectorAll('.th-tog').forEach(function(b){b.onclick=function(){var rid=b.dataset.rid;var t=v.querySelector('.th[data-tid="'+rid+'"]');var show=t.style.display==='none';t.style.display=show?'block':'none';openThreads[rid]=show;}});
+  v.querySelectorAll('.th-send').forEach(function(b){b.onclick=async function(){var inp=v.querySelector('.th-in[data-rid="'+b.dataset.rid+'"]');if(!inp.value.trim())return;openThreads[b.dataset.rid]=true;var ok=await addComment(b.dataset.rid,inp.value);if(ok)renderDossier();}});
+  Object.keys(openThreads).forEach(function(rid){if(openThreads[rid]){var t=v.querySelector('.th[data-tid="'+rid+'"]');if(t)t.style.display='block';}});
+}
+
+/* ---------- NAV ---------- */
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier};
+function renderAll(){var act=document.querySelector('#nav button.active').dataset.v;Object.keys(views).forEach(function(k){$('view-'+k).classList.toggle('hide',k!==act)});views[act]()}
+document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(){document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');renderAll()}});
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){})}
+init();
+</script>
+</body>
+</html>
