@@ -326,7 +326,7 @@ function renderDossier(){
 }
 
 /* ---------- EXPORT PDF ---------- */
-function loadImg(url){return new Promise(function(res,rej){var img=new Image();img.crossOrigin='anonymous';img.onload=function(){try{var c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);res({data:c.toDataURL('image/jpeg',0.8),w:img.naturalWidth,h:img.naturalHeight});}catch(e){rej(e);}};img.onerror=rej;img.src=url;});}
+function loadImg(url){return new Promise(function(res,rej){var img=new Image();if(/^https?:/i.test(url))img.crossOrigin='anonymous';img.onload=function(){try{var c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);res({data:c.toDataURL('image/jpeg',0.85),w:img.naturalWidth,h:img.naturalHeight});}catch(e){rej(e);}};img.onerror=function(){rej(new Error('load'))};img.src=url;});}
 async function exportPDF(){
   var btn=$('dz-export'); if(btn){btn.disabled=true;btn.textContent='Genero il PDF…';}
   try{
@@ -359,6 +359,14 @@ async function exportPDF(){
         doc.setFontSize(9); doc.setTextColor(110);
         doc.text(r.autore_nome+' · '+fmt(r.created_at), tx, y+12+lines.length*13+3); doc.setTextColor(0);
         y+=Math.max(imgH+6, 12+lines.length*13+16);
+        var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
+        for(var j=0;j<cms.length;j++){
+          if(y>H-60){doc.addPage();y=54;}
+          doc.setFontSize(9); doc.setTextColor(90);
+          var clines=doc.splitTextToSize('— '+cms[j].autore_nome+': '+cms[j].testo, W-M-(M+18));
+          doc.text(clines, M+18, y); doc.setTextColor(0);
+          y+=clines.length*11+5;
+        }
       }
       y+=12;
     }
