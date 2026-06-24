@@ -69,6 +69,7 @@
 
 <script src="config.js"></script>
 <script src="capitolato-verde.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
@@ -171,13 +172,26 @@ async function addComment(rid, testo){
 }
 function latest(area,sid){var r=reports.filter(function(x){return x.area===area&&x.servizio===sid});return r[0]||null}
 function statoOf(area,sid){var l=latest(area,sid);return l?l.stato:'todo'}
-function supersededOk(r){return reports.some(function(x){return x.area===r.area&&x.servizio===r.servizio&&x.stato==='ok'&&new Date(x.created_at)>new Date(r.created_at)})}
+function isOpen(r){return r.stato==='problema' && !r.risolto}
+async function resolveProblem(r){
+  if(DEMO){ r.risolto=true; return true; }
+  const { error } = await sb.from('segnalazioni').update({ risolto:true }).eq('id', r.id);
+  if(error){ alert('Errore: '+error.message); return false; }
+  await loadReports(); return true;
+}
+function openImage(url){
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:2000;padding:14px';
+  ov.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:100%;border-radius:8px"><div style="position:absolute;top:16px;right:20px;color:#fff;font-size:30px">×</div>';
+  ov.onclick=function(){ov.remove()};
+  document.body.appendChild(ov);
+}
 
 /* ---------- VIEW: ZONA ---------- */
 function renderZona(){
   var v=$('view-zona');
   var apri=CAPITOLATO_VERDE.filter(function(s){return statoOf(curArea,s.id)==='problema'}).length;
-  var totApri=reports.filter(function(r){return r.stato==='problema'&&!supersededOk(r)}).length;
+  var totApri=reports.filter(isOpen).length;
   var html='<label>Dove sei ora</label><select id="z-area">'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+a+'</option>'}).join('')+'</select>'+
     '<div class="metrics" style="margin-top:11px"><div class="metric"><label>Qui, aperti</label><div class="n" style="color:var(--bad)">'+apri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">problemi</span></div></div>'+
     '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
@@ -224,7 +238,7 @@ function openSegnala(sid){
   $('b-x').onclick=function(){m.remove()};
   $('b-send').onclick=async function(){
     if(!stato){$('b-warn').style.display='block';return}
-    if(DEMO){ reports.unshift({id:'d'+Date.now(),area:curArea,servizio:s.id,servizio_nome:s.nome,fonte:s.fonte,stato:stato,nota:$('b-nota').value.trim(),foto_url:(fotoBlob?URL.createObjectURL(fotoBlob):null),autore_nome:userNome,created_at:new Date().toISOString()}); m.remove(); renderAll(); return; }
+    if(DEMO){ reports.unshift({id:'d'+Date.now(),area:curArea,servizio:s.id,servizio_nome:s.nome,fonte:s.fonte,stato:stato,nota:$('b-nota').value.trim(),foto_url:(fotoBlob?URL.createObjectURL(fotoBlob):null),autore_id:userId,autore_nome:userNome,risolto:false,created_at:new Date().toISOString()}); m.remove(); renderAll(); return; }
     var btn=$('b-send'); btn.disabled=true; btn.textContent='Invio…';
     try{
       var fotoUrl=null;
@@ -249,23 +263,30 @@ function downscale(file,cb){var img=new Image();var rd=new FileReader();rd.onloa
 /* ---------- VIEW: BACHECA ---------- */
 function renderBacheca(){
   var v=$('view-bacheca');
-  var probByArea={};reports.forEach(function(r){if(r.stato==='problema'&&!supersededOk(r)){probByArea[r.area]=(probByArea[r.area]||0)+1}});
+  var probByArea={};reports.forEach(function(r){if(isOpen(r)){probByArea[r.area]=(probByArea[r.area]||0)+1}});
   var okAree=AREE.filter(function(a){return !probByArea[a]}).length;
   var totProb=Object.keys(probByArea).reduce(function(t,k){return t+probByArea[k]},0);
   var html='<div class="metrics"><div class="metric"><label>Aree in ordine</label><div class="n">'+okAree+' <span style="font-size:15px;font-weight:400;color:var(--hint)">/'+AREE.length+'</span></div></div>'+
     '<div class="metric"><label>Problemi aperti</label><div class="n" style="color:var(--bad)">'+totProb+'</div></div></div>'+
     '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 8px">Mappa del complesso · '+oggiLabel()+'</p><div class="grid">';
   AREE.forEach(function(a){var p=probByArea[a]||0,good=p===0;
-    html+='<div class="tile" style="border-color:var(--'+(good?'ok':'bad')+');background:var(--'+(good?'ok':'bad')+'bg);color:var(--'+(good?'ok':'bad')+')">'+
-      '<span style="font-size:15px;font-weight:600">'+a+'</span><span style="font-size:14px">'+(good?'✓ ok':'! '+p+(p>1?' problemi':' problema'))+'</span></div>';
+    html+='<button class="tile bch-tile" data-area="'+esc(a)+'" style="cursor:pointer;border-color:var(--'+(good?'ok':'bad')+');background:var(--'+(good?'ok':'bad')+'bg);color:var(--'+(good?'ok':'bad')+')">'+
+      '<span style="font-size:15px;font-weight:600">'+a+'</span><span style="font-size:14px">'+(good?'✓ ok':'! '+p+(p>1?' problemi':' problema'))+'</span></button>';
   });
   v.innerHTML=html+'</div>';
+  v.querySelectorAll('.bch-tile').forEach(function(b){b.onclick=function(){goToArea(b.dataset.area)}});
+}
+function goToArea(a){
+  curArea=a;
+  document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('active')});
+  document.querySelector('#nav button[data-v="zona"]').classList.add('active');
+  renderAll(); window.scrollTo(0,0);
 }
 
 /* ---------- VIEW: DOSSIER ---------- */
 function renderDossier(){
   var v=$('view-dossier');
-  var probs=reports.filter(function(r){return r.stato==='problema'&&!supersededOk(r)});
+  var probs=reports.filter(isOpen);
   var bySrv={};probs.forEach(function(r){(bySrv[r.servizio]=bySrv[r.servizio]||[]).push(r)});
   var html='<div class="card"><div class="row"><span style="font-size:28px">▤</span><div><div style="font-weight:600;font-size:18px">Dossier — esecuzione capitolato verde</div><div class="sub">generato il '+new Date().toLocaleDateString('it-IT')+' · si aggiorna da solo</div></div></div>'+
     '<div class="metrics" style="margin-top:12px"><div class="metric"><label>segnalazioni</label><div class="n">'+reports.length+'</div></div><div class="metric"><label>inadempienze aperte</label><div class="n" style="color:var(--bad)">'+Object.keys(bySrv).length+'</div></div></div></div>';
@@ -278,12 +299,16 @@ function renderDossier(){
       '<span class="pill" style="background:var(--badbg);color:var(--bad)">! '+rs.length+' segnalazioni · '+esc(rs[0].fonte)+'</span></div>';
     rs.forEach(function(r){
       var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
+      var mine=(r.autore_id && r.autore_id===userId);
       html+='<div style="border-top:.5px solid var(--line);padding:8px 0">'+
         '<div class="row">'+
-        (r.foto_url?'<img class="photo-thumb" src="'+esc(r.foto_url)+'">':'<div class="photo-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--hint);background:var(--todobg)">—</div>')+
+        (r.foto_url?'<img class="photo-thumb dz-img" data-img="'+esc(r.foto_url)+'" src="'+esc(r.foto_url)+'" style="cursor:pointer">':'<div class="photo-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--hint);background:var(--todobg)">—</div>')+
         '<div style="flex:1;min-width:0"><div style="font-size:16px">'+esc(r.area)+(r.nota?' — '+esc(r.nota):'')+'</div>'+
         '<div style="font-size:14px;color:var(--hint)">'+esc(r.autore_nome)+' · '+fmt(r.created_at)+'</div></div></div>'+
-        '<button class="th-tog" data-rid="'+r.id+'" style="margin-top:6px;font-size:14px;padding:7px 12px">Discussione'+(cms.length?' ('+cms.length+')':'')+'</button>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+
+        '<button class="th-tog" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px">Discussione'+(cms.length?' ('+cms.length+')':'')+'</button>'+
+        (mine?'<button class="dz-resolve" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px;border-color:var(--ok);color:var(--ok)">✓ Segna risolto</button>':'')+
+        '</div>'+
         '<div class="th" data-tid="'+r.id+'" style="display:none;margin-top:8px;padding-left:8px;border-left:2px solid var(--line)">'+
           cms.map(function(c){return '<div style="margin-bottom:7px"><div style="font-size:14px"><span style="font-weight:500">'+esc(c.autore_nome)+'</span> <span style="color:var(--hint)">'+new Date(c.created_at).toLocaleDateString('it-IT')+'</span></div><div style="font-size:15px">'+esc(c.testo)+'</div></div>'}).join('')+
           '<div style="display:flex;gap:6px;margin-top:6px"><input type="text" class="th-in" data-rid="'+r.id+'" placeholder="Scrivi un commento…" style="flex:1;margin-top:0"><button class="th-send" data-rid="'+r.id+'" style="flex:none">Invia</button></div>'+
@@ -291,10 +316,57 @@ function renderDossier(){
     });
     html+='</div>';
   });
-  v.innerHTML=html+'<button class="btn-primary" style="margin-top:6px" onclick="this.textContent=\'Versione finale: PDF firmato con foto e date\'">Esporta PDF firmato</button>';
+  v.innerHTML=html+'<button class="btn-primary" id="dz-export" style="margin-top:6px">Esporta PDF firmato</button>';
   v.querySelectorAll('.th-tog').forEach(function(b){b.onclick=function(){var rid=b.dataset.rid;var t=v.querySelector('.th[data-tid="'+rid+'"]');var show=t.style.display==='none';t.style.display=show?'block':'none';openThreads[rid]=show;}});
   v.querySelectorAll('.th-send').forEach(function(b){b.onclick=async function(){var inp=v.querySelector('.th-in[data-rid="'+b.dataset.rid+'"]');if(!inp.value.trim())return;openThreads[b.dataset.rid]=true;var ok=await addComment(b.dataset.rid,inp.value);if(ok)renderDossier();}});
+  v.querySelectorAll('.dz-img').forEach(function(b){b.onclick=function(){openImage(b.dataset.img)}});
+  v.querySelectorAll('.dz-resolve').forEach(function(b){b.onclick=async function(){var r=reports.find(function(x){return x.id===b.dataset.rid});if(r&&await resolveProblem(r))renderDossier();}});
+  var ex=$('dz-export'); if(ex) ex.onclick=exportPDF;
   Object.keys(openThreads).forEach(function(rid){if(openThreads[rid]){var t=v.querySelector('.th[data-tid="'+rid+'"]');if(t)t.style.display='block';}});
+}
+
+/* ---------- EXPORT PDF ---------- */
+function loadImg(url){return new Promise(function(res,rej){var img=new Image();img.crossOrigin='anonymous';img.onload=function(){try{var c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);res({data:c.toDataURL('image/jpeg',0.8),w:img.naturalWidth,h:img.naturalHeight});}catch(e){rej(e);}};img.onerror=rej;img.src=url;});}
+async function exportPDF(){
+  var btn=$('dz-export'); if(btn){btn.disabled=true;btn.textContent='Genero il PDF…';}
+  try{
+    var doc=new jspdf.jsPDF({unit:'pt',format:'a4'});
+    var W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=40, y=54;
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.text('Dossier — esecuzione capitolato verde', M, y); y+=20;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(110);
+    doc.text('Condominio Oasi delle Palme (Via Cina 451, Roma) · generato il '+new Date().toLocaleDateString('it-IT'), M, y); y+=14;
+    var probs=reports.filter(isOpen);
+    doc.text(reports.length+' segnalazioni totali · '+probs.length+' inadempienze aperte', M, y); y+=22;
+    doc.setTextColor(0);
+    var bySrv={}; probs.forEach(function(r){(bySrv[r.servizio]=bySrv[r.servizio]||[]).push(r);});
+    if(!probs.length){ doc.setFontSize(11); doc.text('Nessuna inadempienza aperta.', M, y); }
+    var keys=Object.keys(bySrv);
+    for(var k=0;k<keys.length;k++){
+      var s=CAPITOLATO_VERDE.find(function(x){return x.id===keys[k]}); var rs=bySrv[keys[k]];
+      if(y>H-120){doc.addPage();y=54;}
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text(s?s.nome:keys[k], M, y); y+=15;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(110);
+      doc.text('dovuto: '+(s?s.freq:'')+'   ·   '+(rs[0].fonte||''), M, y); y+=16; doc.setTextColor(0);
+      for(var i=0;i<rs.length;i++){
+        var r=rs[i];
+        if(y>H-110){doc.addPage();y=54;}
+        var imgH=0;
+        if(r.foto_url){ try{ var im=await loadImg(r.foto_url); var iw=70, ih=Math.min(90,70*im.h/im.w); doc.addImage(im.data,'JPEG',M,y,iw,ih); imgH=ih; }catch(e){} }
+        var tx=M+(imgH?82:0);
+        doc.setFontSize(11);
+        var head=r.area+(r.nota?' — '+r.nota:'');
+        var lines=doc.splitTextToSize(head, W-tx-M); doc.text(lines, tx, y+12);
+        doc.setFontSize(9); doc.setTextColor(110);
+        doc.text(r.autore_nome+' · '+fmt(r.created_at), tx, y+12+lines.length*13+3); doc.setTextColor(0);
+        y+=Math.max(imgH+6, 12+lines.length*13+16);
+      }
+      y+=12;
+    }
+    doc.setFontSize(8); doc.setTextColor(140);
+    doc.text('Ogni voce è ancorata al capitolato e a segnalazioni firmate con foto e data.', M, H-26);
+    doc.save('dossier-oasi-delle-palme.pdf');
+  }catch(err){ alert('Errore PDF: '+err.message); }
+  if(btn){btn.disabled=false;btn.textContent='Esporta PDF firmato';}
 }
 
 /* ---------- NAV ---------- */
