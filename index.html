@@ -79,12 +79,14 @@
   <div id="view-zona"><div class="spin">Carico…</div></div>
   <div id="view-bacheca" class="hide"></div>
   <div id="view-dossier" class="hide"></div>
+  <div id="view-admin" class="hide"></div>
 </div>
 
 <nav id="nav" style="display:none">
   <button data-v="zona" class="active"><span class="ic">◎</span>Controlla</button>
   <button data-v="bacheca"><span class="ic">▦</span>Bacheca</button>
   <button data-v="dossier"><span class="ic">▤</span>Dossier</button>
+  <button data-v="admin" id="nav-admin" class="hide"><span class="ic">★</span>Admin</button>
 </nav>
 
 <script src="config.js?v=2"></script>
@@ -95,84 +97,138 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
 
-let userId=null, userNome=null, userUnita=null, reports=[], comments=[], openThreads={}, curArea='Pal. E';
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='Pal. E';
+let UNITA_LIST=null;
+function approvato(){return userStato==='approvato'}
+async function loadUnitaList(){
+  if(UNITA_LIST) return UNITA_LIST;
+  if(DEMO){ UNITA_LIST=[{unita:'I/08',palazzina:'I',interno:'8'}]; return UNITA_LIST; }
+  var res=await sb.from('unita_elenco').select('unita,palazzina,interno');
+  UNITA_LIST=(res.data||[]).slice().sort(function(a,b){return a.unita<b.unita?-1:1});
+  return UNITA_LIST;
+}
+function findUnitaCode(pal,intr){var u=(UNITA_LIST||[]).find(function(x){return x.palazzina===pal&&String(x.interno)===String(intr)});return u?u.unita:null;}
 const meseOggi=new Date().getMonth()+1;
 const $=function(id){return document.getElementById(id)};
 function esc(s){return (s||'').replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
 function fmt(iso){var d=new Date(iso);return d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
 function oggiLabel(){return new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}
 function applicabile(s){return !s.mesi||s.mesi.indexOf(meseOggi)>=0}
-function setApp(on){$('nav').style.display=on?'flex':'none'; if(!on)$('user-badge').classList.add('hide')}
+function setApp(on){$('nav').style.display=on?'flex':'none'; $('nav-admin').classList.toggle('hide',!isAdmin); if(!on)$('user-badge').classList.add('hide')}
 
 /* ---------- AUTH / INIT ---------- */
 async function init(){
-  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8'}; $('hsub').textContent='MODALITÀ PROVA (senza login)'; showBadge(); setApp(true); renderAll(); return; }
+  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8'}; userStato='approvato'; isAdmin=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; showBadge(); setApp(true); renderAll(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
-  userId=session.user.id;
-  userNome=(session.user.user_metadata && session.user.user_metadata.nome) || null;
-  if(!userNome){ setApp(false); renderNome(); return; }
+  userId=session.user.id; userEmail=session.user.email||null;
+  var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
+  if(!unita){ setApp(false); renderSelezionaUnita(); return; }      // utente senza unità (o vecchio account)
+  var pr = await claimUnita(unita);
+  if(pr.blocked){ setApp(false); renderBloccato(pr); return; }
+  userUnita = pr.row; userNome = pr.row.nome; userStato = pr.row.stato;
+  try{ const { data:adm } = await sb.rpc('is_admin'); isAdmin = !!adm; }catch(e){ isAdmin=false; }
   $('hsub').textContent='il controllo del capitolato è di tutti';
-  userUnita = await findUnita(userNome);
   showBadge();
   await loadReports(); await loadComments(); setApp(true); renderAll();
 }
 
-async function findUnita(nome){
-  var toks=(nome||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(function(t){return t.length>2});
-  if(!toks.length) return null;
-  toks.sort(function(a,b){return b.length-a.length});
-  var res=await sb.from('proprietari').select('unita,palazzina,interno,nome').ilike('nome','%'+toks[0]+'%');
-  var data=res.data||[]; if(!data.length) return null;
-  function norm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
-  function score(pn){var pt=norm(pn).split(/[\s\-]+/);return toks.filter(function(t){return pt.some(function(p){return p.indexOf(t)>=0||t.indexOf(p)>=0})}).length}
-  data.sort(function(a,b){return score(b.nome)-score(a.nome)});
-  return score(data[0].nome)>0 ? data[0] : null;
+// Lega l'email dell'utente alla sua unità; ritorna {row, blocked, motivo}
+async function claimUnita(unita){
+  var res=await sb.from('proprietari').select('*').eq('unita',unita).maybeSingle();
+  var row=res.data;
+  if(!row) return { blocked:true, motivo:'Unità '+unita+' non trovata nell\'elenco proprietari.', row:{unita:unita} };
+  if(!row.autore_id){
+    var up=await sb.from('proprietari').update({autore_id:userId,email:userEmail,stato:'in_attesa'}).eq('unita',unita).is('autore_id',null).select().maybeSingle();
+    if(up.data) return { blocked:false, row:up.data };
+    var re=await sb.from('proprietari').select('*').eq('unita',unita).maybeSingle(); row=re.data||row;   // qualcuno ha appena richiesto
+  }
+  if(row.autore_id && row.autore_id!==userId) return { blocked:true, motivo:'L\'unità '+unita+' è già stata richiesta da un altro account. Se è la tua, contatta l\'amministratore del gruppo.', row:row };
+  return { blocked:false, row:row };
+}
+
+function statoChip(){
+  if(approvato()) return '<span class="pill" style="background:var(--okbg);color:var(--ok)">✓ verificato</span>';
+  return '<span class="pill" style="background:var(--infobg);color:var(--info)">in attesa di conferma</span>';
 }
 function showBadge(){
   var ub=$('user-badge');
   var ini=(userNome||'?').trim().split(/\s+/).map(function(w){return w[0]}).slice(0,2).join('').toUpperCase();
   var sub = userUnita ? ('Pal. '+userUnita.palazzina+' · int '+userUnita.interno) : 'unità non associata';
-  ub.innerHTML='<div style="text-align:right;line-height:1.2"><div style="font-size:15px;font-weight:500">'+esc(userNome.split(' ')[0])+'</div>'+
-    '<div style="font-size:14px;color:var(--hint)">'+sub+'</div></div>'+
-    '<div style="width:34px;height:34px;border-radius:50%;background:var(--infobg);color:var(--info);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">'+esc(ini)+'</div>';
+  ub.innerHTML='<div style="text-align:right;line-height:1.2"><div style="font-size:15px;font-weight:500">'+esc((userNome||'').split(' ')[0])+(approvato()?'':' ·')+'</div>'+
+    '<div style="font-size:14px;color:var(--hint)">'+sub+(approvato()?'':' · in attesa')+'</div></div>'+
+    '<div style="width:34px;height:34px;border-radius:50%;background:var(--'+(approvato()?'okbg':'infobg')+');color:var(--'+(approvato()?'ok':'info')+');display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">'+esc(ini)+'</div>';
   ub.classList.remove('hide');
 }
 sb.auth.onAuthStateChange(function(_e,sess){ if(sess) init(); });
 
+function unitaPickerHTML(){
+  return '<label>La tua unità</label>'+
+    '<div style="display:flex;gap:8px;margin-top:5px"><select id="u-pal" style="flex:2;margin-top:0"><option value="" disabled selected>Palazzina…</option></select>'+
+    '<select id="u-int" style="flex:1;margin-top:0" disabled><option value="" disabled selected>Int…</option></select></div>';
+}
+async function fillUnitaPicker(){
+  var list=await loadUnitaList();
+  var palSel=$('u-pal'), intSel=$('u-int'); if(!palSel) return;
+  var pals=[]; list.forEach(function(u){if(pals.indexOf(u.palazzina)<0)pals.push(u.palazzina)});
+  pals.sort();
+  pals.forEach(function(p){var o=document.createElement('option');o.value=p;o.textContent='Palazzina '+p;palSel.appendChild(o)});
+  palSel.onchange=function(){
+    intSel.innerHTML='<option value="" disabled selected>Int…</option>';
+    list.filter(function(u){return u.palazzina===palSel.value}).sort(function(a,b){return (parseInt(a.interno,10)||0)-(parseInt(b.interno,10)||0)})
+      .forEach(function(u){var o=document.createElement('option');o.value=u.interno;o.textContent='Interno '+u.interno;intSel.appendChild(o)});
+    intSel.disabled=false;
+  };
+}
 function renderLogin(){
   $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Accedi come condòmino</p>'+
-    '<p class="sub" style="margin:0 0 12px">Nome e email: ti arriva un link per entrare. Le tue verifiche saranno firmate col tuo nome e valgono come prova.</p>'+
-    '<label>Nome e cognome</label><input id="l-nome" type="text" placeholder="es. Mario Rossi" autocapitalize="words">'+
-    '<label style="margin-top:8px;display:block">Email</label><input id="l-email" type="email" placeholder="tu@email.it" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false">'+
+    '<p class="sub" style="margin:0 0 12px">Indica la <b>tua unità</b> e la tua email: ti arriva un link per entrare. L\'amministratore del gruppo conferma che sei tu — da quel momento le tue verifiche valgono come prova firmata.</p>'+
+    unitaPickerHTML()+
+    '<label style="margin-top:10px;display:block">Email</label><input id="l-email" type="email" placeholder="tu@email.it" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false">'+
     '<button class="btn-primary" style="margin-top:12px" id="l-go">Ricevi il link di accesso</button>'+
     '<p id="l-msg" class="sub" style="margin-top:10px;display:none"></p></div>'+
     '<button class="src-link" id="l-pres" style="font-size:16px;margin:2px 2px 0">Cos\'è Custodi 451? Come funziona →</button>';
   $('l-pres').onclick=function(){presentazione()};
+  fillUnitaPicker();
   if(localStorage.getItem('presVista')!=='1'){ localStorage.setItem('presVista','1'); presentazione(); }   // popup automatico al primo accesso
   $('l-go').onclick=async function(){
-    const nome=$('l-nome').value.trim(); const email=$('l-email').value.trim();
-    if(!nome){$('l-nome').focus();return} if(!email){$('l-email').focus();return}
+    const pal=$('u-pal').value, intr=$('u-int').value, email=$('l-email').value.trim();
+    if(!pal){$('u-pal').focus();return} if(!intr){$('u-int').focus();return} if(!email){$('l-email').focus();return}
+    const unita=findUnitaCode(pal,intr);
+    if(!unita){ const m=$('l-msg');m.style.display='block';m.style.color='var(--bad)';m.textContent='Unità non trovata. Controlla palazzina e interno.';return; }
     $('l-go').disabled=true; $('l-go').textContent='Invio…';
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ data:{ nome:nome }, emailRedirectTo: location.origin+location.pathname } });
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ data:{ unita:unita }, emailRedirectTo: location.origin+location.pathname } });
     const m=$('l-msg'); m.style.display='block';
     if(error){ m.style.color='var(--bad)'; m.textContent='Errore: '+error.message; $('l-go').disabled=false; $('l-go').textContent='Ricevi il link di accesso'; }
-    else { m.style.color='var(--ok)'; m.textContent='Ti ho mandato un link a '+email+'. Aprilo da questo telefono per entrare.'; $('l-go').textContent='Link inviato ✓'; }
+    else { m.style.color='var(--ok)'; m.textContent='Ti ho mandato un link a '+email+'. Aprilo da questo telefono per entrare ('+unita+').'; $('l-go').textContent='Link inviato ✓'; }
   };
 }
 
-function renderNome(){
-  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Come ti chiami?</p>'+
-    '<p class="sub" style="margin:0 0 12px">Serve solo a firmare le tue verifiche.</p>'+
-    '<label>Nome e cognome</label><input id="o-nome" type="text" placeholder="es. Mario Rossi" autocapitalize="words">'+
-    '<button class="btn-primary" style="margin-top:12px" id="o-go">Entra</button></div>';
+// utente loggato ma senza unità nei metadati (vecchio account): fagli scegliere l'unità
+function renderSelezionaUnita(){
+  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Qual è la tua unità?</p>'+
+    '<p class="sub" style="margin:0 0 12px">Serve a legare il tuo accesso alla tua unità. L\'amministratore confermerà che sei tu.</p>'+
+    unitaPickerHTML()+
+    '<button class="btn-primary" style="margin-top:12px" id="o-go">Continua</button></div>';
+  fillUnitaPicker();
   $('o-go').onclick=async function(){
-    const n=$('o-nome').value.trim(); if(!n){$('o-nome').focus();return}
+    const pal=$('u-pal').value, intr=$('u-int').value;
+    if(!pal){$('u-pal').focus();return} if(!intr){$('u-int').focus();return}
+    const unita=findUnitaCode(pal,intr);
+    if(!unita){ alert('Unità non trovata. Controlla palazzina e interno.'); return; }
     $('o-go').disabled=true;
-    const { error } = await sb.auth.updateUser({ data:{ nome:n } });
+    const { error } = await sb.auth.updateUser({ data:{ unita:unita } });
     if(error){ $('o-go').disabled=false; alert('Errore: '+error.message); return; }
     init();
   };
+}
+
+function renderBloccato(pr){
+  $('hsub').textContent='accesso non confermato';
+  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 6px;color:var(--bad)">Accesso non disponibile</p>'+
+    '<p class="sub" style="margin:0 0 12px">'+esc(pr.motivo||'Non è stato possibile associare la tua unità.')+'</p>'+
+    '<button id="b-logout">Esci e riprova con un\'altra unità</button></div>';
+  $('b-logout').onclick=async function(){ await sb.auth.signOut(); location.reload(); };
 }
 
 /* ---------- DATI ---------- */
@@ -273,7 +329,8 @@ function renderZona(){
   var v=$('view-zona');
   var apri=CAPITOLATO_VERDE.filter(function(s){return statoOf(curArea,s.id)==='problema'}).length;
   var totApri=reports.filter(isOpen).length;
-  var html='<label>Dove sei ora</label><select id="z-area">'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+a+'</option>'}).join('')+'</select>'+
+  var html=(approvato()?'':'<div class="pres-note" style="margin:0 0 11px"><b>Il tuo accesso è in attesa di conferma</b> dall\'amministratore del gruppo. Intanto puoi guardare tutto; potrai inviare segnalazioni appena sei confermato.</div>')+
+    '<label>Dove sei ora</label><select id="z-area">'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+a+'</option>'}).join('')+'</select>'+
     '<div class="metrics" style="margin-top:11px"><div class="metric"><label>Qui, aperti</label><div class="n" style="color:var(--bad)">'+apri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">problemi</span></div></div>'+
     '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
     '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:12px 2px 8px">Cosa controllare in '+esc(curArea)+' · '+oggiLabel()+'</p>';
@@ -284,12 +341,12 @@ function renderZona(){
     html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
       '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
       '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):'')+'</div></div>'+
-      '<button class="seg" data-s="'+s.id+'">Segnala</button></div>'+
+      (approvato()?'<button class="seg" data-s="'+s.id+'">Segnala</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>')+'</div>'+
       '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
   });
   v.innerHTML=html;
   $('z-area').onchange=function(e){curArea=e.target.value;renderAll()};
-  v.querySelectorAll('.seg').forEach(function(b){b.onclick=function(){openSegnala(b.dataset.s)}});
+  v.querySelectorAll('.seg:not([disabled])').forEach(function(b){b.onclick=function(){openSegnala(b.dataset.s)}});
   v.querySelectorAll('.src-link[data-cap]').forEach(function(b){b.onclick=function(){openCapitolato(b.dataset.cap)}});
 }
 
@@ -469,8 +526,58 @@ async function exportPDF(){
   if(btn){btn.disabled=false;btn.textContent='Esporta PDF firmato';}
 }
 
+/* ---------- VIEW: ADMIN (conferma condòmini) ---------- */
+var DEMO_ADMIN=[
+  {unita:'C/02',palazzina:'C',interno:'2',nome:'Vermigli Andrea',email:'andrea.v@email.it',stato:'in_attesa'},
+  {unita:'F/05',palazzina:'F',interno:'5',nome:'Giralico Maria Enrica',email:'giralico@email.it',stato:'in_attesa'},
+  {unita:'I/08',palazzina:'I',interno:'8',nome:'Lantieri Alessandro',email:'corrado@email.it',stato:'approvato'}
+];
+async function renderAdmin(){
+  var v=$('view-admin');
+  v.innerHTML='<div class="spin">Carico richieste…</div>';
+  var rows;
+  if(DEMO){ rows=DEMO_ADMIN; }
+  else {
+    var res=await sb.from('proprietari').select('*').neq('stato','libero').order('stato',{ascending:true}).order('unita',{ascending:true});
+    if(res.error){ v.innerHTML='<div class="empty">Errore: '+esc(res.error.message)+'<br><br>Hai eseguito <b>migrate_v5_verifica.sql</b> su Supabase?</div>'; return; }
+    rows=res.data||[];
+  }
+  var attesa=rows.filter(function(r){return r.stato==='in_attesa'});
+  var appr=rows.filter(function(r){return r.stato==='approvato'});
+  var rif=rows.filter(function(r){return r.stato==='rifiutato'});
+  function card(r){
+    return '<div class="card"><div class="row"><div style="flex:1;min-width:0">'+
+      '<div style="font-size:17px;font-weight:600">'+esc(r.nome||'(senza nome)')+'</div>'+
+      '<div style="font-size:15px;color:var(--hint)">Pal. '+esc(r.palazzina)+' · int '+esc(r.interno)+' · '+esc(r.email||'—')+'</div></div></div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">'+
+      (r.stato==='approvato'
+        ? '<button class="adm" data-u="'+esc(r.unita)+'" data-a="revoca" style="border-color:var(--bad);color:var(--bad)">Revoca</button>'
+        : '<button class="adm" data-u="'+esc(r.unita)+'" data-a="appr" style="border-color:var(--ok);color:var(--ok)">✓ Approva</button>'+
+          '<button class="adm" data-u="'+esc(r.unita)+'" data-a="rif" style="border-color:var(--bad);color:var(--bad)">Rifiuta</button>')+
+      '</div></div>';
+  }
+  var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 8px">Conferma condòmini</p>';
+  html+='<div class="cap-grp">In attesa ('+attesa.length+')</div>'+(attesa.length?attesa.map(card).join(''):'<div class="empty">Nessuna richiesta in attesa.</div>');
+  html+='<div class="cap-grp">Approvati ('+appr.length+')</div>'+(appr.length?appr.map(card).join(''):'<div class="empty">Nessuno ancora approvato.</div>');
+  if(rif.length) html+='<div class="cap-grp">Rifiutati ('+rif.length+')</div>'+rif.map(card).join('');
+  v.innerHTML=html;
+  v.querySelectorAll('.adm').forEach(function(b){b.onclick=async function(){
+    b.disabled=true;
+    var nuovo = b.dataset.a==='appr' ? 'approvato' : b.dataset.a==='rif' ? 'rifiutato' : 'libero';
+    if(DEMO){
+      if(nuovo==='libero'){ DEMO_ADMIN=DEMO_ADMIN.filter(function(x){return x.unita!==b.dataset.u}); }
+      else { var r=DEMO_ADMIN.find(function(x){return x.unita===b.dataset.u}); if(r)r.stato=nuovo; }
+      renderAdmin(); return;
+    }
+    var patch = nuovo==='libero' ? {stato:'libero',autore_id:null,email:null} : {stato:nuovo};
+    var up=await sb.from('proprietari').update(patch).eq('unita',b.dataset.u);
+    if(up.error){ alert('Errore: '+up.error.message); b.disabled=false; return; }
+    renderAdmin();
+  }});
+}
+
 /* ---------- NAV ---------- */
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier};
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,admin:renderAdmin};
 function renderAll(){var act=document.querySelector('#nav button.active').dataset.v;Object.keys(views).forEach(function(k){$('view-'+k).classList.toggle('hide',k!==act)});views[act]()}
 document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(){document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');renderAll()}});
 
