@@ -48,6 +48,22 @@
   .photo-thumb{width:46px;height:46px;border-radius:var(--r);object-fit:cover;border:.5px solid var(--line)}
   .empty{color:var(--hint);font-size:16px;text-align:center;padding:18px}
   .spin{color:var(--hint);font-size:16px;text-align:center;padding:24px}
+  /* fonte cliccabile → apre il contratto */
+  .src-link{background:none;border:none;padding:0;margin-top:6px;color:var(--info);font-size:14px;text-decoration:underline;text-underline-offset:2px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+  /* pagina a tutta schermo (presentazione + contratto) */
+  .page{position:fixed;inset:0;z-index:2100;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .page-in{max-width:480px;margin:0 auto;padding:18px 16px calc(28px + env(safe-area-inset-bottom,0px))}
+  .page-top{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;gap:10px;padding:6px 0 12px;margin-bottom:6px;border-bottom:.5px solid var(--line)}
+  .page-x{flex:none;width:40px;height:40px;border-radius:50%;border:.5px solid var(--line2);background:var(--surface);font-size:22px;line-height:1;padding:0}
+  .page-h{font-size:20px;font-weight:700;margin:0}
+  .cap-item{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:13px 14px;margin-bottom:9px;scroll-margin-top:64px}
+  .cap-item.hl{border-color:var(--ok);box-shadow:0 0 0 2px var(--okbg);animation:hlpulse 1.6s ease-out}
+  @keyframes hlpulse{0%{box-shadow:0 0 0 3px var(--ok)}100%{box-shadow:0 0 0 2px var(--okbg)}}
+  .cap-grp{font-size:14px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--hint);margin:18px 2px 8px}
+  .lead{font-size:17px;line-height:1.55;color:var(--txt);margin:0 0 12px}
+  .pres-step{display:flex;gap:11px;align-items:flex-start;margin:0 0 12px}
+  .pres-n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--okbg);color:var(--ok);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .pres-note{background:var(--infobg);border-radius:var(--r2);padding:13px 14px;font-size:16px;line-height:1.5;color:var(--txt);margin:14px 0}
 </style>
 </head>
 <body>
@@ -71,8 +87,8 @@
   <button data-v="dossier"><span class="ic">▤</span>Dossier</button>
 </nav>
 
-<script src="config.js"></script>
-<script src="capitolato-verde.js"></script>
+<script src="config.js?v=2"></script>
+<script src="capitolato-verde.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -130,7 +146,10 @@ function renderLogin(){
     '<label>Nome e cognome</label><input id="l-nome" type="text" placeholder="es. Mario Rossi" autocapitalize="words">'+
     '<label style="margin-top:8px;display:block">Email</label><input id="l-email" type="email" placeholder="tu@email.it" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false">'+
     '<button class="btn-primary" style="margin-top:12px" id="l-go">Ricevi il link di accesso</button>'+
-    '<p id="l-msg" class="sub" style="margin-top:10px;display:none"></p></div>';
+    '<p id="l-msg" class="sub" style="margin-top:10px;display:none"></p></div>'+
+    '<button class="src-link" id="l-pres" style="font-size:16px;margin:2px 2px 0">Cos\'è Custodi 451? Come funziona →</button>';
+  $('l-pres').onclick=function(){presentazione()};
+  if(localStorage.getItem('presVista')!=='1'){ localStorage.setItem('presVista','1'); presentazione(); }   // popup automatico al primo accesso
   $('l-go').onclick=async function(){
     const nome=$('l-nome').value.trim(); const email=$('l-email').value.trim();
     if(!nome){$('l-nome').focus();return} if(!email){$('l-email').focus();return}
@@ -191,6 +210,64 @@ function openImage(url){
   document.body.appendChild(ov);
 }
 
+/* ---------- PAGINA: PRESENTAZIONE ---------- */
+function presentazione(){
+  var p=document.createElement('div'); p.className='page'; p.id='page-pres';
+  p.innerHTML='<div class="page-in">'+
+    '<div class="page-top"><button class="page-x" id="pres-x">×</button><h2 class="page-h">Cos\'è Custodi 451</h2></div>'+
+    '<p class="lead">Il nostro è uno dei condomìni più belli di Roma. Per mantenerlo servono dei lavori: sono <b>scritti nel contratto</b> che paghiamo (il capitolato del verde). <b>Custodi 451</b> serve a verificare, <b>tutti insieme</b>, che quei lavori vengano fatti davvero.</p>'+
+    '<div class="pres-step"><div class="pres-n">1</div><div><b>Dove sei</b><br><span class="sub">Scegli la zona in cui ti trovi (la tua palazzina, la piscina, il viale…).</span></div></div>'+
+    '<div class="pres-step"><div class="pres-n">2</div><div><b>Cosa dovrebbe essere fatto</b><br><span class="sub">L\'app ti mostra le voci del capitolato previste per oggi in quella zona, con il punto del contratto.</span></div></div>'+
+    '<div class="pres-step"><div class="pres-n">3</div><div><b>Segnala</b><br><span class="sub">Tocca «Fatto» o «Problema», aggiungi una foto e una nota. La segnalazione è firmata col tuo nome e con la data.</span></div></div>'+
+    '<div class="pres-note">Ogni voce dell\'app è presa <b>dal contratto</b>, non da un\'opinione. Una foto datata e firmata vale come <b>prova</b>: mette a confronto ciò che è <b>dovuto</b> (capitolato) con ciò che è <b>constatato</b> (la realtà).</div>'+
+    '<p class="lead" style="font-size:16px;color:var(--muted)">Non è una denuncia e non è una cosa personale: è uno strumento di <b>trasparenza, a favore di tutta la comunità</b>. Più siamo a guardare, più la cura del verde torna ad essere di tutti.</p>'+
+    '<button class="src-link" id="pres-cap" style="font-size:16px;margin:6px 0 16px">📄 Sfoglia il contratto del verde (capitolato House &amp; Garden)</button>'+
+    '<button class="btn-primary" id="pres-go">Ho capito, inizia</button>'+
+    '</div>';
+  document.body.appendChild(p);
+  function close(){p.remove()}
+  $('pres-x').onclick=close; $('pres-go').onclick=close;
+  $('pres-cap').onclick=function(){openCapitolato();};
+}
+
+/* ---------- PAGINA: CONTRATTO / CAPITOLATO ---------- */
+function openCapitolato(sid){
+  var ex=document.getElementById('page-cap'); if(ex) ex.remove();
+  // raggruppa le voci per frequenza, come nel capitolato
+  var GRP=[
+    ['Giornaliero',      ['irrigazione','prato_piscina']],
+    ['Settimanale',      ['strade','tennis']],
+    ['Ogni 10 giorni',   ['rasatura']],
+    ['Periodico stagionale',['innaffiatura_pilotis','raccolta_foglie','estirpazione']],
+    ['2 volte l\'anno',  ['ricostruzione_manto','concimazione']],
+    ['Trimestrale (3×/anno)',['siepi']],
+    ['Annuale',          ['arieggiatura','potatura_alberi','lampioni']],
+    ['Manutenzione impianto irrigazione',['manut_irrigazione']],
+    ['Disinfestazione / Derattizzazione',['disinfestazione','derattizzazione']]
+  ];
+  function byId(id){return CAPITOLATO_VERDE.find(function(x){return x.id===id})}
+  var body='';
+  GRP.forEach(function(g){
+    body+='<div class="cap-grp">'+esc(g[0])+'</div>';
+    g[1].forEach(function(id){var s=byId(id); if(!s)return;
+      body+='<div class="cap-item" id="cap-'+id+'">'+
+        '<div style="font-weight:600;font-size:17px">'+esc(s.nome)+'</div>'+
+        '<div style="font-size:15px;color:var(--hint);margin:2px 0 8px">'+esc(s.freq)+' · '+esc(s.fonte)+'</div>'+
+        '<div style="font-size:16px;line-height:1.55">'+esc(s.testo||'')+'</div></div>';
+    });
+  });
+  var p=document.createElement('div'); p.className='page'; p.id='page-cap';
+  p.innerHTML='<div class="page-in">'+
+    '<div class="page-top"><button class="page-x" id="cap-x">×</button><h2 class="page-h">Contratto del verde</h2></div>'+
+    '<p class="lead" style="font-size:16px;color:var(--muted)">Contratto <b>House &amp; Garden S.r.l.</b> — capitolato del verde (pagg. 5–7). Canone <b>€ 48.250 + IVA / anno</b> (verde € 44.400 + disinfestazione € 1.850 + derattizzazione € 2.000). Ogni voce qui sotto è un <b>obbligo contrattuale</b>: se non è eseguita, è un inadempimento al contratto.</p>'+
+    body+
+    '<p class="sub" style="margin-top:14px">Stipulato il 25/09/2017. Testo riportato fedelmente dal capitolato allegato al contratto; per ogni contestazione fa fede il documento originale, depositato presso l\'amministrazione.</p>'+
+    '</div>';
+  document.body.appendChild(p);
+  $('cap-x').onclick=function(){p.remove()};
+  if(sid){ var el=document.getElementById('cap-'+sid); if(el){ el.scrollIntoView({block:'start'}); el.classList.add('hl'); } }
+}
+
 /* ---------- VIEW: ZONA ---------- */
 function renderZona(){
   var v=$('view-zona');
@@ -207,11 +284,13 @@ function renderZona(){
     html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
       '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
       '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):'')+'</div></div>'+
-      '<button class="seg" data-s="'+s.id+'">Segnala</button></div><div class="src" style="margin-top:6px">'+esc(s.fonte)+'</div></div>';
+      '<button class="seg" data-s="'+s.id+'">Segnala</button></div>'+
+      '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
   });
   v.innerHTML=html;
   $('z-area').onchange=function(e){curArea=e.target.value;renderAll()};
   v.querySelectorAll('.seg').forEach(function(b){b.onclick=function(){openSegnala(b.dataset.s)}});
+  v.querySelectorAll('.src-link[data-cap]').forEach(function(b){b.onclick=function(){openCapitolato(b.dataset.cap)}});
 }
 
 /* ---------- SEGNALA ---------- */
@@ -300,7 +379,8 @@ function renderDossier(){
     html+='<div class="card"><div style="font-weight:600;font-size:17px">'+esc(s?s.nome:sid)+'</div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:7px 0">'+
       '<span class="pill" style="background:var(--todobg);color:var(--todo)">dovuto: '+esc(s?s.freq:'')+'</span>'+
-      '<span class="pill" style="background:var(--badbg);color:var(--bad)">! '+rs.length+' segnalazioni · '+esc(rs[0].fonte)+'</span></div>';
+      '<span class="pill" style="background:var(--badbg);color:var(--bad)">! '+rs.length+' segnalazioni</span></div>'+
+      '<button class="src-link" data-cap="'+sid+'">📄 '+esc(rs[0].fonte)+'</button>';
     rs.forEach(function(r){
       var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
       var mine=(r.autore_id && r.autore_id===userId);
@@ -321,6 +401,7 @@ function renderDossier(){
     html+='</div>';
   });
   v.innerHTML=html+'<button class="btn-primary" id="dz-export" style="margin-top:6px">Esporta PDF firmato</button>';
+  v.querySelectorAll('.src-link[data-cap]').forEach(function(b){b.onclick=function(){openCapitolato(b.dataset.cap)}});
   v.querySelectorAll('.th-tog').forEach(function(b){b.onclick=function(){var rid=b.dataset.rid;var t=v.querySelector('.th[data-tid="'+rid+'"]');var show=t.style.display==='none';t.style.display=show?'block':'none';openThreads[rid]=show;}});
   v.querySelectorAll('.th-send').forEach(function(b){b.onclick=async function(){var inp=v.querySelector('.th-in[data-rid="'+b.dataset.rid+'"]');if(!inp.value.trim())return;openThreads[b.dataset.rid]=true;var ok=await addComment(b.dataset.rid,inp.value);if(ok)renderDossier();}});
   v.querySelectorAll('.dz-img').forEach(function(b){b.onclick=function(){openImage(b.dataset.img)}});
