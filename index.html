@@ -103,7 +103,7 @@ function approvato(){return userStato==='approvato'}
 async function loadUnitaList(){
   if(UNITA_LIST) return UNITA_LIST;
   if(DEMO){ UNITA_LIST=[{unita:'I/08',palazzina:'I',interno:'8'}]; return UNITA_LIST; }
-  var res=await sb.from('unita_elenco').select('unita,palazzina,interno');
+  var res=await sb.from('unita_pubbliche').select('unita,palazzina,interno');
   UNITA_LIST=(res.data||[]).slice().sort(function(a,b){return a.unita<b.unita?-1:1});
   return UNITA_LIST;
 }
