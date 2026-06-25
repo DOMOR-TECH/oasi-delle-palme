@@ -30,3 +30,6 @@ python3 -m http.server 8451
 3. **Export PDF** del dossier (firmato, con foto e date).
 4. **GDPR**: informativa, foto delle parti comuni (non persone), minimizzazione.
 5. Estendere oltre il verde (scale/piscina/impianti) — **solo dopo** aver estratto i rispettivi capitolati verbatim dai contratti (vedi `../CAPITOLATO_SEED.md`).
+
+
+## TEST
