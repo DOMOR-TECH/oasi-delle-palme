@@ -362,7 +362,7 @@ async function exportPDF(){
         y+=12+lines.length*13+12;
         if(r.foto_url){ try{
           var im=await loadImg(r.foto_url);
-          var iw=W-2*M, ih=iw*im.h/im.w;             // foto a tutta larghezza, proporzioni reali
+          var iw=(W-2*M)*0.5, ih=iw*im.h/im.w;       // foto al 50% della larghezza utile, proporzioni reali
           var avail=H-54-y-16;                        // spazio rimasto sotto y in questa pagina
           if(ih>avail){ doc.addPage(); y=54; avail=H-54-y-16; }
           if(ih>avail){ var sc=avail/ih; ih=avail; iw=iw*sc; }   // foto verticale più alta della pagina: riduci in proporzione
