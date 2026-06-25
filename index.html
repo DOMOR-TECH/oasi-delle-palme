@@ -186,7 +186,12 @@ function userMenu(){
 async function eliminaAccount(menuEl){
   if(!confirm('Vuoi eliminare il tuo account?\n\nIl tuo accesso verrà chiuso e la tua unità liberata. Le segnalazioni che hai inviato RESTANO (firmate col tuo nome).')) return;
   if(DEMO){ alert('In modalità prova non c\'è un account da eliminare.'); return; }
-  // libera la propria unità (le segnalazioni restano: autore_nome è salvato)
+  // 1) cancellazione completa via edge function (login Auth + appartamento), se attiva
+  try{
+    var r=await sb.functions.invoke('elimina-account');
+    if(r && !r.error){ await sb.auth.signOut(); alert('Account eliminato. Le tue segnalazioni restano nel dossier. A presto!'); location.reload(); return; }
+  }catch(e){ /* function non ancora deployata → fallback */ }
+  // 2) fallback: libera almeno l'appartamento (il login Auth resta finché non deployi la edge function)
   var up=await sb.from('proprietari').update({stato:'libero',autore_id:null,email:null}).eq('autore_id',userId);
   if(up.error){ alert('Errore: '+up.error.message+'\n\nServe la migrazione migrate_v7 sul database.'); return; }
   await sb.auth.signOut();
