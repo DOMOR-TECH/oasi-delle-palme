@@ -588,15 +588,18 @@ async function renderAdmin(){
   var appr=rows.filter(function(r){return r.stato==='approvato'});
   var rif=rows.filter(function(r){return r.stato==='rifiutato'});
   function card(r){
+    var u=esc(r.unita);
+    var bAppr='<button class="adm" data-u="'+u+'" data-a="appr" style="border-color:var(--ok);color:var(--ok)">✓ Approva</button>';
+    var bRif ='<button class="adm" data-u="'+u+'" data-a="rif" style="border-color:var(--bad);color:var(--bad)">Rifiuta</button>';
+    var bRimuovi='<button class="adm" data-u="'+u+'" data-a="revoca" style="color:var(--muted)">Rimuovi</button>';   // libera l'unità + toglie l'entry
+    var bRevoca='<button class="adm" data-u="'+u+'" data-a="revoca" style="border-color:var(--bad);color:var(--bad)">Revoca</button>';
+    var actions = r.stato==='approvato' ? bRevoca
+                : r.stato==='rifiutato' ? bAppr+bRimuovi
+                : bAppr+bRif+bRimuovi;   // in attesa: Approva · Rifiuta · Rimuovi
     return '<div class="card"><div class="row"><div style="flex:1;min-width:0">'+
       '<div style="font-size:17px;font-weight:600">'+esc(r.nome||'(senza nome)')+'</div>'+
       '<div style="font-size:15px;color:var(--hint)">Pal. '+esc(r.palazzina)+' · int '+esc(r.interno)+' · '+esc(r.email||'—')+'</div></div></div>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">'+
-      (r.stato==='approvato'
-        ? '<button class="adm" data-u="'+esc(r.unita)+'" data-a="revoca" style="border-color:var(--bad);color:var(--bad)">Revoca</button>'
-        : '<button class="adm" data-u="'+esc(r.unita)+'" data-a="appr" style="border-color:var(--ok);color:var(--ok)">✓ Approva</button>'+
-          '<button class="adm" data-u="'+esc(r.unita)+'" data-a="rif" style="border-color:var(--bad);color:var(--bad)">Rifiuta</button>')+
-      '</div></div>';
+      '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">'+actions+'</div></div>';
   }
   var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 8px">Conferma condòmini</p>';
   html+='<div class="cap-grp">In attesa ('+attesa.length+')</div>'+(attesa.length?attesa.map(card).join(''):'<div class="empty">Nessuna richiesta in attesa.</div>');
