@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1d9e75">
 <link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Custodi 451">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Custodi 451</title>
 <style>
   :root{
@@ -384,6 +388,63 @@ document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){})}
 init();
+</script>
+
+<style>
+#installbar{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(18px);z-index:1500;opacity:0;pointer-events:none;transition:.25s;max-width:94%}
+#installbar.on{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+#installwrap{display:flex;align-items:center;gap:4px;background:#1d9e75;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+#installbtn{background:none;color:#fff;border:none;border-radius:999px;padding:14px 18px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap}
+#installx{background:none;border:none;color:rgba(255,255,255,.85);font-size:20px;line-height:1;padding:0 16px 0 0;cursor:pointer}
+.iosguide{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px}
+.ig-card{background:#fff;border-radius:16px;padding:22px;max-width:420px;width:100%;color:#1c1c1a;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.ig-h{font-size:20px;font-weight:700;margin-bottom:10px}
+.iosguide p{font-size:16px;margin:0 0 8px}
+.iosguide ol{margin:6px 0 4px;padding-left:22px}
+.iosguide li{font-size:17px;line-height:1.75;margin-bottom:8px}
+.ig-ic{display:inline-flex;vertical-align:middle;background:#e6f1fb;border-radius:7px;padding:3px;margin:0 2px}
+.ig-x{margin-top:14px;width:100%;background:#1d9e75;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
+</style>
+<script>
+/* Installa sulla Home — Android: prompt nativo · iOS: guida (Apple non consente install automatica) */
+(function(){
+  var standalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  if(standalone)return;                 // già installata: niente bottone
+  if(localStorage.getItem('installHidden')==='1')return;
+  var ua=navigator.userAgent||'';
+  var isIOS=/iphone|ipad|ipod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  var isSafari=/safari/i.test(ua)&&!/(chrome|crios|fxios|edgios|android)/i.test(ua);
+  var deferred=null;
+  function build(){
+    if(document.getElementById('installbar'))return;
+    var bar=document.createElement('div');bar.id='installbar';
+    bar.innerHTML='<div id="installwrap"><button id="installbtn">📲 Installa l\'app sul telefono</button><button id="installx" title="Nascondi">×</button></div>';
+    document.body.appendChild(bar);
+    document.getElementById('installx').onclick=function(){bar.classList.remove('on');localStorage.setItem('installHidden','1');};
+    document.getElementById('installbtn').onclick=function(){
+      if(deferred){deferred.prompt();deferred.userChoice.then(function(r){if(r&&r.outcome==='accepted'){bar.classList.remove('on');}deferred=null;});return;}
+      iosGuide(!isIOS);   // iOS o fallback desktop: mostra istruzioni
+    };
+    return bar;
+  }
+  function show(){var b=build();setTimeout(function(){b.classList.add('on');},30);}
+  function iosGuide(generic){
+    var ov=document.createElement('div');ov.className='iosguide';
+    var share='<span class="ig-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#185fa5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 11v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>';
+    var plus='<span class="ig-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#185fa5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg></span>';
+    ov.innerHTML='<div class="ig-card"><div class="ig-h">Aggiungi alla schermata Home</div>'+
+      (generic?'<p>Apri questa pagina su <b>Safari</b> dal tuo iPhone, poi segui questi passi:</p>':'')+
+      '<ol><li>Tocca il pulsante <b>Condividi</b> '+share+' in basso</li>'+
+      '<li>Scorri e scegli <b>«Aggiungi a Home»</b> '+plus+'</li>'+
+      '<li>Tocca <b>Aggiungi</b> in alto a destra</li></ol>'+
+      '<button class="ig-x">Ho capito</button></div>';
+    ov.onclick=function(e){if(e.target===ov||e.target.classList.contains('ig-x'))ov.remove();};
+    document.body.appendChild(ov);
+  }
+  window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;show();});  // Android/Chrome
+  window.addEventListener('appinstalled',function(){var b=document.getElementById('installbar');if(b)b.classList.remove('on');deferred=null;});
+  if(isIOS&&isSafari){window.addEventListener('load',show);}                                          // iPhone Safari
+})();
 </script>
 </body>
 </html>
