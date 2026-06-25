@@ -81,6 +81,7 @@
   <div id="view-zona"><div class="spin">Carico…</div></div>
   <div id="view-bacheca" class="hide"></div>
   <div id="view-dossier" class="hide"></div>
+  <div id="view-voti" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
 
@@ -88,6 +89,7 @@
   <button data-v="zona" class="active"><span class="ic">◎</span>Controlla</button>
   <button data-v="bacheca"><span class="ic">▦</span>Bacheca</button>
   <button data-v="dossier"><span class="ic">▤</span>Dossier</button>
+  <button data-v="voti"><span class="ic">☑</span>Voti</button>
   <button data-v="admin" id="nav-admin" class="hide"><span class="ic">★</span>Admin</button>
 </nav>
 
@@ -131,7 +133,7 @@ async function updateAdminBadge(){
 
 /* ---------- AUTH / INIT ---------- */
 async function init(){
-  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8'}; userStato='approvato'; isAdmin=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; showBadge(); setApp(true); renderAll(); updateAdminBadge(); return; }
+  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; showBadge(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -686,8 +688,94 @@ async function renderAdmin(){
   }});
 }
 
+/* ---------- VIEW: VOTI (sondaggi informali, pesati per millesimi, palesi) ---------- */
+var DEMO_SONDAGGI=[{id:'s1',domanda:'Sei a favore di valutare il cambio di amministratore per il 2027?',opzioni:['Sì','No','Astenuto'],chiuso:false,autore_nome:'Admin'}];
+var DEMO_VOTI=[
+  {sondaggio_id:'s1',unita:'A/07',autore_id:'u1',autore_nome:'Romani Barbara',millesimi:6.8,opzione:'Sì'},
+  {sondaggio_id:'s1',unita:'F/03',autore_id:'u2',autore_nome:'Bruschi - Caratelli',millesimi:5.7,opzione:'Sì'},
+  {sondaggio_id:'s1',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:4.9,opzione:'No'}
+];
+async function renderVoti(){
+  var v=$('view-voti'); v.innerHTML='<div class="spin">Carico…</div>';
+  var sondaggi, voti;
+  if(DEMO){ sondaggi=DEMO_SONDAGGI; voti=DEMO_VOTI; }
+  else {
+    var rs=await sb.from('sondaggi').select('*').order('created_at',{ascending:false});
+    if(rs.error){ v.innerHTML='<div class="empty">Errore: '+esc(rs.error.message)+'<br><br>Hai eseguito <b>migrate_v9_votazione.sql</b>?</div>'; return; }
+    sondaggi=rs.data||[];
+    var rv=await sb.from('voti').select('*'); voti=rv.error?[]:(rv.data||[]);
+  }
+  var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 10px">Sondaggi della comunità</p>';
+  if(isAdmin){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">+ Nuovo sondaggio</button>'; }
+  if(!sondaggi.length){ html+='<div class="empty">Nessun sondaggio aperto.'+(isAdmin?' Creane uno col pulsante qui sopra.':'')+'</div>'; }
+  sondaggi.forEach(function(s){
+    var sv=voti.filter(function(x){return x.sondaggio_id===s.id});
+    var mine=sv.find(function(x){return x.autore_id===userId});
+    var opzioni = Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto']);
+    var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
+    html+='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(s.domanda)+'</div>'+
+      '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(s.chiuso?' · CHIUSO':'')+'</div>';
+    if(!mine && !s.chiuso && approvato()){
+      html+='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px">'+opzioni.map(function(o){return '<button class="vt-vote" data-s="'+esc(s.id)+'" data-o="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div>';
+    } else if(!approvato() && !mine && !s.chiuso){
+      html+='<div class="sub" style="margin-bottom:4px">Per votare devi essere un condòmino confermato.</div>';
+    }
+    opzioni.forEach(function(o){
+      var ov=sv.filter(function(x){return x.opzione===o});
+      var mm=ov.reduce(function(t,x){return t+(+x.millesimi||0)},0);
+      var pct=totMm>0?Math.round(mm/totMm*100):0;
+      html+='<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:15px;gap:8px">'+
+        '<span>'+(mine&&mine.opzione===o?'<b>'+esc(o)+' ✓ (il tuo voto)</b>':esc(o))+'</span>'+
+        '<span style="color:var(--hint);white-space:nowrap">'+ov.length+' u · '+mm.toFixed(1).replace('.',',')+' mm</span></div>'+
+        '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--ok)"></div></div>'+
+        (ov.length?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+ov.map(function(x){return esc(x.autore_nome)}).join(', ')+'</div>':'')+'</div>';
+    });
+    if(isAdmin){ html+='<div style="display:flex;gap:7px;margin-top:12px">'+
+      '<button class="vt-close" data-s="'+esc(s.id)+'" data-chiuso="'+(s.chiuso?'1':'0')+'" style="font-size:14px">'+(s.chiuso?'Riapri':'Chiudi')+'</button>'+
+      '<button class="vt-del" data-s="'+esc(s.id)+'" style="font-size:14px;border-color:var(--bad);color:var(--bad)">Elimina</button></div>'; }
+    html+='</div>';
+  });
+  v.innerHTML=html;
+  v.querySelectorAll('.vt-vote').forEach(function(b){b.onclick=function(){votaSondaggio(b.dataset.s,b.dataset.o)}});
+  if(isAdmin){
+    var nb=$('vt-new'); if(nb) nb.onclick=nuovoSondaggio;
+    v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=function(){toggleSondaggio(b.dataset.s,b.dataset.chiuso!=='1')}});
+    v.querySelectorAll('.vt-del').forEach(function(b){b.onclick=function(){eliminaSondaggio(b.dataset.s)}});
+  }
+}
+async function votaSondaggio(sid,opzione){
+  if(DEMO){ DEMO_VOTI=DEMO_VOTI.filter(function(x){return !(x.sondaggio_id===sid&&x.autore_id===userId)}); DEMO_VOTI.push({sondaggio_id:sid,unita:userUnita.unita,autore_id:userId,autore_nome:userNome,millesimi:userUnita.millesimi||0,opzione:opzione}); renderVoti(); return; }
+  if(!approvato()){ alert('Devi essere un condòmino confermato per votare.'); return; }
+  var up=await sb.from('voti').upsert({ sondaggio_id:sid, unita:userUnita.unita, autore_id:userId, autore_nome:userNome, millesimi:(userUnita.millesimi||0), opzione:opzione },{onConflict:'sondaggio_id,unita'});
+  if(up.error){ alert('Errore: '+up.error.message); return; }
+  renderVoti();
+}
+async function nuovoSondaggio(){
+  var d=prompt('Domanda del sondaggio:'); if(!d||!d.trim())return;
+  var opz=prompt('Opzioni separate da virgola:','Sì, No, Astenuto');
+  var opzioni=(opz&&opz.trim())?opz.split(',').map(function(s){return s.trim()}).filter(Boolean):['Sì','No','Astenuto'];
+  if(opzioni.length<2){ alert('Servono almeno 2 opzioni.'); return; }
+  if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d.trim(),opzioni:opzioni,chiuso:false,autore_nome:userNome}); renderVoti(); return; }
+  var up=await sb.from('sondaggi').insert({domanda:d.trim(),opzioni:opzioni,autore_nome:userNome});
+  if(up.error){ alert('Errore: '+up.error.message); return; }
+  renderVoti();
+}
+async function toggleSondaggio(sid,chiudi){
+  if(DEMO){ var s=DEMO_SONDAGGI.find(function(x){return x.id===sid}); if(s)s.chiuso=chiudi; renderVoti(); return; }
+  var up=await sb.from('sondaggi').update({chiuso:chiudi}).eq('id',sid);
+  if(up.error){ alert('Errore: '+up.error.message); return; }
+  renderVoti();
+}
+async function eliminaSondaggio(sid){
+  if(!confirm('Eliminare questo sondaggio e tutti i suoi voti?')) return;
+  if(DEMO){ DEMO_SONDAGGI=DEMO_SONDAGGI.filter(function(x){return x.id!==sid}); DEMO_VOTI=DEMO_VOTI.filter(function(x){return x.sondaggio_id!==sid}); renderVoti(); return; }
+  var up=await sb.from('sondaggi').delete().eq('id',sid);
+  if(up.error){ alert('Errore: '+up.error.message); return; }
+  renderVoti();
+}
+
 /* ---------- NAV ---------- */
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,admin:renderAdmin};
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,admin:renderAdmin};
 function renderAll(){var act=document.querySelector('#nav button.active').dataset.v;Object.keys(views).forEach(function(k){$('view-'+k).classList.toggle('hide',k!==act)});views[act]()}
 document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(){document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');renderAll()}});
 
