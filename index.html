@@ -649,11 +649,11 @@ async function renderAdmin(){
   var appr=rows.filter(function(r){return r.stato==='approvato'});
   var rif=rows.filter(function(r){return r.stato==='rifiutato'});
   function card(r){
-    var u=esc(r.unita);
-    var bAppr='<button class="adm" data-u="'+u+'" data-a="appr" style="border-color:var(--ok);color:var(--ok)">✓ Approva</button>';
-    var bRif ='<button class="adm" data-u="'+u+'" data-a="rif" style="border-color:var(--bad);color:var(--bad)">Rifiuta</button>';
-    var bRimuovi='<button class="adm" data-u="'+u+'" data-a="revoca" style="color:var(--muted)">Rimuovi</button>';   // libera l'unità + toglie l'entry
-    var bRevoca='<button class="adm" data-u="'+u+'" data-a="revoca" style="border-color:var(--bad);color:var(--bad)">Revoca</button>';
+    var u=esc(r.unita), nm=esc(r.nome||'');
+    var bAppr='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="appr" style="border-color:var(--ok);color:var(--ok)">✓ Approva</button>';
+    var bRif ='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="rif" style="border-color:var(--bad);color:var(--bad)">Rifiuta</button>';
+    var bRimuovi='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="revoca" style="color:var(--muted)">Rimuovi</button>';   // libera l'unità + toglie l'entry
+    var bRevoca='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="revoca" style="border-color:var(--bad);color:var(--bad)">Revoca</button>';
     var actions = r.stato==='approvato' ? bRevoca
                 : r.stato==='rifiutato' ? bAppr+bRimuovi
                 : bAppr+bRif+bRimuovi;   // in attesa: Approva · Rifiuta · Rimuovi
@@ -668,6 +668,9 @@ async function renderAdmin(){
   if(rif.length) html+='<div class="cap-grp">Rifiutati ('+rif.length+')</div>'+rif.map(card).join('');
   v.innerHTML=html;
   v.querySelectorAll('.adm').forEach(function(b){b.onclick=async function(){
+    if(b.dataset.a==='revoca'){
+      if(!confirm('Rimuovere '+(b.dataset.nome||'questo utente')+'?\n\nL\'unità tornerà libera e il suo accesso verrà chiuso. Le segnalazioni che ha inviato RESTANO.')) return;
+    }
     b.disabled=true;
     var nuovo = b.dataset.a==='appr' ? 'approvato' : b.dataset.a==='rif' ? 'rifiutato' : 'libero';
     if(DEMO){
