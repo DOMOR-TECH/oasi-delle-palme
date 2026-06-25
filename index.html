@@ -360,7 +360,22 @@ function openCapitolato(sid){
     '<p class="lead" style="font-size:16px;color:var(--muted)">Contratto <b>House &amp; Garden S.r.l.</b> — capitolato del verde (pagg. 5–7). Canone <b>€ 48.250 + IVA / anno</b> (verde € 44.400 + disinfestazione € 1.850 + derattizzazione € 2.000). Ogni voce qui sotto è un <b>obbligo contrattuale</b>: se non è eseguita, è un inadempimento al contratto.</p>'+
     '<button class="btn-primary" id="cap-pdf" style="margin:0 0 14px">📄 Scarica il contratto originale (PDF)</button>'+
     body+
-    '<p class="sub" style="margin-top:14px">Stipulato il 25/09/2017. Testo riportato fedelmente dal capitolato allegato al contratto; per ogni contestazione fa fede il documento originale, depositato presso l\'amministrazione.</p>'+
+    '<div class="cap-grp">Art. 5 — Controllo e penali</div>'+
+    '<div class="cap-item">'+
+      '<div style="font-weight:600;font-size:17px">Cosa prevede il contratto se i lavori non vengono fatti</div>'+
+      '<div style="font-size:16px;line-height:1.55;margin-top:8px">'+
+      'Il contratto (Art. 5) dà al condominio strumenti precisi, <b>a costo zero</b>:'+
+      '<ul style="padding-left:20px;margin:8px 0">'+
+        '<li><b>Controllo con foto</b> — diritto di verificare l\'esecuzione anche con documentazione fotografica (è ciò che fa questa app).</li>'+
+        '<li><b>Penale € 30/giorno</b> per ogni ritardo non giustificato (le tempistiche del capitolato sono dichiarate «essenziali»).</li>'+
+        '<li><b>Penalità ≥ € 100</b> per ogni inadempimento accertato.</li>'+
+        '<li><b>Sospensione dei pagamenti</b> in caso di inadempimenti reiterati.</li>'+
+        '<li><b>Esecuzione in danno</b> — far fare i lavori ad altra ditta a spese di House &amp; Garden, trattenendo le somme dal canone.</li>'+
+        '<li><b>Risoluzione del contratto</b> ed eventuale risarcimento danni.</li>'+
+      '</ul>'+
+      'Le difformità vanno <b>contestate per iscritto</b>: la ditta deve rimediare subito o giustificare per iscritto.</div>'+
+    '</div>'+
+    '<p class="sub" style="margin-top:14px">Stipulato il 25/09/2017. Testo riportato fedelmente dal capitolato e dall\'Art. 5 del contratto; per ogni contestazione fa fede il documento originale, scaricabile qui sopra.</p>'+
     '</div>';
   document.body.appendChild(p);
   $('cap-x').onclick=function(){p.remove()};
