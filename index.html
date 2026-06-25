@@ -167,7 +167,7 @@ function unitaPickerHTML(){
     '<div style="display:flex;gap:8px;margin-top:5px"><select id="u-pal" style="flex:2;margin-top:0"><option value="" disabled selected>Palazzina…</option></select>'+
     '<select id="u-int" style="flex:1;margin-top:0" disabled><option value="" disabled selected>Int…</option></select></div>';
 }
-async function fillUnitaPicker(){
+async function fillUnitaPicker(pre){
   var list=await loadUnitaList();
   var palSel=$('u-pal'), intSel=$('u-int'); if(!palSel) return;
   var pals=[]; list.forEach(function(u){if(pals.indexOf(u.palazzina)<0)pals.push(u.palazzina)});
@@ -179,6 +179,7 @@ async function fillUnitaPicker(){
       .forEach(function(u){var o=document.createElement('option');o.value=u.interno;o.textContent='Interno '+u.interno;intSel.appendChild(o)});
     intSel.disabled=false;
   };
+  if(pre){ var u=list.find(function(x){return x.unita===pre}); if(u){ palSel.value=u.palazzina; palSel.onchange(); intSel.value=u.interno; } }   // pre-compila (conferma dopo il login)
 }
 function renderLogin(){
   $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Accedi come condòmino</p>'+
@@ -196,8 +197,9 @@ function renderLogin(){
     if(!pal){$('u-pal').focus();return} if(!intr){$('u-int').focus();return} if(!email){$('l-email').focus();return}
     const unita=findUnitaCode(pal,intr);
     if(!unita){ const m=$('l-msg');m.style.display='block';m.style.color='var(--bad)';m.textContent='Unità non trovata. Controlla palazzina e interno.';return; }
+    try{ localStorage.setItem('pendingUnita', unita); }catch(e){}   // riconfermata dopo il login
     $('l-go').disabled=true; $('l-go').textContent='Invio…';
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ data:{ unita:unita }, emailRedirectTo: location.origin+location.pathname } });
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin+location.pathname } });
     const m=$('l-msg'); m.style.display='block';
     if(error){ m.style.color='var(--bad)'; m.textContent='Errore: '+error.message; $('l-go').disabled=false; $('l-go').textContent='Ricevi il link di accesso'; }
     else { m.style.color='var(--ok)'; m.textContent='Ti ho mandato un link a '+email+'. Aprilo da questo telefono per entrare ('+unita+').'; $('l-go').textContent='Link inviato ✓'; }
@@ -206,11 +208,12 @@ function renderLogin(){
 
 // utente loggato ma senza unità nei metadati (vecchio account): fagli scegliere l'unità
 function renderSelezionaUnita(){
-  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Qual è la tua unità?</p>'+
-    '<p class="sub" style="margin:0 0 12px">Serve a legare il tuo accesso alla tua unità. L\'amministratore confermerà che sei tu.</p>'+
+  var pre=null; try{ pre=localStorage.getItem('pendingUnita'); }catch(e){}
+  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Conferma la tua unità</p>'+
+    '<p class="sub" style="margin:0 0 12px">Controlla che palazzina e interno siano corretti: è ciò a cui verrà legato il tuo accesso. L\'amministratore confermerà che sei tu.</p>'+
     unitaPickerHTML()+
-    '<button class="btn-primary" style="margin-top:12px" id="o-go">Continua</button></div>';
-  fillUnitaPicker();
+    '<button class="btn-primary" style="margin-top:12px" id="o-go">Conferma ed entra</button></div>';
+  fillUnitaPicker(pre);
   $('o-go').onclick=async function(){
     const pal=$('u-pal').value, intr=$('u-int').value;
     if(!pal){$('u-pal').focus();return} if(!intr){$('u-int').focus();return}
@@ -219,6 +222,7 @@ function renderSelezionaUnita(){
     $('o-go').disabled=true;
     const { error } = await sb.auth.updateUser({ data:{ unita:unita } });
     if(error){ $('o-go').disabled=false; alert('Errore: '+error.message); return; }
+    try{ localStorage.removeItem('pendingUnita'); }catch(e){}
     init();
   };
 }
