@@ -221,10 +221,10 @@ async function fillUnitaPicker(pre){
 }
 function renderLogin(){
   $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Accedi come condòmino</p>'+
-    '<p class="sub" style="margin:0 0 12px">Indica la <b>tua unità</b> e la tua email: ti arriva un link per entrare. L\'amministratore del gruppo conferma che sei tu — da quel momento le tue verifiche valgono come prova firmata.</p>'+
+    '<p class="sub" style="margin:0 0 12px">Indica la <b>tua unità</b> e la tua email: ti arriva un <b>codice</b> per entrare. L\'amministratore del gruppo conferma che sei tu — da quel momento le tue verifiche valgono come prova firmata.</p>'+
     unitaPickerHTML()+
     '<label style="margin-top:10px;display:block">Email</label><input id="l-email" type="email" placeholder="tu@email.it" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false">'+
-    '<button class="btn-primary" style="margin-top:12px" id="l-go">Ricevi il link di accesso</button>'+
+    '<button class="btn-primary" style="margin-top:12px" id="l-go">Ricevi il codice di accesso</button>'+
     '<p id="l-msg" class="sub" style="margin-top:10px;display:none"></p></div>'+
     '<button class="src-link" id="l-pres" style="font-size:16px;margin:2px 2px 0">Cos\'è Custodi 451? Come funziona →</button>';
   $('l-pres').onclick=function(){presentazione()};
@@ -238,9 +238,28 @@ function renderLogin(){
     try{ localStorage.setItem('pendingUnita', unita); }catch(e){}   // riconfermata dopo il login
     $('l-go').disabled=true; $('l-go').textContent='Invio…';
     const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin+location.pathname } });
-    const m=$('l-msg'); m.style.display='block';
-    if(error){ m.style.color='var(--bad)'; m.textContent='Errore: '+error.message; $('l-go').disabled=false; $('l-go').textContent='Ricevi il link di accesso'; }
-    else { m.style.color='var(--ok)'; m.textContent='Ti ho mandato un link a '+email+'. Aprilo da questo telefono per entrare ('+unita+').'; $('l-go').textContent='Link inviato ✓'; }
+    if(error){ const m=$('l-msg'); m.style.display='block'; m.style.color='var(--bad)'; m.textContent='Errore: '+error.message; $('l-go').disabled=false; $('l-go').textContent='Ricevi il codice di accesso'; }
+    else { renderCodeStep(email); }
+  };
+}
+
+// Inserimento del CODICE a 6 cifre → resta dentro l'app installata (PWA), non apre il browser
+function renderCodeStep(email){
+  $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 4px">Inserisci il codice</p>'+
+    '<p class="sub" style="margin:0 0 12px">Ti ho mandato un\'email a <b>'+esc(email)+'</b> con un <b>codice a 6 cifre</b>. Scrivilo qui sotto per entrare: così <b>resti nell\'app</b>. (Controlla anche lo Spam la prima volta.)</p>'+
+    '<label>Codice a 6 cifre</label><input id="c-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" style="letter-spacing:6px;font-size:24px;text-align:center">'+
+    '<button class="btn-primary" style="margin-top:12px" id="c-go">Entra</button>'+
+    '<p id="c-msg" class="sub" style="margin-top:10px;display:none"></p>'+
+    '<button class="src-link" id="c-back" style="font-size:15px;margin-top:12px">‹ Cambia email o unità</button></div>';
+  $('c-back').onclick=renderLogin;
+  $('c-code').focus();
+  $('c-go').onclick=async function(){
+    var code=$('c-code').value.replace(/\D/g,'');
+    if(code.length<6){ $('c-code').focus(); return; }
+    $('c-go').disabled=true; $('c-go').textContent='Verifico…';
+    const { error } = await sb.auth.verifyOtp({ email:email, token:code, type:'email' });
+    if(error){ var m=$('c-msg'); m.style.display='block'; m.style.color='var(--bad)'; m.textContent='Codice non valido o scaduto. Controlla e riprova.'; $('c-go').disabled=false; $('c-go').textContent='Entra'; }
+    // se OK: onAuthStateChange → init()
   };
 }
 
