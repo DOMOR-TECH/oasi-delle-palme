@@ -689,7 +689,10 @@ async function renderAdmin(){
 }
 
 /* ---------- VIEW: VOTI (sondaggi informali, pesati per millesimi, palesi) ---------- */
-var DEMO_SONDAGGI=[{id:'s1',domanda:'Sei a favore di valutare il cambio di amministratore per il 2027?',opzioni:['Sì','No','Astenuto'],chiuso:false,autore_nome:'Admin'}];
+var DEMO_SONDAGGI=[
+  {id:'s1',domanda:'Sei a favore di valutare il cambio di amministratore per il 2027?',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Admin'},
+  {id:'s2',domanda:'Proposta: installare rastrelliere per le biciclette?',opzioni:['Sì','No'],chiuso:false,approvato:false,proposto_da:'u9',autore_nome:'Coccia Anna'}
+];
 var DEMO_VOTI=[
   {sondaggio_id:'s1',unita:'A/07',autore_id:'u1',autore_nome:'Romani Barbara',millesimi:6.8,opzione:'Sì'},
   {sondaggio_id:'s1',unita:'F/03',autore_id:'u2',autore_nome:'Bruschi - Caratelli',millesimi:5.7,opzione:'Sì'},
@@ -705,13 +708,30 @@ async function renderVoti(){
     sondaggi=rs.data||[];
     var rv=await sb.from('voti').select('*'); voti=rv.error?[]:(rv.data||[]);
   }
+  var attivi=sondaggi.filter(function(s){return s.approvato!==false});
+  var proposte=sondaggi.filter(function(s){return s.approvato===false});
+  function opzOf(s){return Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto'])}
   var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 10px">Sondaggi della comunità</p>';
-  if(isAdmin){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">+ Nuovo sondaggio</button>'; }
-  if(!sondaggi.length){ html+='<div class="empty">Nessun sondaggio aperto.'+(isAdmin?' Creane uno col pulsante qui sopra.':'')+'</div>'; }
-  sondaggi.forEach(function(s){
+  if(approvato()){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">＋ '+(isAdmin?'Nuovo sondaggio':'Proponi un sondaggio')+'</button>'; }
+  else { html+='<div class="sub" style="margin-bottom:12px">Quando sarai un condòmino confermato potrai votare e proporre sondaggi.</div>'; }
+  // PROPOSTE (in attesa di avallo dell'admin)
+  if(proposte.length){
+    html+='<div class="cap-grp">Proposte da approvare ('+proposte.length+')</div>';
+    proposte.forEach(function(s){
+      html+='<div class="card"><div style="font-weight:600;font-size:17px">'+esc(s.domanda)+'</div>'+
+        '<div style="font-size:14px;color:var(--hint);margin:3px 0 8px">proposto da '+esc(s.autore_nome||'—')+' · opzioni: '+esc(opzOf(s).join(' / '))+'</div>';
+      if(isAdmin){ html+='<div style="display:flex;gap:7px"><button class="vt-appr" data-s="'+esc(s.id)+'" style="border-color:var(--ok);color:var(--ok)">✓ Avalla</button>'+
+        '<button class="vt-del" data-s="'+esc(s.id)+'" style="border-color:var(--bad);color:var(--bad)">Elimina</button></div>'; }
+      else { html+='<div class="sub">In attesa che l\'amministratore la approvi.</div>'; }
+      html+='</div>';
+    });
+    html+='<div class="cap-grp">Sondaggi attivi</div>';
+  }
+  if(!attivi.length){ html+='<div class="empty">Nessun sondaggio attivo.'+(approvato()?' '+(isAdmin?'Creane uno':'Proponine uno')+' col pulsante qui sopra.':'')+'</div>'; }
+  attivi.forEach(function(s){
     var sv=voti.filter(function(x){return x.sondaggio_id===s.id});
     var mine=sv.find(function(x){return x.autore_id===userId});
-    var opzioni = Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto']);
+    var opzioni=opzOf(s);
     var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
     html+='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(s.domanda)+'</div>'+
       '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(s.chiuso?' · CHIUSO':'')+'</div>';
@@ -737,8 +757,9 @@ async function renderVoti(){
   });
   v.innerHTML=html;
   v.querySelectorAll('.vt-vote').forEach(function(b){b.onclick=function(){votaSondaggio(b.dataset.s,b.dataset.o)}});
+  var nb=$('vt-new'); if(nb) nb.onclick=nuovoSondaggio;
   if(isAdmin){
-    var nb=$('vt-new'); if(nb) nb.onclick=nuovoSondaggio;
+    v.querySelectorAll('.vt-appr').forEach(function(b){b.onclick=function(){approveSondaggio(b.dataset.s)}});
     v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=function(){toggleSondaggio(b.dataset.s,b.dataset.chiuso!=='1')}});
     v.querySelectorAll('.vt-del').forEach(function(b){b.onclick=function(){eliminaSondaggio(b.dataset.s)}});
   }
@@ -751,12 +772,21 @@ async function votaSondaggio(sid,opzione){
   renderVoti();
 }
 async function nuovoSondaggio(){
-  var d=prompt('Domanda del sondaggio:'); if(!d||!d.trim())return;
+  if(!approvato()){ alert('Devi essere un condòmino confermato.'); return; }
+  var d=prompt(isAdmin?'Domanda del sondaggio:':'Proponi una domanda (l\'amministratore la valuterà):'); if(!d||!d.trim())return;
   var opz=prompt('Opzioni separate da virgola:','Sì, No, Astenuto');
   var opzioni=(opz&&opz.trim())?opz.split(',').map(function(s){return s.trim()}).filter(Boolean):['Sì','No','Astenuto'];
   if(opzioni.length<2){ alert('Servono almeno 2 opzioni.'); return; }
-  if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d.trim(),opzioni:opzioni,chiuso:false,autore_nome:userNome}); renderVoti(); return; }
-  var up=await sb.from('sondaggi').insert({domanda:d.trim(),opzioni:opzioni,autore_nome:userNome});
+  if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d.trim(),opzioni:opzioni,chiuso:false,approvato:isAdmin,proposto_da:userId,autore_nome:userNome}); renderVoti(); if(!isAdmin)alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
+  var rec={domanda:d.trim(),opzioni:opzioni,autore_nome:userNome,approvato:isAdmin,proposto_da:userId};
+  var up=await sb.from('sondaggi').insert(rec);
+  if(up.error){ alert('Errore: '+up.error.message); return; }
+  if(!isAdmin) alert('Proposta inviata! L\'amministratore la valuterà.');
+  renderVoti();
+}
+async function approveSondaggio(sid){
+  if(DEMO){ var s=DEMO_SONDAGGI.find(function(x){return x.id===sid}); if(s)s.approvato=true; renderVoti(); return; }
+  var up=await sb.from('sondaggi').update({approvato:true}).eq('id',sid);
   if(up.error){ alert('Errore: '+up.error.message); return; }
   renderVoti();
 }
