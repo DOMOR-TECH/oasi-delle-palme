@@ -358,12 +358,26 @@ function openCapitolato(sid){
   p.innerHTML='<div class="page-in">'+
     '<div class="page-top"><button class="page-x" id="cap-x">×</button><h2 class="page-h">Contratto del verde</h2></div>'+
     '<p class="lead" style="font-size:16px;color:var(--muted)">Contratto <b>House &amp; Garden S.r.l.</b> — capitolato del verde (pagg. 5–7). Canone <b>€ 48.250 + IVA / anno</b> (verde € 44.400 + disinfestazione € 1.850 + derattizzazione € 2.000). Ogni voce qui sotto è un <b>obbligo contrattuale</b>: se non è eseguita, è un inadempimento al contratto.</p>'+
+    '<button class="btn-primary" id="cap-pdf" style="margin:0 0 14px">📄 Scarica il contratto originale (PDF)</button>'+
     body+
     '<p class="sub" style="margin-top:14px">Stipulato il 25/09/2017. Testo riportato fedelmente dal capitolato allegato al contratto; per ogni contestazione fa fede il documento originale, depositato presso l\'amministrazione.</p>'+
     '</div>';
   document.body.appendChild(p);
   $('cap-x').onclick=function(){p.remove()};
+  $('cap-pdf').onclick=scaricaContratto;
   if(sid){ var el=document.getElementById('cap-'+sid); if(el){ el.scrollIntoView({block:'start'}); el.classList.add('hl'); } }
+}
+// Scarica il contratto originale (PDF) — solo condòmini loggati, link temporaneo
+async function scaricaContratto(){
+  if(DEMO){ alert('In modalità prova il download non è attivo. Nella versione vera, da qui si scarica il PDF originale del contratto.'); return; }
+  if(!userId){ alert('Accedi come condòmino per scaricare il contratto originale.'); return; }
+  var btn=$('cap-pdf'); if(btn){btn.disabled=true;btn.textContent='Preparo il download…';}
+  try{
+    var r=await sb.storage.from('documenti').createSignedUrl('contratto-house-garden.pdf', 120);
+    if(r.error||!r.data){ alert('Il documento non è ancora disponibile. (Va caricato nello Storage "documenti".)'); }
+    else { window.open(r.data.signedUrl,'_blank'); }
+  }catch(e){ alert('Errore: '+(e.message||e)); }
+  if(btn){btn.disabled=false;btn.textContent='📄 Scarica il contratto originale (PDF)';}
 }
 
 /* ---------- VIEW: ZONA ---------- */
