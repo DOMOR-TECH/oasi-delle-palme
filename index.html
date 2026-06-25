@@ -159,6 +159,39 @@ function showBadge(){
     '<div style="font-size:14px;color:var(--hint)">'+sub+(approvato()?'':' · in attesa')+'</div></div>'+
     '<div style="width:34px;height:34px;border-radius:50%;background:var(--'+(approvato()?'okbg':'infobg')+');color:var(--'+(approvato()?'ok':'info')+');display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">'+esc(ini)+'</div>';
   ub.classList.remove('hide');
+  ub.style.cursor='pointer'; ub.onclick=userMenu;
+}
+
+/* ---------- MENU UTENTE (I miei dati / Esci / Elimina account) ---------- */
+function userMenu(){
+  var m=document.createElement('div'); m.className='page'; m.id='page-user';
+  var sub = userUnita ? ('Palazzina '+userUnita.palazzina+' · interno '+userUnita.interno) : 'unità non associata';
+  m.innerHTML='<div class="page-in">'+
+    '<div class="page-top"><button class="page-x" id="um-x">×</button><h2 class="page-h">I miei dati</h2></div>'+
+    '<div class="card"><div style="display:grid;gap:10px">'+
+      '<div><label>Nome</label><div style="font-size:17px;font-weight:600">'+esc(userNome||'—')+'</div></div>'+
+      '<div><label>Unità</label><div style="font-size:17px">'+esc(sub)+'</div></div>'+
+      '<div><label>Email</label><div style="font-size:17px">'+esc(userEmail||'—')+'</div></div>'+
+      '<div><label>Stato</label><div style="margin-top:4px">'+statoChip()+'</div></div>'+
+    '</div></div>'+
+    '<button id="um-logout" style="width:100%;margin-top:4px">Esci</button>'+
+    '<button id="um-del" style="width:100%;margin-top:18px;border-color:var(--bad);color:var(--bad)">Elimina il mio account</button>'+
+    '<p class="sub" style="margin-top:8px">Eliminando l\'account si chiude il tuo accesso e si libera la tua unità. <b>Le segnalazioni che hai inviato restano</b> (firmate col tuo nome), perché sono prove condivise della comunità.</p>'+
+    '</div>';
+  document.body.appendChild(m);
+  $('um-x').onclick=function(){m.remove()};
+  $('um-logout').onclick=async function(){ if(DEMO){location.href=location.pathname;return;} await sb.auth.signOut(); location.reload(); };
+  $('um-del').onclick=function(){ eliminaAccount(m); };
+}
+async function eliminaAccount(menuEl){
+  if(!confirm('Vuoi eliminare il tuo account?\n\nIl tuo accesso verrà chiuso e la tua unità liberata. Le segnalazioni che hai inviato RESTANO (firmate col tuo nome).')) return;
+  if(DEMO){ alert('In modalità prova non c\'è un account da eliminare.'); return; }
+  // libera la propria unità (le segnalazioni restano: autore_nome è salvato)
+  var up=await sb.from('proprietari').update({stato:'libero',autore_id:null,email:null}).eq('autore_id',userId);
+  if(up.error){ alert('Errore: '+up.error.message+'\n\nServe la migrazione migrate_v7 sul database.'); return; }
+  await sb.auth.signOut();
+  alert('Account eliminato. Le tue segnalazioni restano nel dossier. A presto!');
+  location.reload();
 }
 sb.auth.onAuthStateChange(function(_e,sess){ if(sess) init(); });
 
@@ -576,6 +609,7 @@ async function renderAdmin(){
     var patch = nuovo==='libero' ? {stato:'libero',autore_id:null,email:null} : {stato:nuovo};
     var up=await sb.from('proprietari').update(patch).eq('unita',b.dataset.u);
     if(up.error){ alert('Errore: '+up.error.message); b.disabled=false; return; }
+    if(userUnita && b.dataset.u===userUnita.unita){ userStato=nuovo; showBadge(); }   // se ho cambiato la MIA unità, aggiorna il badge subito
     renderAdmin();
   }});
 }
