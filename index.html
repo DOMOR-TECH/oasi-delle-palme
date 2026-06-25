@@ -354,15 +354,22 @@ async function exportPDF(){
       for(var i=0;i<rs.length;i++){
         var r=rs[i];
         if(y>H-110){doc.addPage();y=54;}
-        var imgH=0;
-        if(r.foto_url){ try{ var im=await loadImg(r.foto_url); var iw=70, ih=Math.min(90,70*im.h/im.w); doc.addImage(im.data,'JPEG',M,y,iw,ih); imgH=ih; }catch(e){} }
-        var tx=M+(imgH?82:0);
         doc.setFontSize(11);
         var head=r.area+(r.nota?' — '+r.nota:'');
-        var lines=doc.splitTextToSize(head, W-tx-M); doc.text(lines, tx, y+12);
+        var lines=doc.splitTextToSize(head, W-2*M); doc.text(lines, M, y+12);
         doc.setFontSize(9); doc.setTextColor(110);
-        doc.text(r.autore_nome+' · '+fmt(r.created_at), tx, y+12+lines.length*13+3); doc.setTextColor(0);
-        y+=Math.max(imgH+6, 12+lines.length*13+16);
+        doc.text(r.autore_nome+' · '+fmt(r.created_at), M, y+12+lines.length*13+3); doc.setTextColor(0);
+        y+=12+lines.length*13+12;
+        if(r.foto_url){ try{
+          var im=await loadImg(r.foto_url);
+          var iw=W-2*M, ih=iw*im.h/im.w;             // foto a tutta larghezza, proporzioni reali
+          var avail=H-54-y-16;                        // spazio rimasto sotto y in questa pagina
+          if(ih>avail){ doc.addPage(); y=54; avail=H-54-y-16; }
+          if(ih>avail){ var sc=avail/ih; ih=avail; iw=iw*sc; }   // foto verticale più alta della pagina: riduci in proporzione
+          var ix=M+((W-2*M)-iw)/2;                     // centra se ridotta
+          doc.addImage(im.data,'JPEG',ix,y,iw,ih);
+          y+=ih+10;
+        }catch(e){} }
         var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
         for(var j=0;j<cms.length;j++){
           if(y>H-60){doc.addPage();y=54;}
@@ -404,6 +411,8 @@ init();
 .iosguide li{font-size:17px;line-height:1.75;margin-bottom:8px}
 .ig-ic{display:inline-flex;vertical-align:middle;background:#e6f1fb;border-radius:7px;padding:3px;margin:0 2px}
 .ig-x{margin-top:14px;width:100%;background:#1d9e75;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
+.ig-copy{width:100%;background:#185fa5;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
+.ig-copy.ok{background:#1d9e75}
 </style>
 <script>
 /* Installa sulla Home — Android: prompt nativo · iOS: guida (Apple non consente install automatica) */
@@ -423,7 +432,8 @@ init();
     document.getElementById('installx').onclick=function(){bar.classList.remove('on');localStorage.setItem('installHidden','1');};
     document.getElementById('installbtn').onclick=function(){
       if(deferred){deferred.prompt();deferred.userChoice.then(function(r){if(r&&r.outcome==='accepted'){bar.classList.remove('on');}deferred=null;});return;}
-      iosGuide(!isIOS);   // iOS o fallback desktop: mostra istruzioni
+      if(isIOS&&!isSafari){safariGuide();return;}   // iPhone con Chrome/Firefox/altro: serve Safari
+      iosGuide(!isIOS);                              // iPhone Safari (passi diretti) o desktop (generico)
     };
     return bar;
   }
@@ -441,9 +451,27 @@ init();
     ov.onclick=function(e){if(e.target===ov||e.target.classList.contains('ig-x'))ov.remove();};
     document.body.appendChild(ov);
   }
+  function safariGuide(){   // iPhone con browser ≠ Safari: l'installazione esiste solo in Safari
+    var isChrome=/crios/i.test(ua);
+    var url=location.href.split('#')[0];
+    var ov=document.createElement('div');ov.className='iosguide';
+    ov.innerHTML='<div class="ig-card"><div class="ig-h">Apri in Safari per installare</div>'+
+      '<p>Su iPhone, l\'app si aggiunge alla Home solo da <b>Safari</b>. Apri questa pagina lì, poi tocca Condividi → «Aggiungi a Home».</p>'+
+      '<button class="ig-copy" id="ig-copy">Copia il link</button>'+
+      (isChrome?'<p style="margin-top:12px">Scorciatoia su Chrome: tocca <b>⋯</b> in basso a destra e scegli <b>«Apri in Safari»</b>.</p>'
+               :'<p style="margin-top:12px">Poi apri <b>Safari</b>, incolla il link nella barra e vai.</p>')+
+      '<button class="ig-x">Ho capito</button></div>';
+    ov.onclick=function(e){if(e.target===ov||e.target.classList.contains('ig-x'))ov.remove();};
+    document.body.appendChild(ov);
+    document.getElementById('ig-copy').onclick=function(){var b=this;
+      function done(){b.textContent='✓ Link copiato';b.classList.add('ok');}
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(done,function(){prompt('Copia il link:',url);});}
+      else{prompt('Copia il link:',url);}
+    };
+  }
   window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;show();});  // Android/Chrome
   window.addEventListener('appinstalled',function(){var b=document.getElementById('installbar');if(b)b.classList.remove('on');deferred=null;});
-  if(isIOS&&isSafari){window.addEventListener('load',show);}                                          // iPhone Safari
+  if(isIOS){window.addEventListener('load',show);}                                                    // iPhone: Safari (guida install) o altro browser (guida Safari)
 })();
 </script>
 </body>
