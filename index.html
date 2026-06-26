@@ -185,7 +185,7 @@ async function updateAdminBadge(){
   var nav=$('nav-admin'); if(!nav) return;
   var n=0;
   if(DEMO){ n=DEMO_ADMIN.filter(function(x){return x.stato==='in_attesa'}).length; }
-  else if(isAdmin){ try{ var r=await sb.from('proprietari').select('unita',{count:'exact',head:true}).eq('stato','in_attesa'); n=r.count||0; }catch(e){ n=0; } }
+  else if(isAdmin){ try{ var r=await sb.from('proprietari').select('unita',{count:'exact',head:true}).eq('stato','in_attesa'); var rc=await sb.from('coproprietari').select('unita',{count:'exact',head:true}).eq('stato','in_attesa'); n=(r.count||0)+(rc.count||0); }catch(e){ n=0; } }
   var b=nav.querySelector('.navbadge');
   if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; nav.appendChild(b); } b.textContent=n; b.style.display='flex'; }
   else if(b){ b.style.display='none'; }
@@ -201,25 +201,34 @@ async function init(){
   if(!unita){ setApp(false); renderSelezionaUnita(); return; }      // utente senza unità (o vecchio account)
   var pr = await claimUnita(unita);
   if(pr.blocked){ setApp(false); renderBloccato(pr); return; }
-  userUnita = pr.row; userNome = pr.row.nome; userStato = pr.row.stato;
+  userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato;   // stato dal primario o dal coproprietario
   try{ const { data:adm } = await sb.rpc('is_admin'); isAdmin = !!adm; }catch(e){ isAdmin=false; }
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
   await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge();
 }
 
-// Lega l'email dell'utente alla sua unità; ritorna {row, blocked, motivo}
+// Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
+// il PRIMO è il "primario" (proprietari.autore_id); gli altri si uniscono come coproprietari.
+// La firma è sempre il NOME DELL'UNITÀ. Ritorna {row, stato, isCo, blocked, motivo}.
 async function claimUnita(unita){
   var res=await sb.from('proprietari').select('*').eq('unita',unita).maybeSingle();
   var row=res.data;
   if(!row) return { blocked:true, motivo:'Unità '+unita+' non trovata nell\'elenco proprietari.', row:{unita:unita} };
   if(!row.autore_id){
     var up=await sb.from('proprietari').update({autore_id:userId,email:userEmail,stato:'in_attesa'}).eq('unita',unita).is('autore_id',null).select().maybeSingle();
-    if(up.data) return { blocked:false, row:up.data };
-    var re=await sb.from('proprietari').select('*').eq('unita',unita).maybeSingle(); row=re.data||row;   // qualcuno ha appena richiesto
+    if(up.data) return { blocked:false, row:up.data, stato:up.data.stato };
+    var re=await sb.from('proprietari').select('*').eq('unita',unita).maybeSingle(); row=re.data||row;   // qualcuno ha appena preso il primario
   }
-  if(row.autore_id && row.autore_id!==userId) return { blocked:true, motivo:'L\'unità '+unita+' è già stata richiesta da un altro account. Se è la tua, contatta l\'amministratore del gruppo.', row:row };
-  return { blocked:false, row:row };
+  if(row.autore_id===userId) return { blocked:false, row:row, stato:row.stato };   // sono il primario
+  // unità già col primario di un altro → mi unisco come COMPROPRIETARIO (in attesa di approvazione)
+  var co=await sb.from('coproprietari').select('*').eq('unita',unita).eq('autore_id',userId).maybeSingle();
+  if(!co.data){
+    var ins=await sb.from('coproprietari').upsert({unita:unita,autore_id:userId,email:userEmail,stato:'in_attesa'},{onConflict:'unita,autore_id'}).select().maybeSingle();
+    if(ins.error) return { blocked:true, motivo:'Errore nell\'unirti all\'unità '+unita+': '+ins.error.message, row:row };
+    co.data=ins.data;
+  }
+  return { blocked:false, row:row, stato:(co.data&&co.data.stato)||'in_attesa', isCo:true };
 }
 
 function statoChip(){
@@ -290,7 +299,7 @@ async function fillUnitaPicker(pre){
   palSel.onchange=function(){
     intSel.innerHTML='<option value="" disabled selected>Int…</option>';
     list.filter(function(u){return u.palazzina===palSel.value}).sort(function(a,b){return (parseInt(a.interno,10)||0)-(parseInt(b.interno,10)||0)})
-      .forEach(function(u){var o=document.createElement('option');o.value=u.interno;var taken=TK.has(u.unita);o.textContent='Interno '+u.interno+(taken?' · già registrata':'');o.disabled=taken;intSel.appendChild(o)});
+      .forEach(function(u){var o=document.createElement('option');o.value=u.interno;var taken=TK.has(u.unita);o.textContent='Interno '+u.interno+(taken?' · comproprietà (ti unisci)':'');intSel.appendChild(o)});
     intSel.disabled=false;
   };
   if(pre){ var u=list.find(function(x){return x.unita===pre}); if(u){ palSel.value=u.palazzina; palSel.onchange(); intSel.value=u.interno; } }   // pre-compila (conferma dopo il login)
@@ -746,34 +755,34 @@ async function exportPDF(){
 
 /* ---------- VIEW: ADMIN (conferma condòmini) ---------- */
 var DEMO_ADMIN=[
-  {unita:'C/02',palazzina:'C',interno:'2',nome:'Vermigli Andrea',email:'andrea.v@email.it',stato:'in_attesa'},
-  {unita:'F/05',palazzina:'F',interno:'5',nome:'Giralico Maria Enrica',email:'giralico@email.it',stato:'in_attesa'},
-  {unita:'I/08',palazzina:'I',interno:'8',nome:'Lantieri Alessandro',email:'corrado@email.it',stato:'approvato'}
+  {unita:'C/02',palazzina:'C',interno:'2',nome:'Vermigli Andrea',email:'andrea.v@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-verm'},
+  {unita:'F/05',palazzina:'F',interno:'5',nome:'Giralico Maria Enrica',email:'giralico@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-gira'},
+  {unita:'I/08',palazzina:'I',interno:'8',nome:'Lantieri Andrea - Marco - Alessandro',email:'andrea.l@email.it',stato:'approvato',_tipo:'primario',autore_id:'p-lant'},
+  {unita:'I/08',palazzina:'I',interno:'8',nome:'Lantieri Andrea - Marco - Alessandro',email:'marco.l@email.it',stato:'in_attesa',_tipo:'co',autore_id:'co-marco'}
 ];
 async function renderAdmin(){
   var v=$('view-admin');
   v.innerHTML='<div class="spin">Carico richieste…</div>';
   var rows;
-  if(DEMO){ rows=DEMO_ADMIN; }
+  if(DEMO){ rows=DEMO_ADMIN.slice(); }
   else {
     var res=await sb.from('proprietari').select('*').neq('stato','libero').order('stato',{ascending:true}).order('unita',{ascending:true});
     if(res.error){ v.innerHTML='<div class="empty">Errore: '+esc(res.error.message)+'<br><br>Hai eseguito <b>migrate_v5_verifica.sql</b> su Supabase?</div>'; return; }
-    rows=res.data||[];
+    rows=(res.data||[]).map(function(r){ r._tipo='primario'; return r; });
+    var rc=await sb.from('coproprietari').select('unita,autore_id,email,stato,proprietari(nome,palazzina,interno)');
+    if(!rc.error){ (rc.data||[]).forEach(function(c){ var p=c.proprietari||{}; rows.push({_tipo:'co',unita:c.unita,autore_id:c.autore_id,email:c.email,stato:c.stato,nome:p.nome||c.unita,palazzina:p.palazzina||'',interno:p.interno||''}); }); }
   }
   var attesa=rows.filter(function(r){return r.stato==='in_attesa'});
   var appr=rows.filter(function(r){return r.stato==='approvato'});
   var rif=rows.filter(function(r){return r.stato==='rifiutato'});
   function card(r){
-    var u=esc(r.unita), nm=esc(r.nome||'');
-    var bAppr='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="appr" style="border-color:var(--ok);color:var(--ok)">✓ Approva</button>';
-    var bRif ='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="rif" style="border-color:var(--bad);color:var(--bad)">Rifiuta</button>';
-    var bRimuovi='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="revoca" style="color:var(--muted)">Rimuovi</button>';   // libera l'unità + toglie l'entry
-    var bRevoca='<button class="adm" data-u="'+u+'" data-nome="'+nm+'" data-a="revoca" style="border-color:var(--bad);color:var(--bad)">Revoca</button>';
-    var actions = r.stato==='approvato' ? bRevoca
-                : r.stato==='rifiutato' ? bAppr+bRimuovi
-                : bAppr+bRif+bRimuovi;   // in attesa: Approva · Rifiuta · Rimuovi
+    var u=esc(r.unita), nm=esc(r.nome||''), aid=esc(r.autore_id||''), tipo=r._tipo||'primario', co=tipo==='co';
+    function btn(a,label,style){return '<button class="adm" data-tipo="'+tipo+'" data-u="'+u+'" data-aid="'+aid+'" data-nome="'+nm+'" data-a="'+a+'" style="'+style+'">'+label+'</button>';}
+    var actions = r.stato==='approvato' ? btn('revoca','Revoca','border-color:var(--bad);color:var(--bad)')
+                : r.stato==='rifiutato' ? btn('appr','✓ Approva','border-color:var(--ok);color:var(--ok)')+btn('revoca','Rimuovi','color:var(--muted)')
+                : btn('appr','✓ Approva','border-color:var(--ok);color:var(--ok)')+btn('rif','Rifiuta','border-color:var(--bad);color:var(--bad)')+btn('revoca','Rimuovi','color:var(--muted)');
     return '<div class="card"><div class="row"><div style="flex:1;min-width:0">'+
-      '<div style="font-size:17px;font-weight:600">'+esc(r.nome||'(senza nome)')+'</div>'+
+      '<div style="font-size:17px;font-weight:600">'+esc(r.nome||'(senza nome)')+(co?' <span class="pill" style="background:var(--ocrabg);color:var(--ocra)">comproprietario</span>':'')+'</div>'+
       '<div style="font-size:15px;color:var(--hint)">Pal. '+esc(r.palazzina)+' · int '+esc(r.interno)+' · '+esc(r.email||'—')+'</div></div></div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">'+actions+'</div></div>';
   }
@@ -784,19 +793,26 @@ async function renderAdmin(){
   v.innerHTML=html;
   v.querySelectorAll('.adm').forEach(function(b){b.onclick=async function(){
     if(b.dataset.a==='revoca'){
-      if(!confirm('Rimuovere '+(b.dataset.nome||'questo utente')+'?\n\nL\'unità tornerà libera e il suo accesso verrà chiuso. Le segnalazioni che ha inviato RESTANO.')) return;
+      if(!confirm('Rimuovere '+(b.dataset.nome||'questo utente')+'?\n\nIl suo accesso verrà chiuso. Le segnalazioni che ha inviato RESTANO.')) return;
     }
     b.disabled=true;
     var nuovo = b.dataset.a==='appr' ? 'approvato' : b.dataset.a==='rif' ? 'rifiutato' : 'libero';
     if(DEMO){
-      if(nuovo==='libero'){ DEMO_ADMIN=DEMO_ADMIN.filter(function(x){return x.unita!==b.dataset.u}); }
-      else { var r=DEMO_ADMIN.find(function(x){return x.unita===b.dataset.u}); if(r)r.stato=nuovo; }
+      var match=function(x){return x.unita===b.dataset.u && (x.autore_id||'')===b.dataset.aid;};
+      if(nuovo==='libero'){ DEMO_ADMIN=DEMO_ADMIN.filter(function(x){return !match(x)}); }
+      else { var r=DEMO_ADMIN.find(match); if(r)r.stato=nuovo; }
       renderAdmin(); return;
     }
-    var patch = nuovo==='libero' ? {stato:'libero',autore_id:null,email:null} : {stato:nuovo};
-    var up=await sb.from('proprietari').update(patch).eq('unita',b.dataset.u);
-    if(up.error){ alert('Errore: '+up.error.message); b.disabled=false; return; }
-    if(userUnita && b.dataset.u===userUnita.unita){ userStato=nuovo; showBadge(); }   // se ho cambiato la MIA unità, aggiorna il badge subito
+    var err=null;
+    if(b.dataset.tipo==='co'){
+      if(nuovo==='libero'){ var d=await sb.from('coproprietari').delete().eq('unita',b.dataset.u).eq('autore_id',b.dataset.aid); err=d.error; }
+      else { var uc=await sb.from('coproprietari').update({stato:nuovo}).eq('unita',b.dataset.u).eq('autore_id',b.dataset.aid); err=uc.error; }
+    } else {
+      var patch = nuovo==='libero' ? {stato:'libero',autore_id:null,email:null} : {stato:nuovo};
+      var up=await sb.from('proprietari').update(patch).eq('unita',b.dataset.u); err=up.error;
+    }
+    if(err){ alert('Errore: '+err.message); b.disabled=false; return; }
+    if(userUnita && b.dataset.u===userUnita.unita && b.dataset.aid===userId){ userStato=nuovo; showBadge(); }   // se ho cambiato il MIO accesso, aggiorna il badge
     renderAdmin(); updateAdminBadge();
   }});
 }
@@ -809,7 +825,8 @@ var DEMO_SONDAGGI=[
 var DEMO_VOTI=[
   {sondaggio_id:'s1',unita:'A/07',autore_id:'u1',autore_nome:'Romani Barbara',millesimi:6.8,opzione:'Sì'},
   {sondaggio_id:'s1',unita:'F/03',autore_id:'u2',autore_nome:'Bruschi - Caratelli',millesimi:5.7,opzione:'Sì'},
-  {sondaggio_id:'s1',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:4.9,opzione:'No'}
+  {sondaggio_id:'s1',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:4.9,opzione:'No'},
+  {sondaggio_id:'s1',unita:'I/08',autore_id:'co-altro',autore_nome:'Lantieri Andrea - Marco - Alessandro',millesimi:6.5,opzione:'No'}   // un comproprietario della MIA unità ha già votato → io vedo ma non cambio
 ];
 async function renderVoti(){
   var v=$('view-voti'); v.innerHTML='<div class="spin">Carico…</div>';
@@ -843,14 +860,18 @@ async function renderVoti(){
   if(!attivi.length){ html+='<div class="empty">Nessun sondaggio attivo.'+(approvato()?' '+(isAdmin?'Creane uno':'Proponine uno')+' col pulsante qui sopra.':'')+'</div>'; }
   attivi.forEach(function(s){
     var sv=voti.filter(function(x){return x.sondaggio_id===s.id});
-    var mine=sv.find(function(x){return x.autore_id===userId});
+    var myVote=sv.find(function(x){return x.autore_id===userId});
+    var unitVote=sv.find(function(x){return userUnita && x.unita===userUnita.unita});   // il voto è dell'UNITÀ
+    var mine=!!myVote;
     var opzioni=opzOf(s);
     var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
     html+='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(s.domanda)+'</div>'+
       '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(s.chiuso?' · CHIUSO':'')+'</div>';
-    if(!mine && !s.chiuso && approvato()){
+    if((!unitVote || mine) && !s.chiuso && approvato()){
       html+='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px">'+opzioni.map(function(o){return '<button class="vt-vote" data-s="'+esc(s.id)+'" data-o="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div>';
-    } else if(!approvato() && !mine && !s.chiuso){
+    } else if(unitVote && !mine && approvato() && !s.chiuso){
+      html+='<div class="sub" style="margin-bottom:4px;color:var(--ocra)">Ha già votato un comproprietario della tua unità. Il voto è <b>dell\'unità</b>: lo vedi, ma non puoi cambiarlo.</div>';
+    } else if(!approvato() && !unitVote && !s.chiuso){
       html+='<div class="sub" style="margin-bottom:4px">Per votare devi essere un condòmino confermato.</div>';
     }
     opzioni.forEach(function(o){
@@ -858,7 +879,7 @@ async function renderVoti(){
       var mm=ov.reduce(function(t,x){return t+(+x.millesimi||0)},0);
       var pct=totMm>0?Math.round(mm/totMm*100):0;
       html+='<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:15px;gap:8px">'+
-        '<span>'+(mine&&mine.opzione===o?'<b>'+esc(o)+' ✓ (il tuo voto)</b>':esc(o))+'</span>'+
+        '<span>'+(unitVote&&unitVote.opzione===o?'<b>'+esc(o)+' ✓ ('+(mine?'il tuo voto':'voto dell\'unità')+')</b>':esc(o))+'</span>'+
         '<span style="color:var(--hint);white-space:nowrap">'+ov.length+' u · '+mm.toFixed(1).replace('.',',')+' mm</span></div>'+
         '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--ok)"></div></div>'+
         (ov.length?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+ov.map(function(x){return esc(x.autore_nome)}).join(', ')+'</div>':'')+'</div>';
