@@ -102,9 +102,9 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v30';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v31';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='Pal. E';
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let UNITA_LIST=null;
 function approvato(){return userStato==='approvato'}
 async function loadUnitaList(){
@@ -590,6 +590,13 @@ function threadHTML(r){
 }
 function renderZona(){
   var v=$('view-zona');
+  var selectHTML='<label>Dove sei ora</label><select id="z-area"><option value="" disabled'+(!curArea?' selected':'')+'>Dove ti trovi ora?</option>'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+esc(a)+'</option>'}).join('')+'</select>';
+  if(!curArea){   // nessun luogo scelto → prima si seleziona "dove ti trovi"
+    v.innerHTML=(approvato()?'':'<div class="pres-note" style="margin:0 0 11px"><b>Il tuo accesso è in attesa di conferma</b> dall\'amministratore del gruppo. Intanto puoi guardare tutto; potrai inviare segnalazioni appena sei confermato.</div>')+selectHTML+
+      '<div class="card" style="text-align:center;margin-top:14px"><div style="font-size:42px">📍</div><div style="font-size:17px;font-weight:600;margin-top:4px">Dove ti trovi ora?</div><div class="sub" style="margin-top:4px">Scegli la zona qui sopra per vedere cosa controllare e poter segnalare.</div></div>';
+    $('z-area').onchange=function(e){curArea=e.target.value;renderAll();};
+    return;
+  }
   var apri=reports.filter(function(r){return r.area===curArea&&isOpen(r)}).length;
   var totApri=reports.filter(isOpen).length;
   function hasOpenProblem(sid){ return reports.some(function(r){return r.area===curArea&&r.servizio===sid&&isOpen(r)}); }
@@ -617,7 +624,7 @@ function renderZona(){
     return '<button class="zchip" data-st="'+key+'" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'#fff':'var(--muted)')+';font-size:14px;font-weight:600">'+label+' · '+counts[key]+'</button>'; }
 
   var html=(approvato()?'':'<div class="pres-note" style="margin:0 0 11px"><b>Il tuo accesso è in attesa di conferma</b> dall\'amministratore del gruppo. Intanto puoi guardare tutto; potrai inviare segnalazioni appena sei confermato.</div>')+
-    '<label>Dove sei ora</label><select id="z-area">'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+a+'</option>'}).join('')+'</select>'+
+    selectHTML+
     '<div class="metrics" style="margin-top:11px"><div class="metric"><label>Qui, aperti</label><div class="n" style="color:var(--bad)">'+apri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">problemi</span></div></div>'+
     '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
     '<div style="display:flex;gap:7px;margin:13px 0 4px">'+chip('attuali','Attuali')+chip('problematici','Problematici')+chip('chiusi','Chiusi')+'</div>';
@@ -681,6 +688,7 @@ function renderZona(){
 
 /* ---------- SEGNALA ---------- */
 function openSegnala(sid){
+  if(!curArea){ alert('Scegli prima dove ti trovi ("Dove sei ora").'); return; }   // niente segnalazione senza luogo
   var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid});
   var existing=myReportP(curArea,sid);
   var existingUrls = existing? fotoListOf(existing).slice() : [];

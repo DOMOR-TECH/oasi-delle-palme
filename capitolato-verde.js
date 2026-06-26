@@ -45,6 +45,7 @@ window.CAPITOLATO_VERDE = [
 
 // Aree del complesso (verde si osserva zona per zona)
 window.AREE = [
+  "Collina","Zona piscina","Campo tennis","Strade interne",
   "Pal. A","Pal. B","Pal. C","Pal. D","Pal. E","Pal. F","Pal. G","Pal. H",
-  "Pal. I","Pal. L","Pal. M","Pal. N","Zona piscina","Campo tennis","Strade interne","Collina"
+  "Pal. I","Pal. L","Pal. M","Pal. N"
 ];
