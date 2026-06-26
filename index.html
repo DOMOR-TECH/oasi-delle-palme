@@ -102,7 +102,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v29';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v30';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='Pal. E';
 let UNITA_LIST=null;
@@ -696,7 +696,7 @@ function openSegnala(sid){
     '<label style="margin-top:12px;display:block">Foto (puoi sceglierne più di una)</label>'+
     '<input id="b-foto" type="file" accept="image/*" multiple style="display:none">'+
     '<div id="b-prevs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'+
-    '<label style="margin-top:8px;display:block">Nota (facoltativa)</label><textarea id="b-nota" rows="2" placeholder="es. prato secco, irrigazione ferma da giorni">'+esc(existing&&existing.nota?existing.nota:'')+'</textarea>'+
+    '<label id="b-nota-lbl" style="margin-top:8px;display:block">Nota (facoltativa)</label><textarea id="b-nota" rows="3" placeholder="es. prato secco, irrigazione ferma da giorni" style="min-height:92px;font-size:16px;border:1.5px solid var(--hint);background:var(--surface);border-radius:10px;padding:11px">'+esc(existing&&existing.nota?existing.nota:'')+'</textarea>'+
     '<div style="font-size:14px;color:var(--hint);margin-top:8px">firma: '+esc(userNome)+' · '+new Date().toLocaleDateString('it-IT')+' · zona '+esc(curArea)+'</div>'+
     '<div id="b-warn" style="color:var(--bad);font-size:15px;margin-top:8px;display:none">Indica prima se è Fatto o Problema</div>'+
     '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button id="b-x">Annulla</button>'+
@@ -715,14 +715,18 @@ function openSegnala(sid){
     p.querySelectorAll('.rm-nw').forEach(function(b){b.onclick=function(){fotoBlobs.splice(+b.dataset.nw,1);renderPrevs();}});
     $('b-add').onclick=function(){ $('b-foto').click(); };
   }
+  function updateNotaLbl(){ var l=$('b-nota-lbl'); if(!l)return;
+    if(stato==='problema'){ l.innerHTML='Nota — <b style="color:var(--bad)">descrivi il problema</b> (obbligatoria)'; $('b-nota').setAttribute('placeholder','Cosa non va? es. prato secco, irrigazione ferma da giorni'); }
+    else { l.textContent='Nota (facoltativa)'; $('b-nota').setAttribute('placeholder','es. note utili, dettagli'); } }
   if(existing && stato){ pick(stato==='ok'?$('b-ok'):$('b-no'), stato==='ok'?'var(--ok)':'var(--bad)'); }
-  renderPrevs();
-  $('b-ok').onclick=function(){stato='ok';pick(this,'var(--ok)')};
-  $('b-no').onclick=function(){stato='problema';pick(this,'var(--bad)')};
+  renderPrevs(); updateNotaLbl();
+  $('b-ok').onclick=function(){stato='ok';pick(this,'var(--ok)');updateNotaLbl();};
+  $('b-no').onclick=function(){stato='problema';pick(this,'var(--bad)');updateNotaLbl();};
   $('b-foto').onchange=function(e){ [].slice.call(e.target.files).forEach(function(f){ downscale(f,function(blob){ fotoBlobs.push(blob); renderPrevs(); }); }); e.target.value=''; };
   $('b-x').onclick=function(){m.remove()};
   $('b-send').onclick=async function(){
-    if(!stato){$('b-warn').style.display='block';return}
+    if(!stato){$('b-warn').textContent='Indica prima se è Fatto o Problema';$('b-warn').style.display='block';return}
+    if(stato==='problema' && !$('b-nota').value.trim()){$('b-warn').textContent='Per un problema scrivi cosa non va.';$('b-warn').style.display='block';$('b-nota').focus();return}
     if(DEMO){
       var urlsD=existingUrls.concat(fotoBlobs.map(function(b){return URL.createObjectURL(b)}));
       if(existing){ existing.stato=stato; existing.nota=$('b-nota').value.trim(); existing.foto_urls=urlsD; existing.foto_url=urlsD[0]||null; }
