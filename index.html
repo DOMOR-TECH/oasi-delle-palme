@@ -170,6 +170,29 @@ function periodOutcome(area,sid,periodId){
   return 'ocra';   // nessuna segnalazione su finestra scaduta → potenzialmente fatto, non confermato, ma comunque fatto
 }
 function curPeriodo(sid){var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid});var w=s?windowOf(s):null;return w?w.id:'';}
+
+// Finestre PASSATE di un servizio (esclusa la corrente) da fromDate a oggi → per la lista ocra a 5 settimane
+function pastWindows(s,fromDate){
+  var out=[],seen={},guard=0,cur=windowOf(s),probe=new Date((cur?cur.ap.getTime():Date.now())-86400000);
+  while(guard++<420){
+    if(probe<fromDate) break;
+    var w=windowOf(s,probe);
+    if(w && !seen[w.id] && (!cur||w.id!==cur.id)){ seen[w.id]=1; if(w.scad>=fromDate) out.push(w); }
+    probe=new Date((w?w.ap.getTime():probe.getTime())-86400000);
+  }
+  return out;
+}
+// Penale Art.5 per una segnalazione di PROBLEMA su servizio settimanale+ (NO giornaliero): €100 + €30/giorno di ritardo
+// dalla scadenza della finestra del report fino a oggi. null se non penalizzabile.
+var PEN_BASE=100, PEN_DAY=30;
+function penaleOf(r){
+  var s=srvById(r.servizio); if(!s||s.win==='D') return null;   // i giornalieri non generano penale
+  if(r.stato!=='problema' || r.risolto) return null;            // solo problemi APERTI
+  var w=windowOf(s,new Date(r.created_at)); if(!w) return null;
+  var giorni=Math.floor((Date.now()-w.scad.getTime())/86400000);
+  if(giorni<0) return null;                                     // finestra ancora aperta → non ancora inadempimento
+  return { giorni:giorni, euro: PEN_BASE + PEN_DAY*giorni };
+}
 // stato/segnalazioni SCOPED al periodo corrente (per la vista Zona)
 function latestP(area,sid){var pid=curPeriodo(sid);var r=reports.filter(function(x){return x.area===area&&x.servizio===sid&&(x.periodo||'')===pid});return r[0]||null;}
 function myReportP(area,sid){var pid=curPeriodo(sid);return reports.find(function(x){return x.autore_id===userId&&x.area===area&&x.servizio===sid&&(x.periodo||'')===pid})||null;}
@@ -193,7 +216,12 @@ async function updateAdminBadge(){
 
 /* ---------- AUTH / INIT ---------- */
 async function init(){
-  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; showBadge(); setApp(true); renderAll(); updateAdminBadge(); return; }
+  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; $('hsub').textContent='MODALITÀ PROVA (senza login)';
+    reports=[
+      {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
+      {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
+    ];
+    showBadge(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -572,8 +600,16 @@ function renderZona(){
   // CHIUSI: report di finestre PASSATE (periodo ≠ corrente) + conteggio ocra (finestra precedente non controllata)
   var chiusiReports=reports.filter(function(r){ return r.area===curArea && !isOpen(r) && (r.periodo||'')!==curPeriodo(r.servizio); })
     .sort(function(a,b){return a.created_at<b.created_at?1:-1});
-  var ocraCount=0; CAPITOLATO_VERDE.forEach(function(s){ var pw=prevWindowOf(s); if(pw && periodOutcome(curArea,s.id,pw.id)==='ocra') ocraCount++; });
-  var counts={attuali:attuali.length, problematici:problematici.length, chiusi:chiusiReports.length+ocraCount};
+  var win5=new Date(Date.now()-35*86400000);   // ultime 5 settimane: l'ocra resta visibile qui
+  var ocraBySrv={}, ocraDaily=0;
+  CAPITOLATO_VERDE.forEach(function(s){
+    pastWindows(s,win5).forEach(function(w){
+      if(periodOutcome(curArea,s.id,w.id)!=='ocra') return;
+      if(s.win==='D') ocraDaily++; else { (ocraBySrv[s.id]=ocraBySrv[s.id]||{s:s,wins:[]}).wins.push(w); }
+    });
+  });
+  var ocraGroups=Object.keys(ocraBySrv).map(function(k){return ocraBySrv[k];});
+  var counts={attuali:attuali.length, problematici:problematici.length, chiusi:chiusiReports.length+ocraGroups.length+(ocraDaily?1:0)};
 
   function chip(key,label){ var on=curStato===key;
     return '<button class="zchip" data-st="'+key+'" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'#fff':'var(--muted)')+';font-size:14px;font-weight:600">'+label+' · '+counts[key]+'</button>'; }
@@ -611,9 +647,16 @@ function renderZona(){
     });
     html+='<p class="sub" style="margin-top:10px">Il dossier completo (con foto ed export PDF) è nel tab <b>Dossier</b>.</p>';
   } else {  // CHIUSI
-    html+='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:8px 2px 8px">Finestre concluse in '+esc(curArea)+'</p>';
-    if(ocraCount) html+='<div class="card" style="background:var(--ocrabg)"><div style="color:var(--ocra);font-size:15px;line-height:1.45">⬤ <b>'+ocraCount+'</b> '+(ocraCount>1?'finestre scadute':'finestra scaduta')+' senza controllo — valgono come fatte, ma nessuno le ha confermate.</div></div>';
-    if(!chiusiReports.length && !ocraCount) html+='<div class="empty">Ancora nessuna finestra conclusa qui.</div>';
+    html+='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:8px 2px 8px">Finestre concluse in '+esc(curArea)+' · ultime 5 settimane</p>';
+    if(!chiusiReports.length && !ocraGroups.length && !ocraDaily) html+='<div class="empty">Ancora nessuna finestra conclusa qui.</div>';
+    if(ocraDaily) html+='<div class="card" style="background:var(--ocrabg)"><div style="color:var(--ocra);font-size:15px;line-height:1.45">⬤ <b>'+ocraDaily+'</b> finestre giornaliere scadute senza controllo — valgono come fatte, ma nessuno le ha confermate.</div></div>';
+    ocraGroups.forEach(function(g){
+      var dates=g.wins.sort(function(a,b){return a.scad<b.scad?1:-1}).map(function(w){return w.ap.toLocaleDateString('it-IT')}).join(' · ');
+      html+='<div class="card" style="background:var(--ocrabg)"><div style="font-size:17px;font-weight:600;color:var(--ocra)">'+esc(g.s.nome)+'</div>'+
+        '<div style="font-size:14px;color:var(--ocra);margin-top:3px">⬤ <b>'+g.wins.length+'</b> '+(g.wins.length>1?'finestre non controllate':'finestra non controllata')+' (ultime 5 sett.) — '+(g.wins.length>1?'valgono':'vale')+' come '+(g.wins.length>1?'fatte':'fatta')+', non confermat'+(g.wins.length>1?'e':'a')+'</div>'+
+        '<div style="font-size:13px;color:var(--ocra);margin-top:4px">'+dates+'</div>'+
+        '<button class="src-link" data-cap="'+g.s.id+'">📄 '+esc(g.s.fonte)+'</button></div>';
+    });
     chiusiReports.forEach(function(r){
       var s=srvById(r.servizio); var fatto=r.stato==='ok';
       var col=fatto?'ok':'todo';
@@ -737,6 +780,22 @@ function renderDossier(){
   var bySrv={};probs.forEach(function(r){(bySrv[r.servizio]=bySrv[r.servizio]||[]).push(r)});
   var html='<div class="card"><div class="row"><span style="font-size:28px">▤</span><div><div style="font-weight:600;font-size:18px">Dossier — esecuzione capitolato verde</div><div class="sub">generato il '+new Date().toLocaleDateString('it-IT')+' · si aggiorna da solo</div></div></div>'+
     '<div class="metrics" style="margin-top:12px"><div class="metric"><label>segnalazioni</label><div class="n">'+reports.length+'</div></div><div class="metric"><label>inadempienze aperte</label><div class="n" style="color:var(--bad)">'+Object.keys(bySrv).length+'</div></div></div></div>';
+  // PENALI Art.5: problemi APERTI su servizi settimanali+ (i giornalieri non generano penale)
+  var penali=[]; probs.forEach(function(r){ var p=penaleOf(r); if(p) penali.push({r:r,p:p}); });
+  if(penali.length){
+    function eur(n){return '€ '+Math.round(n).toLocaleString('it-IT');}
+    var totEuro=penali.reduce(function(t,x){return t+x.p.euro},0);
+    var penList=penali.sort(function(a,b){return b.p.euro-a.p.euro}).map(function(x){ var s=srvById(x.r.servizio);
+      return '<div style="border-top:.5px solid var(--line);padding:8px 0;display:flex;justify-content:space-between;gap:8px">'+
+        '<div style="min-width:0"><div style="font-size:16px;font-weight:600">'+esc(s?s.nome:x.r.servizio)+'</div>'+
+        '<div style="font-size:14px;color:var(--hint)">'+esc(x.r.area)+' · '+x.p.giorni+' gg di ritardo · €100 + €30×'+x.p.giorni+'</div></div>'+
+        '<div style="font-weight:700;color:var(--bad);white-space:nowrap">'+eur(x.p.euro)+'</div></div>'; }).join('');
+    html+='<div class="card" style="border-color:var(--bad)"><div class="row"><span style="font-size:26px">⚖️</span>'+
+      '<div><div style="font-weight:600;font-size:18px">Penali Art. 5</div><div class="sub">servizi non eseguiti e segnalati (settimanali+)</div></div></div>'+
+      '<div style="font-size:30px;font-weight:800;color:var(--bad);margin:10px 0 2px">'+eur(totEuro)+'</div>'+
+      '<div class="sub" style="margin-bottom:4px">'+penali.length+' inadempiment'+(penali.length>1?'i':'o')+' · €100 a inadempimento + €30/giorno di ritardo (matura finché non risolto)</div>'+
+      penList+'</div>';
+  }
   if(!probs.length){ v.innerHTML=html+'<div class="empty">Nessuna inadempienza aperta. Le segnalazioni di "problema" compariranno qui, pronte per il legale o l\'assemblea.</div>'; return; }
   Object.keys(bySrv).forEach(function(sid){
     var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid}),rs=bySrv[sid];
