@@ -102,6 +102,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
+const APP_VERSION = 'v28';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='Pal. E';
 let UNITA_LIST=null;
@@ -290,6 +291,7 @@ function userMenu(){
     '<button id="um-logout" style="width:100%;margin-top:10px">Esci</button>'+
     '<button id="um-del" style="width:100%;margin-top:18px;border-color:var(--bad);color:var(--bad)">Elimina il mio account</button>'+
     '<p class="sub" style="margin-top:8px">Eliminando l\'account si chiude il tuo accesso e si libera la tua unità. <b>Le segnalazioni che hai inviato restano</b> (firmate col tuo nome), perché sono prove condivise della comunità.</p>'+
+    '<p class="sub" style="margin-top:14px;text-align:center;color:var(--hint)">Custodi 451 · versione '+APP_VERSION+'</p>'+
     '</div>';
   document.body.appendChild(m);
   $('um-x').onclick=function(){m.remove()};
