@@ -137,8 +137,6 @@ function dscad(e){var oggi=new Date(),dom=new Date(oggi);dom.setDate(dom.getDate
   if(e.toDateString()===dom.toDateString())return 'domani';
   return e.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});}
 function startOfWeek(d){var x=new Date(d);var day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);x.setHours(0,0,0,0);return x;}
-// Il controllo parte dall'adozione dell'app: le finestre scadute PRIMA di questa data non si contano (niente muro di ocra al lancio).
-var CONTROLLO_START=new Date(2026,5,26,0,0,0);
 // Finestra corrente del servizio s; null se fuori stagione (mese non attivo). ap = apertura, scad = scadenza.
 function windowOf(s,d){d=d||new Date();var m=d.getMonth()+1,y=d.getFullYear();
   if(s.mesi&&s.mesi.indexOf(m)<0)return null;
@@ -152,7 +150,7 @@ function windowOf(s,d){d=d||new Date();var m=d.getMonth()+1,y=d.getFullYear();
 // Finestra immediatamente precedente (o null se prima dell'avvio del controllo / non esiste in stagione)
 function prevWindowOf(s,d){d=d||new Date();var cur=windowOf(s,d);if(!cur)return null;
   var before=new Date(cur.ap.getTime()-86400000);
-  for(var k=0;k<400;k++){var w=windowOf(s,before);if(w&&w.id!==cur.id)return (w.scad>=CONTROLLO_START)?w:null;before=new Date(before.getTime()-86400000);}
+  for(var k=0;k<400;k++){var w=windowOf(s,before);if(w&&w.id!==cur.id)return w;before=new Date(before.getTime()-86400000);}
   return null;
 }
 // Esito di una finestra PASSATA: 'ok'=fatto confermato · 'problema'=segnalato · 'ocra'=scaduta SENZA controllo (vale come fatta)
