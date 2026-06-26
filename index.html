@@ -119,6 +119,41 @@ function esc(s){return (s||'').replace(/[&<>]/g,function(c){return{'&':'&amp;','
 function fmt(iso){var d=new Date(iso);return d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
 function oggiLabel(){return new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}
 function applicabile(s){return !s.mesi||s.mesi.indexOf(meseOggi)>=0}
+
+/* ---------- FINESTRE DI VERIFICA (nota 18) ----------
+   Ogni servizio ha una finestra (giorno/settimana/decade/mese/stagione): la verifica
+   vive DENTRO la finestra e si CHIUDE alla sua scadenza. Niente "non fatto" prima della
+   scadenza → niente penali Art.5 applicate male. Le segnalazioni sono bucketizzate per periodo. */
+function pad2(n){return (n<10?'0':'')+n}
+var MESINOMI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+function isoWeek(d){var t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));var day=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-day+3);var firstThu=new Date(Date.UTC(t.getUTCFullYear(),0,4));var week=1+Math.round(((t-firstThu)/86400000-3+((firstThu.getUTCDay()+6)%7))/7);return [t.getUTCFullYear(),week];}
+function endOfWeek(d){var x=new Date(d);var day=(x.getDay()+6)%7;x.setDate(x.getDate()+(6-day));x.setHours(23,59,59,0);return x;}
+function decadeOf(d){var g=d.getDate();return g<=10?1:g<=20?2:3;}
+function endOfDecade(d){var n=decadeOf(d),y=d.getFullYear(),m=d.getMonth();if(n===1)return new Date(y,m,10,23,59,59);if(n===2)return new Date(y,m,20,23,59,59);return new Date(y,m+1,0,23,59,59);}
+function endOfMonth(d){return new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59);}
+function dscad(e){var oggi=new Date(),dom=new Date(oggi);dom.setDate(dom.getDate()+1);
+  if(e.toDateString()===oggi.toDateString())return 'oggi';
+  if(e.toDateString()===dom.toDateString())return 'domani';
+  return e.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});}
+// Finestra corrente del servizio s; null se fuori stagione (mese non attivo)
+function windowOf(s,d){d=d||new Date();var m=d.getMonth()+1,y=d.getFullYear();
+  if(s.mesi&&s.mesi.indexOf(m)<0)return null;
+  var t=s.win||'W';
+  if(t==='D'){var e=new Date(y,d.getMonth(),d.getDate(),23,59,59);return {id:y+'-'+pad2(m)+'-'+pad2(d.getDate()),scad:e,label:'oggi'};}
+  if(t==='X10'){var n=decadeOf(d),e=endOfDecade(d);return {id:y+'-'+pad2(m)+'-D'+n,scad:e,label:'entro '+dscad(e)};}
+  if(t==='M'){var e=endOfMonth(d);return {id:y+'-'+pad2(m),scad:e,label:'entro fine '+MESINOMI[d.getMonth()]};}
+  if(t==='S'){var last=s.mesi?Math.max.apply(null,s.mesi):12,first=s.mesi?Math.min.apply(null,s.mesi):1,e=new Date(y,last,0,23,59,59);return {id:y+'-S'+pad2(first),scad:e,label:'entro fine '+MESINOMI[last-1]};}
+  var w=isoWeek(d),e=endOfWeek(d);return {id:w[0]+'-W'+pad2(w[1]),scad:e,label:'entro '+dscad(e)};   // 'W' default
+}
+function curPeriodo(sid){var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid});var w=s?windowOf(s):null;return w?w.id:'';}
+// stato/segnalazioni SCOPED al periodo corrente (per la vista Zona)
+function latestP(area,sid){var pid=curPeriodo(sid);var r=reports.filter(function(x){return x.area===area&&x.servizio===sid&&(x.periodo||'')===pid});return r[0]||null;}
+function myReportP(area,sid){var pid=curPeriodo(sid);return reports.find(function(x){return x.autore_id===userId&&x.area===area&&x.servizio===sid&&(x.periodo||'')===pid})||null;}
+// pill: problema aperto (qualsiasi periodo, finché non risolto) prevale; poi "fatto" del periodo; poi da verificare
+function pillStato(area,sid){
+  if(reports.some(function(r){return r.area===area&&r.servizio===sid&&isOpen(r)}))return 'problema';
+  var l=latestP(area,sid);return (l&&l.stato==='ok')?'ok':'todo';
+}
 function setApp(on){$('nav').style.display=on?'flex':'none'; $('nav-admin').classList.toggle('hide',!isAdmin); if(!on)$('user-badge').classList.add('hide')}
 
 // Pallino rosso col numero di richieste IN ATTESA sul tab Admin
@@ -435,7 +470,7 @@ async function scaricaContratto(){
 /* ---------- VIEW: ZONA ---------- */
 function renderZona(){
   var v=$('view-zona');
-  var apri=CAPITOLATO_VERDE.filter(function(s){return statoOf(curArea,s.id)==='problema'}).length;
+  var apri=reports.filter(function(r){return r.area===curArea&&isOpen(r)}).length;
   var totApri=reports.filter(isOpen).length;
   var html=(approvato()?'':'<div class="pres-note" style="margin:0 0 11px"><b>Il tuo accesso è in attesa di conferma</b> dall\'amministratore del gruppo. Intanto puoi guardare tutto; potrai inviare segnalazioni appena sei confermato.</div>')+
     '<label>Dove sei ora</label><select id="z-area">'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+a+'</option>'}).join('')+'</select>'+
@@ -443,13 +478,14 @@ function renderZona(){
     '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
     '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:12px 2px 8px">Cosa controllare in '+esc(curArea)+' · '+oggiLabel()+'</p>';
   CAPITOLATO_VERDE.forEach(function(s){
-    if(!applicabile(s))return;
-    var st=statoOf(curArea,s.id),c=st==='ok'?'ok':st==='problema'?'bad':'todo',ic=st==='ok'?'✓':st==='problema'?'!':'?';
-    var l=latest(curArea,s.id); var mio=myReport(curArea,s.id);
+    var w=windowOf(s); if(!w)return;                       // mostra solo i servizi la cui finestra è APERTA ora
+    var st=pillStato(curArea,s.id),c=st==='ok'?'ok':st==='problema'?'bad':'todo',ic=st==='ok'?'✓':st==='problema'?'!':'?';
+    var l=latestP(curArea,s.id); var mio=myReportP(curArea,s.id);
     var btnLabel = mio? '✎ Modifica' : 'Segnala';
+    var scadTxt = st==='ok' ? 'verificato in questa finestra' : (st==='problema' ? 'problema aperto' : w.label);
     html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
       '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
-      '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+(mio?' · <b style="color:var(--'+(mio.stato==='ok'?'ok':'bad')+')">tua: '+(mio.stato==='ok'?'fatto':'problema')+'</b>':(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):''))+'</div></div>'+
+      '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+' · <b>'+esc(scadTxt)+'</b>'+(mio?' · <b style="color:var(--'+(mio.stato==='ok'?'ok':'bad')+')">tua: '+(mio.stato==='ok'?'fatto':'problema')+'</b>':(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):''))+'</div></div>'+
       (approvato()?'<button class="seg" data-s="'+s.id+'">'+btnLabel+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>')+'</div>'+
       '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
   });
@@ -462,7 +498,7 @@ function renderZona(){
 /* ---------- SEGNALA ---------- */
 function openSegnala(sid){
   var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid});
-  var existing=myReport(curArea,sid);
+  var existing=myReportP(curArea,sid);
   var existingUrls = existing? fotoListOf(existing).slice() : [];
   var m=document.createElement('div');
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
@@ -503,7 +539,7 @@ function openSegnala(sid){
     if(DEMO){
       var urlsD=existingUrls.concat(fotoBlobs.map(function(b){return URL.createObjectURL(b)}));
       if(existing){ existing.stato=stato; existing.nota=$('b-nota').value.trim(); existing.foto_urls=urlsD; existing.foto_url=urlsD[0]||null; }
-      else { reports.unshift({id:'d'+Date.now(),area:curArea,servizio:s.id,servizio_nome:s.nome,fonte:s.fonte,stato:stato,nota:$('b-nota').value.trim(),foto_url:urlsD[0]||null,foto_urls:urlsD,autore_id:userId,autore_nome:userNome,risolto:false,created_at:new Date().toISOString()}); }
+      else { reports.unshift({id:'d'+Date.now(),area:curArea,servizio:s.id,servizio_nome:s.nome,fonte:s.fonte,stato:stato,nota:$('b-nota').value.trim(),foto_url:urlsD[0]||null,foto_urls:urlsD,autore_id:userId,autore_nome:userNome,risolto:false,periodo:curPeriodo(s.id),created_at:new Date().toISOString()}); }
       m.remove(); renderAll(); return;
     }
     var btn=$('b-send'); btn.disabled=true; btn.textContent='Invio…';
@@ -516,8 +552,8 @@ function openSegnala(sid){
         newUrls.push(sb.storage.from('foto').getPublicUrl(path).data.publicUrl);
       }
       var allUrls=existingUrls.concat(newUrls);
-      var payload={ area:curArea, servizio:s.id, servizio_nome:s.nome, fonte:s.fonte, stato:stato, nota:$('b-nota').value.trim(), foto_url:allUrls[0]||null, foto_urls:allUrls, autore_id:userId, autore_nome:userNome };
-      var res=await sb.from('segnalazioni').upsert(payload,{onConflict:'autore_id,area,servizio'});
+      var payload={ area:curArea, servizio:s.id, servizio_nome:s.nome, fonte:s.fonte, stato:stato, nota:$('b-nota').value.trim(), foto_url:allUrls[0]||null, foto_urls:allUrls, autore_id:userId, autore_nome:userNome, periodo:curPeriodo(s.id) };
+      var res=await sb.from('segnalazioni').upsert(payload,{onConflict:'autore_id,area,servizio,periodo'});
       if(res.error) throw res.error;
       m.remove(); await loadReports(); renderAll();
     }catch(err){ $('b-warn').textContent='Errore: '+err.message; $('b-warn').style.display='block'; btn.disabled=false; btn.textContent=existing?'Salva modifiche':'Invia segnalazione'; }
