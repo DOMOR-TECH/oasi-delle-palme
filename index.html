@@ -258,14 +258,45 @@ function userMenu(){
       '<div><label>Email</label><div style="font-size:17px">'+esc(userEmail||'—')+'</div></div>'+
       '<div><label>Stato</label><div style="margin-top:4px">'+statoChip()+'</div></div>'+
     '</div></div>'+
-    '<button id="um-logout" style="width:100%;margin-top:4px">Esci</button>'+
+    '<button id="um-chg" style="width:100%;margin-top:4px">Cambia unità</button>'+
+    '<button id="um-logout" style="width:100%;margin-top:10px">Esci</button>'+
     '<button id="um-del" style="width:100%;margin-top:18px;border-color:var(--bad);color:var(--bad)">Elimina il mio account</button>'+
     '<p class="sub" style="margin-top:8px">Eliminando l\'account si chiude il tuo accesso e si libera la tua unità. <b>Le segnalazioni che hai inviato restano</b> (firmate col tuo nome), perché sono prove condivise della comunità.</p>'+
     '</div>';
   document.body.appendChild(m);
   $('um-x').onclick=function(){m.remove()};
+  $('um-chg').onclick=function(){ cambiaUnita(m); };
   $('um-logout').onclick=async function(){ if(DEMO){location.href=location.pathname;return;} await sb.auth.signOut(); location.reload(); };
   $('um-del').onclick=function(){ eliminaAccount(m); };
+}
+// Cambia unità: l'utente sceglie la sua unità corretta da solo (libera la precedente, aggiorna il metadata, rientra)
+function cambiaUnita(menuEl){
+  menuEl.querySelector('.page-in').innerHTML=
+    '<div class="page-top"><button class="page-x" id="cu-x">×</button><h2 class="page-h">Cambia unità</h2></div>'+
+    '<p class="sub" style="margin:0 0 12px">Scegli la tua unità corretta. La tua unità attuale verrà liberata e dovrai essere riapprovato dall\'amministratore.</p>'+
+    unitaPickerHTML()+
+    '<button class="btn-primary" id="cu-go" style="margin-top:14px">Conferma cambio</button>'+
+    '<p id="cu-msg" class="sub" style="margin-top:10px;display:none;color:var(--bad)"></p>';
+  fillUnitaPicker();
+  $('cu-x').onclick=function(){ menuEl.remove(); };
+  $('cu-go').onclick=async function(){
+    var pal=$('u-pal').value, intr=$('u-int').value;
+    if(!pal){$('u-pal').focus();return} if(!intr){$('u-int').focus();return}
+    var nu=findUnitaCode(pal,intr);
+    if(!nu){ var msg=$('cu-msg'); msg.style.display='block'; msg.textContent='Unità non trovata.'; return; }
+    if(nu===(userUnita&&userUnita.unita)){ menuEl.remove(); return; }
+    if(!confirm('Cambiare la tua unità in '+nu+'?\n\nLa precedente verrà liberata e dovrai essere riapprovato.')) return;
+    if(DEMO){ alert('In modalità prova il cambio unità non è attivo.'); return; }
+    var btn=$('cu-go'); btn.disabled=true; btn.textContent='Un attimo…';
+    // 1) rilascia i miei accessi attuali (primario o comproprietario)
+    await sb.from('proprietari').update({autore_id:null,email:null,stato:'libero'}).eq('autore_id',userId);
+    await sb.from('coproprietari').delete().eq('autore_id',userId);
+    // 2) aggiorna il metadata e rientra pulito
+    var up=await sb.auth.updateUser({ data:{ unita:nu } });
+    if(up.error){ var m2=$('cu-msg'); m2.style.display='block'; m2.textContent='Errore: '+up.error.message; btn.disabled=false; btn.textContent='Conferma cambio'; return; }
+    try{ localStorage.setItem('pendingUnita', nu); }catch(e){}
+    location.reload();
+  };
 }
 async function eliminaAccount(menuEl){
   if(!confirm('Vuoi eliminare il tuo account?\n\nIl tuo accesso verrà chiuso e la tua unità liberata. Le segnalazioni che hai inviato RESTANO (firmate col tuo nome).')) return;
