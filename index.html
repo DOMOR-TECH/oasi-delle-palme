@@ -329,6 +329,8 @@ async function addComment(rid, testo){
 function latest(area,sid){var r=reports.filter(function(x){return x.area===area&&x.servizio===sid});return r[0]||null}
 function statoOf(area,sid){var l=latest(area,sid);return l?l.stato:'todo'}
 function isOpen(r){return r.stato==='problema' && !r.risolto}
+function myReport(area,sid){return reports.find(function(x){return x.autore_id===userId && x.area===area && x.servizio===sid})||null}
+function fotoListOf(r){return (r.foto_urls&&r.foto_urls.length)?r.foto_urls:(r.foto_url?[r.foto_url]:[])}
 async function resolveProblem(r){
   if(DEMO){ r.risolto=true; return true; }
   const { error } = await sb.from('segnalazioni').update({ risolto:true }).eq('id', r.id);
@@ -443,11 +445,12 @@ function renderZona(){
   CAPITOLATO_VERDE.forEach(function(s){
     if(!applicabile(s))return;
     var st=statoOf(curArea,s.id),c=st==='ok'?'ok':st==='problema'?'bad':'todo',ic=st==='ok'?'✓':st==='problema'?'!':'?';
-    var l=latest(curArea,s.id);
+    var l=latest(curArea,s.id); var mio=myReport(curArea,s.id);
+    var btnLabel = mio? '✎ Modifica' : 'Segnala';
     html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
       '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
-      '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):'')+'</div></div>'+
-      (approvato()?'<button class="seg" data-s="'+s.id+'">Segnala</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>')+'</div>'+
+      '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+(mio?' · <b style="color:var(--'+(mio.stato==='ok'?'ok':'bad')+')">tua: '+(mio.stato==='ok'?'fatto':'problema')+'</b>':(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):''))+'</div></div>'+
+      (approvato()?'<button class="seg" data-s="'+s.id+'">'+btnLabel+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>')+'</div>'+
       '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
   });
   v.innerHTML=html;
@@ -459,49 +462,65 @@ function renderZona(){
 /* ---------- SEGNALA ---------- */
 function openSegnala(sid){
   var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid});
+  var existing=myReport(curArea,sid);
+  var existingUrls = existing? fotoListOf(existing).slice() : [];
   var m=document.createElement('div');
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
   m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
-    '<div style="font-size:18px;font-weight:600">'+esc(s.nome)+'</div>'+
+    '<div style="font-size:18px;font-weight:600">'+esc(s.nome)+(existing?' <span style="font-size:14px;color:var(--info)">· modifica</span>':'')+'</div>'+
     '<div style="font-size:15px;color:var(--hint);margin:2px 0 12px">'+esc(curArea)+' · dovuto: '+esc(s.freq)+' · '+esc(s.fonte)+'</div>'+
+    (existing?'<div class="sub" style="margin:-6px 0 10px">Hai già segnalato questa voce: stai <b>modificando</b> la tua segnalazione.</div>':'')+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
       '<button id="b-ok" style="border-color:var(--ok);color:var(--ok)">✓ Fatto</button>'+
       '<button id="b-no" style="border-color:var(--bad);color:var(--bad)">! Problema</button></div>'+
-    '<label style="margin-top:12px;display:block">Foto (consigliata = prova)</label>'+
-    '<input id="b-foto" type="file" accept="image/*" capture="environment" style="margin-top:4px">'+
-    '<img id="b-prev" class="hide" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--r);margin-top:8px">'+
-    '<label style="margin-top:8px;display:block">Nota (facoltativa)</label><textarea id="b-nota" rows="2" placeholder="es. prato secco, irrigazione ferma da giorni"></textarea>'+
+    '<label style="margin-top:12px;display:block">Foto (puoi sceglierne più di una)</label>'+
+    '<input id="b-foto" type="file" accept="image/*" multiple style="margin-top:4px">'+
+    '<div id="b-prevs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'+
+    '<label style="margin-top:8px;display:block">Nota (facoltativa)</label><textarea id="b-nota" rows="2" placeholder="es. prato secco, irrigazione ferma da giorni">'+esc(existing&&existing.nota?existing.nota:'')+'</textarea>'+
     '<div style="font-size:14px;color:var(--hint);margin-top:8px">firma: '+esc(userNome)+' · '+new Date().toLocaleDateString('it-IT')+' · zona '+esc(curArea)+'</div>'+
     '<div id="b-warn" style="color:var(--bad);font-size:15px;margin-top:8px;display:none">Indica prima se è Fatto o Problema</div>'+
     '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button id="b-x">Annulla</button>'+
-    '<button class="btn-primary" id="b-send">Invia segnalazione</button></div></div>';
+    '<button class="btn-primary" id="b-send">'+(existing?'Salva modifiche':'Invia segnalazione')+'</button></div></div>';
   document.querySelector('.wrap').appendChild(m);
-  var stato=null, fotoBlob=null;
+  var stato = existing? existing.stato : null, fotoBlobs=[];
   function pick(el,col){$('b-ok').style.outline='';$('b-no').style.outline='';el.style.outline='2px solid '+col}
+  function renderPrevs(){
+    var h='';
+    existingUrls.forEach(function(u,i){ h+='<div style="position:relative"><img src="'+esc(u)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-ex="'+i+'" class="rm-ex" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; });
+    fotoBlobs.forEach(function(b,i){ h+='<div style="position:relative"><img src="'+URL.createObjectURL(b)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-nw="'+i+'" class="rm-nw" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; });
+    var p=$('b-prevs'); p.innerHTML=h;
+    p.querySelectorAll('.rm-ex').forEach(function(b){b.onclick=function(){existingUrls.splice(+b.dataset.ex,1);renderPrevs();}});
+    p.querySelectorAll('.rm-nw').forEach(function(b){b.onclick=function(){fotoBlobs.splice(+b.dataset.nw,1);renderPrevs();}});
+  }
+  if(existing && stato){ pick(stato==='ok'?$('b-ok'):$('b-no'), stato==='ok'?'var(--ok)':'var(--bad)'); }
+  renderPrevs();
   $('b-ok').onclick=function(){stato='ok';pick(this,'var(--ok)')};
   $('b-no').onclick=function(){stato='problema';pick(this,'var(--bad)')};
-  $('b-foto').onchange=function(e){var f=e.target.files[0];if(!f)return;downscale(f,function(blob){fotoBlob=blob;var p=$('b-prev');p.src=URL.createObjectURL(blob);p.classList.remove('hide')})};
+  $('b-foto').onchange=function(e){ [].slice.call(e.target.files).forEach(function(f){ downscale(f,function(blob){ fotoBlobs.push(blob); renderPrevs(); }); }); e.target.value=''; };
   $('b-x').onclick=function(){m.remove()};
   $('b-send').onclick=async function(){
     if(!stato){$('b-warn').style.display='block';return}
-    if(DEMO){ reports.unshift({id:'d'+Date.now(),area:curArea,servizio:s.id,servizio_nome:s.nome,fonte:s.fonte,stato:stato,nota:$('b-nota').value.trim(),foto_url:(fotoBlob?URL.createObjectURL(fotoBlob):null),autore_id:userId,autore_nome:userNome,risolto:false,created_at:new Date().toISOString()}); m.remove(); renderAll(); return; }
+    if(DEMO){
+      var urlsD=existingUrls.concat(fotoBlobs.map(function(b){return URL.createObjectURL(b)}));
+      if(existing){ existing.stato=stato; existing.nota=$('b-nota').value.trim(); existing.foto_urls=urlsD; existing.foto_url=urlsD[0]||null; }
+      else { reports.unshift({id:'d'+Date.now(),area:curArea,servizio:s.id,servizio_nome:s.nome,fonte:s.fonte,stato:stato,nota:$('b-nota').value.trim(),foto_url:urlsD[0]||null,foto_urls:urlsD,autore_id:userId,autore_nome:userNome,risolto:false,created_at:new Date().toISOString()}); }
+      m.remove(); renderAll(); return;
+    }
     var btn=$('b-send'); btn.disabled=true; btn.textContent='Invio…';
     try{
-      var fotoUrl=null;
-      if(fotoBlob){
-        var path=userId+'/'+Date.now()+'.jpg';
-        var up=await sb.storage.from('foto').upload(path, fotoBlob, {contentType:'image/jpeg'});
+      var newUrls=[];
+      for(var i=0;i<fotoBlobs.length;i++){
+        var path=userId+'/'+Date.now()+'-'+i+'.jpg';
+        var up=await sb.storage.from('foto').upload(path, fotoBlobs[i], {contentType:'image/jpeg'});
         if(up.error) throw up.error;
-        fotoUrl=sb.storage.from('foto').getPublicUrl(path).data.publicUrl;
+        newUrls.push(sb.storage.from('foto').getPublicUrl(path).data.publicUrl);
       }
-      var ins=await sb.from('segnalazioni').insert({
-        area:curArea, servizio:s.id, servizio_nome:s.nome, fonte:s.fonte,
-        stato:stato, nota:$('b-nota').value.trim(), foto_url:fotoUrl,
-        autore_id:userId, autore_nome:userNome
-      });
-      if(ins.error) throw ins.error;
+      var allUrls=existingUrls.concat(newUrls);
+      var payload={ area:curArea, servizio:s.id, servizio_nome:s.nome, fonte:s.fonte, stato:stato, nota:$('b-nota').value.trim(), foto_url:allUrls[0]||null, foto_urls:allUrls, autore_id:userId, autore_nome:userNome };
+      var res=await sb.from('segnalazioni').upsert(payload,{onConflict:'autore_id,area,servizio'});
+      if(res.error) throw res.error;
       m.remove(); await loadReports(); renderAll();
-    }catch(err){ $('b-warn').textContent='Errore: '+err.message; $('b-warn').style.display='block'; btn.disabled=false; btn.textContent='Invia segnalazione'; }
+    }catch(err){ $('b-warn').textContent='Errore: '+err.message; $('b-warn').style.display='block'; btn.disabled=false; btn.textContent=existing?'Salva modifiche':'Invia segnalazione'; }
   };
 }
 function downscale(file,cb){var img=new Image();var rd=new FileReader();rd.onload=function(){img.onload=function(){var mx=1280,sc=Math.min(1,mx/Math.max(img.width,img.height));var cv=document.createElement('canvas');cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);cv.toBlob(function(b){cb(b)},'image/jpeg',0.75)};img.src=rd.result};rd.readAsDataURL(file)}
@@ -547,9 +566,13 @@ function renderDossier(){
     rs.forEach(function(r){
       var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
       var mine=(r.autore_id && r.autore_id===userId);
+      var fotos=fotoListOf(r);
+      var fotoHtml=fotos.length
+        ? fotos.map(function(u){return '<img class="photo-thumb dz-img" data-img="'+esc(u)+'" src="'+esc(u)+'" style="cursor:pointer">'}).join('')
+        : '<div class="photo-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--hint);background:var(--todobg)">—</div>';
       html+='<div style="border-top:.5px solid var(--line);padding:8px 0">'+
-        '<div class="row">'+
-        (r.foto_url?'<img class="photo-thumb dz-img" data-img="'+esc(r.foto_url)+'" src="'+esc(r.foto_url)+'" style="cursor:pointer">':'<div class="photo-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--hint);background:var(--todobg)">—</div>')+
+        '<div class="row" style="align-items:flex-start">'+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;max-width:150px">'+fotoHtml+'</div>'+
         '<div style="flex:1;min-width:0"><div style="font-size:16px">'+esc(r.area)+(r.nota?' — '+esc(r.nota):'')+'</div>'+
         '<div style="font-size:14px;color:var(--hint)">'+esc(r.autore_nome)+' · '+fmt(r.created_at)+'</div></div></div>'+
         '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+
@@ -604,8 +627,9 @@ async function exportPDF(){
         doc.setFontSize(9); doc.setTextColor(110);
         doc.text(r.autore_nome+' · '+fmt(r.created_at), M, y+12+lines.length*13+3); doc.setTextColor(0);
         y+=12+lines.length*13+12;
-        if(r.foto_url){ try{
-          var im=await loadImg(r.foto_url);
+        var fotos=fotoListOf(r);
+        for(var fi=0; fi<fotos.length; fi++){ try{
+          var im=await loadImg(fotos[fi]);
           var iw=(W-2*M)*0.5, ih=iw*im.h/im.w;       // foto al 50% della larghezza utile, proporzioni reali
           var avail=H-54-y-16;                        // spazio rimasto sotto y in questa pagina
           if(ih>avail){ doc.addPage(); y=54; avail=H-54-y-16; }
