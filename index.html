@@ -16,6 +16,7 @@
     --bg:#f6f5f1; --surface:#ffffff; --line:rgba(0,0,0,.12); --line2:rgba(0,0,0,.22);
     --txt:#1c1c1a; --muted:#5f5e5a; --hint:#8a8980;
     --ok:#0f6e56; --okbg:#e1f5ee; --bad:#a32d2d; --badbg:#fceaea; --todo:#85705a; --todobg:#f1efe8;
+    --ocra:#9a6b1f; --ocrabg:#f6ecd4;
     --info:#185fa5; --infobg:#e6f1fb; --r:10px; --r2:14px;
   }
   *{box-sizing:border-box}
@@ -135,15 +136,31 @@ function dscad(e){var oggi=new Date(),dom=new Date(oggi);dom.setDate(dom.getDate
   if(e.toDateString()===oggi.toDateString())return 'oggi';
   if(e.toDateString()===dom.toDateString())return 'domani';
   return e.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});}
-// Finestra corrente del servizio s; null se fuori stagione (mese non attivo)
+function startOfWeek(d){var x=new Date(d);var day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);x.setHours(0,0,0,0);return x;}
+// Il controllo parte dall'adozione dell'app: le finestre scadute PRIMA di questa data non si contano (niente muro di ocra al lancio).
+var CONTROLLO_START=new Date(2026,5,26,0,0,0);
+// Finestra corrente del servizio s; null se fuori stagione (mese non attivo). ap = apertura, scad = scadenza.
 function windowOf(s,d){d=d||new Date();var m=d.getMonth()+1,y=d.getFullYear();
   if(s.mesi&&s.mesi.indexOf(m)<0)return null;
   var t=s.win||'W';
-  if(t==='D'){var e=new Date(y,d.getMonth(),d.getDate(),23,59,59);return {id:y+'-'+pad2(m)+'-'+pad2(d.getDate()),scad:e,label:'oggi'};}
-  if(t==='X10'){var n=decadeOf(d),e=endOfDecade(d);return {id:y+'-'+pad2(m)+'-D'+n,scad:e,label:'entro '+dscad(e)};}
-  if(t==='M'){var e=endOfMonth(d);return {id:y+'-'+pad2(m),scad:e,label:'entro fine '+MESINOMI[d.getMonth()]};}
-  if(t==='S'){var last=s.mesi?Math.max.apply(null,s.mesi):12,first=s.mesi?Math.min.apply(null,s.mesi):1,e=new Date(y,last,0,23,59,59);return {id:y+'-S'+pad2(first),scad:e,label:'entro fine '+MESINOMI[last-1]};}
-  var w=isoWeek(d),e=endOfWeek(d);return {id:w[0]+'-W'+pad2(w[1]),scad:e,label:'entro '+dscad(e)};   // 'W' default
+  if(t==='D'){var e=new Date(y,d.getMonth(),d.getDate(),23,59,59);return {id:y+'-'+pad2(m)+'-'+pad2(d.getDate()),ap:new Date(y,d.getMonth(),d.getDate(),0,0,0),scad:e,label:'oggi'};}
+  if(t==='X10'){var n=decadeOf(d),e=endOfDecade(d),ap=new Date(y,d.getMonth(),n===1?1:n===2?11:21,0,0,0);return {id:y+'-'+pad2(m)+'-D'+n,ap:ap,scad:e,label:'entro '+dscad(e)};}
+  if(t==='M'){var e=endOfMonth(d);return {id:y+'-'+pad2(m),ap:new Date(y,d.getMonth(),1,0,0,0),scad:e,label:'entro fine '+MESINOMI[d.getMonth()]};}
+  if(t==='S'){var last=s.mesi?Math.max.apply(null,s.mesi):12,first=s.mesi?Math.min.apply(null,s.mesi):1,e=new Date(y,last,0,23,59,59);return {id:y+'-S'+pad2(first),ap:new Date(y,first-1,1,0,0,0),scad:e,label:'entro fine '+MESINOMI[last-1]};}
+  var w=isoWeek(d),e=endOfWeek(d);return {id:w[0]+'-W'+pad2(w[1]),ap:startOfWeek(d),scad:e,label:'entro '+dscad(e)};   // 'W' default
+}
+// Finestra immediatamente precedente (o null se prima dell'avvio del controllo / non esiste in stagione)
+function prevWindowOf(s,d){d=d||new Date();var cur=windowOf(s,d);if(!cur)return null;
+  var before=new Date(cur.ap.getTime()-86400000);
+  for(var k=0;k<400;k++){var w=windowOf(s,before);if(w&&w.id!==cur.id)return (w.scad>=CONTROLLO_START)?w:null;before=new Date(before.getTime()-86400000);}
+  return null;
+}
+// Esito di una finestra PASSATA: 'ok'=fatto confermato · 'problema'=segnalato · 'ocra'=scaduta SENZA controllo (vale come fatta)
+function periodOutcome(area,sid,periodId){
+  var rs=reports.filter(function(x){return x.area===area&&x.servizio===sid&&(x.periodo||'')===periodId;});
+  if(rs.some(function(r){return r.stato==='problema'}))return 'problema';
+  if(rs.some(function(r){return r.stato==='ok'}))return 'ok';
+  return 'ocra';   // nessuna segnalazione su finestra scaduta → potenzialmente fatto, non confermato, ma comunque fatto
 }
 function curPeriodo(sid){var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid});var w=s?windowOf(s):null;return w?w.id:'';}
 // stato/segnalazioni SCOPED al periodo corrente (per la vista Zona)
@@ -483,10 +500,15 @@ function renderZona(){
     var l=latestP(curArea,s.id); var mio=myReportP(curArea,s.id);
     var btnLabel = mio? '✎ Modifica' : 'Segnala';
     var scadTxt = st==='ok' ? 'verificato in questa finestra' : (st==='problema' ? 'problema aperto' : w.label);
+    var pw=prevWindowOf(s), pwBadge='';
+    if(pw && periodOutcome(curArea,s.id,pw.id)==='ocra'){
+      pwBadge='<div style="margin-top:8px;font-size:14px;background:var(--ocrabg);color:var(--ocra);padding:7px 10px;border-radius:8px;line-height:1.4">⬤ Finestra precedente <b>scaduta senza controllo</b> — vale come fatta, ma <b>nessuno l\'ha confermata</b>. La prossima volta tocca a noi guardare in tempo.</div>';
+    }
     html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
       '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
       '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+' · <b>'+esc(scadTxt)+'</b>'+(mio?' · <b style="color:var(--'+(mio.stato==='ok'?'ok':'bad')+')">tua: '+(mio.stato==='ok'?'fatto':'problema')+'</b>':(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):''))+'</div></div>'+
       (approvato()?'<button class="seg" data-s="'+s.id+'">'+btnLabel+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>')+'</div>'+
+      pwBadge+
       '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
   });
   v.innerHTML=html;
