@@ -585,14 +585,21 @@ function downscale(file,cb){var img=new Image();var rd=new FileReader();rd.onloa
 function renderBacheca(){
   var v=$('view-bacheca');
   var probByArea={};reports.forEach(function(r){if(isOpen(r)){probByArea[r.area]=(probByArea[r.area]||0)+1}});
-  var okAree=AREE.filter(function(a){return !probByArea[a]}).length;
+  var pw={}; CAPITOLATO_VERDE.forEach(function(s){pw[s.id]=prevWindowOf(s);});
+  function ocraOf(a){var n=0;CAPITOLATO_VERDE.forEach(function(s){var w=pw[s.id];if(w&&periodOutcome(a,s.id,w.id)==='ocra')n++;});return n;}
+  var ocraByArea={}; AREE.forEach(function(a){ocraByArea[a]=ocraOf(a)});
   var totProb=Object.keys(probByArea).reduce(function(t,k){return t+probByArea[k]},0);
-  var html='<div class="metrics"><div class="metric"><label>Aree in ordine</label><div class="n">'+okAree+' <span style="font-size:15px;font-weight:400;color:var(--hint)">/'+AREE.length+'</span></div></div>'+
+  var totOcra=AREE.reduce(function(t,a){return t+ocraByArea[a]},0);
+  var okAree=AREE.filter(function(a){return !probByArea[a]&&!ocraByArea[a]}).length;
+  var html='<div class="metrics"><div class="metric"><label>Aree controllate</label><div class="n">'+okAree+' <span style="font-size:15px;font-weight:400;color:var(--hint)">/'+AREE.length+'</span></div></div>'+
     '<div class="metric"><label>Problemi aperti</label><div class="n" style="color:var(--bad)">'+totProb+'</div></div></div>'+
-    '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 8px">Mappa del complesso · '+oggiLabel()+'</p><div class="grid">';
-  AREE.forEach(function(a){var p=probByArea[a]||0,good=p===0;
-    html+='<button class="tile bch-tile" data-area="'+esc(a)+'" style="cursor:pointer;border-color:var(--'+(good?'ok':'bad')+');background:var(--'+(good?'ok':'bad')+'bg);color:var(--'+(good?'ok':'bad')+')">'+
-      '<span style="font-size:15px;font-weight:600">'+a+'</span><span style="font-size:14px">'+(good?'✓ ok':'! '+p+(p>1?' problemi':' problema'))+'</span></button>';
+    (totOcra?'<div style="margin:9px 0 2px;font-size:14px;background:var(--ocrabg);color:var(--ocra);padding:7px 10px;border-radius:8px">⬤ <b>'+totOcra+'</b> finestre scadute senza controllo — valgono come fatte, ma nessuno le ha confermate</div>':'')+
+    '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:10px 2px 8px">Mappa del complesso · '+oggiLabel()+'</p><div class="grid">';
+  AREE.forEach(function(a){var p=probByArea[a]||0,o=ocraByArea[a]||0;
+    var col=p>0?'bad':o>0?'ocra':'ok';
+    var txt=p>0?('! '+p+(p>1?' problemi':' problema')):o>0?('⬤ '+o+' non controllate'):'✓ ok';
+    html+='<button class="tile bch-tile" data-area="'+esc(a)+'" style="cursor:pointer;border-color:var(--'+col+');background:var(--'+col+'bg);color:var(--'+col+')">'+
+      '<span style="font-size:15px;font-weight:600">'+a+'</span><span style="font-size:14px">'+txt+'</span></button>';
   });
   v.innerHTML=html+'</div>';
   v.querySelectorAll('.bch-tile').forEach(function(b){b.onclick=function(){goToArea(b.dataset.area)}});
