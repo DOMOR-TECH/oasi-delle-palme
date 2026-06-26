@@ -547,37 +547,91 @@ async function scaricaContratto(){
   if(btn){btn.disabled=false;btn.textContent='📄 Scarica il contratto originale (PDF)';}
 }
 
-/* ---------- VIEW: ZONA ---------- */
+/* ---------- VIEW: ZONA (3 stati: Attuali · Problematici · Chiusi) ---------- */
+var curStato='attuali';
+function srvById(id){return CAPITOLATO_VERDE.find(function(x){return x.id===id})}
+function threadHTML(r){
+  var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
+  return '<button class="th-tog" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px;margin-top:8px">Discussione'+(cms.length?' ('+cms.length+')':'')+'</button>'+
+    '<div class="th" data-tid="'+r.id+'" style="display:none;margin-top:8px;padding-left:8px;border-left:2px solid var(--line)">'+
+      cms.map(function(c){return '<div style="margin-bottom:7px"><div style="font-size:14px"><span style="font-weight:500">'+esc(c.autore_nome)+'</span> <span style="color:var(--hint)">'+new Date(c.created_at).toLocaleDateString('it-IT')+'</span></div><div style="font-size:15px">'+esc(c.testo)+'</div></div>'}).join('')+
+      '<div style="display:flex;gap:6px;margin-top:6px"><input type="text" class="th-in" data-rid="'+r.id+'" placeholder="Scrivi un commento…" style="flex:1;margin-top:0"><button class="th-send" data-rid="'+r.id+'" style="flex:none">Invia</button></div>'+
+    '</div>';
+}
 function renderZona(){
   var v=$('view-zona');
   var apri=reports.filter(function(r){return r.area===curArea&&isOpen(r)}).length;
   var totApri=reports.filter(isOpen).length;
+  function hasOpenProblem(sid){ return reports.some(function(r){return r.area===curArea&&r.servizio===sid&&isOpen(r)}); }
+  // partiziona i servizi attivi
+  var attuali=[], problematici=[];
+  CAPITOLATO_VERDE.forEach(function(s){
+    if(hasOpenProblem(s.id)) problematici.push(s);
+    else if(windowOf(s)) attuali.push(s);
+  });
+  // CHIUSI: report di finestre PASSATE (periodo ≠ corrente) + conteggio ocra (finestra precedente non controllata)
+  var chiusiReports=reports.filter(function(r){ return r.area===curArea && !isOpen(r) && (r.periodo||'')!==curPeriodo(r.servizio); })
+    .sort(function(a,b){return a.created_at<b.created_at?1:-1});
+  var ocraCount=0; CAPITOLATO_VERDE.forEach(function(s){ var pw=prevWindowOf(s); if(pw && periodOutcome(curArea,s.id,pw.id)==='ocra') ocraCount++; });
+  var counts={attuali:attuali.length, problematici:problematici.length, chiusi:chiusiReports.length+ocraCount};
+
+  function chip(key,label){ var on=curStato===key;
+    return '<button class="zchip" data-st="'+key+'" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'#fff':'var(--muted)')+';font-size:14px;font-weight:600">'+label+' · '+counts[key]+'</button>'; }
+
   var html=(approvato()?'':'<div class="pres-note" style="margin:0 0 11px"><b>Il tuo accesso è in attesa di conferma</b> dall\'amministratore del gruppo. Intanto puoi guardare tutto; potrai inviare segnalazioni appena sei confermato.</div>')+
     '<label>Dove sei ora</label><select id="z-area">'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+a+'</option>'}).join('')+'</select>'+
     '<div class="metrics" style="margin-top:11px"><div class="metric"><label>Qui, aperti</label><div class="n" style="color:var(--bad)">'+apri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">problemi</span></div></div>'+
     '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
-    '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:12px 2px 8px">Cosa controllare in '+esc(curArea)+' · '+oggiLabel()+'</p>';
-  CAPITOLATO_VERDE.forEach(function(s){
-    var w=windowOf(s); if(!w)return;                       // mostra solo i servizi la cui finestra è APERTA ora
-    var st=pillStato(curArea,s.id),c=st==='ok'?'ok':st==='problema'?'bad':'todo',ic=st==='ok'?'✓':st==='problema'?'!':'?';
-    var l=latestP(curArea,s.id); var mio=myReportP(curArea,s.id);
-    var btnLabel = mio? '✎ Modifica' : 'Segnala';
-    var scadTxt = st==='ok' ? 'verificato in questa finestra' : (st==='problema' ? 'problema aperto' : w.label);
-    var pw=prevWindowOf(s), pwBadge='';
-    if(pw && periodOutcome(curArea,s.id,pw.id)==='ocra'){
-      pwBadge='<div style="margin-top:8px;font-size:14px;background:var(--ocrabg);color:var(--ocra);padding:7px 10px;border-radius:8px;line-height:1.4">⬤ Finestra precedente <b>scaduta senza controllo</b> — vale come fatta, ma <b>nessuno l\'ha confermata</b>. La prossima volta tocca a noi guardare in tempo.</div>';
-    }
-    html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
-      '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
-      '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+' · <b>'+esc(scadTxt)+'</b>'+(mio?' · <b style="color:var(--'+(mio.stato==='ok'?'ok':'bad')+')">tua: '+(mio.stato==='ok'?'fatto':'problema')+'</b>':(l?' · ultimo: '+(l.stato==='ok'?'fatto':'problema')+' '+new Date(l.created_at).toLocaleDateString('it-IT'):''))+'</div></div>'+
-      (approvato()?'<button class="seg" data-s="'+s.id+'">'+btnLabel+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>')+'</div>'+
-      pwBadge+
-      '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
-  });
+    '<div style="display:flex;gap:7px;margin:13px 0 4px">'+chip('attuali','Attuali')+chip('problematici','Problematici')+chip('chiusi','Chiusi')+'</div>';
+
+  function segBtn(sid,mio){ return approvato()?'<button class="seg" data-s="'+sid+'">'+(mio?'✎ Modifica':'Segnala')+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>'; }
+
+  if(curStato==='attuali'){
+    html+='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:8px 2px 8px">Cosa controllare in '+esc(curArea)+' · '+oggiLabel()+'</p>';
+    if(!attuali.length) html+='<div class="empty">Per ora niente da controllare in questa zona.</div>';
+    attuali.forEach(function(s){
+      var w=windowOf(s), st=pillStato(curArea,s.id), c=st==='ok'?'ok':'todo', ic=st==='ok'?'✓':'?';
+      var mio=myReportP(curArea,s.id), scadTxt= st==='ok'?'verificato in questa finestra':w.label;
+      html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
+        '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+' · <b>'+esc(scadTxt)+'</b>'+(mio?' · <b style="color:var(--ok)">tua: fatto</b>':'')+'</div></div>'+segBtn(s.id,mio)+'</div>'+
+        '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
+    });
+  } else if(curStato==='problematici'){
+    html+='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:8px 2px 8px">Problemi aperti in '+esc(curArea)+'</p>';
+    if(!problematici.length) html+='<div class="empty">Nessun problema aperto in questa zona. 👍</div>';
+    problematici.forEach(function(s){
+      var probs=reports.filter(function(r){return r.area===curArea&&r.servizio===s.id&&isOpen(r)});
+      var mio=myReportP(curArea,s.id);
+      html+='<div class="card"><div class="row"><span class="pill" style="background:var(--badbg);color:var(--bad)">!</span>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
+        '<div style="font-size:15px;color:var(--bad)"><b>'+probs.length+(probs.length>1?' problemi aperti':' problema aperto')+'</b></div></div>'+segBtn(s.id,mio)+'</div>'+
+        (probs[0]&&probs[0].nota?'<div style="font-size:15px;color:var(--muted);margin-top:6px">«'+esc(probs[0].nota)+'»</div>':'')+
+        '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
+    });
+    html+='<p class="sub" style="margin-top:10px">Il dossier completo (con foto ed export PDF) è nel tab <b>Dossier</b>.</p>';
+  } else {  // CHIUSI
+    html+='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:8px 2px 8px">Finestre concluse in '+esc(curArea)+'</p>';
+    if(ocraCount) html+='<div class="card" style="background:var(--ocrabg)"><div style="color:var(--ocra);font-size:15px;line-height:1.45">⬤ <b>'+ocraCount+'</b> '+(ocraCount>1?'finestre scadute':'finestra scaduta')+' senza controllo — valgono come fatte, ma nessuno le ha confermate.</div></div>';
+    if(!chiusiReports.length && !ocraCount) html+='<div class="empty">Ancora nessuna finestra conclusa qui.</div>';
+    chiusiReports.forEach(function(r){
+      var s=srvById(r.servizio); var fatto=r.stato==='ok';
+      var col=fatto?'ok':'todo';
+      html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+col+'bg);color:var(--'+col+')">'+(fatto?'✓':'•')+'</span>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s?s.nome:r.servizio)+'</div>'+
+        '<div style="font-size:14px;color:var(--hint)">'+(fatto?'fatto':'problema risolto')+' · '+esc(r.autore_nome)+' · '+new Date(r.created_at).toLocaleDateString('it-IT')+' <span style="color:var(--ok)">· completato</span></div></div></div>'+
+        (r.nota?'<div style="font-size:15px;color:var(--muted);margin-top:6px">«'+esc(r.nota)+'»</div>':'')+
+        threadHTML(r)+'</div>';
+    });
+  }
   v.innerHTML=html;
   $('z-area').onchange=function(e){curArea=e.target.value;renderAll()};
+  v.querySelectorAll('.zchip').forEach(function(b){b.onclick=function(){curStato=b.dataset.st;renderZona();window.scrollTo(0,0);}});
   v.querySelectorAll('.seg:not([disabled])').forEach(function(b){b.onclick=function(){openSegnala(b.dataset.s)}});
   v.querySelectorAll('.src-link[data-cap]').forEach(function(b){b.onclick=function(){openCapitolato(b.dataset.cap)}});
+  v.querySelectorAll('.th-tog').forEach(function(b){b.onclick=function(){var t=v.querySelector('.th[data-tid="'+b.dataset.rid+'"]');var show=t.style.display==='none';t.style.display=show?'block':'none';openThreads[b.dataset.rid]=show;}});
+  v.querySelectorAll('.th-send').forEach(function(b){b.onclick=async function(){var inp=v.querySelector('.th-in[data-rid="'+b.dataset.rid+'"]');if(!inp.value.trim())return;openThreads[b.dataset.rid]=true;var ok=await addComment(b.dataset.rid,inp.value);if(ok)renderZona();}});
+  Object.keys(openThreads).forEach(function(rid){if(openThreads[rid]){var t=v.querySelector('.th[data-tid="'+rid+'"]');if(t)t.style.display='block';}});
 }
 
 /* ---------- SEGNALA ---------- */
