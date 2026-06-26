@@ -114,6 +114,15 @@ async function loadUnitaList(){
   return UNITA_LIST;
 }
 function findUnitaCode(pal,intr){var u=(UNITA_LIST||[]).find(function(x){return x.palazzina===pal&&String(x.interno)===String(intr)});return u?u.unita:null;}
+// Insieme delle unità GIÀ REGISTRATE (stato != libero) → nel picker si mostrano non selezionabili
+var TAKEN_SET=null;
+async function loadTaken(){
+  if(TAKEN_SET) return TAKEN_SET;
+  if(DEMO){ TAKEN_SET=new Set(); return TAKEN_SET; }
+  try{ var r=await sb.from('proprietari').select('unita,stato'); TAKEN_SET=new Set((r.data||[]).filter(function(x){return x.stato&&x.stato!=='libero'}).map(function(x){return x.unita})); }
+  catch(e){ TAKEN_SET=new Set(); }
+  return TAKEN_SET;
+}
 const meseOggi=new Date().getMonth()+1;
 const $=function(id){return document.getElementById(id)};
 function esc(s){return (s||'').replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
@@ -273,6 +282,7 @@ function unitaPickerHTML(){
 }
 async function fillUnitaPicker(pre){
   var list=await loadUnitaList();
+  var TK=await loadTaken();
   var palSel=$('u-pal'), intSel=$('u-int'); if(!palSel) return;
   var pals=[]; list.forEach(function(u){if(pals.indexOf(u.palazzina)<0)pals.push(u.palazzina)});
   pals.sort();
@@ -280,7 +290,7 @@ async function fillUnitaPicker(pre){
   palSel.onchange=function(){
     intSel.innerHTML='<option value="" disabled selected>Int…</option>';
     list.filter(function(u){return u.palazzina===palSel.value}).sort(function(a,b){return (parseInt(a.interno,10)||0)-(parseInt(b.interno,10)||0)})
-      .forEach(function(u){var o=document.createElement('option');o.value=u.interno;o.textContent='Interno '+u.interno;intSel.appendChild(o)});
+      .forEach(function(u){var o=document.createElement('option');o.value=u.interno;var taken=TK.has(u.unita);o.textContent='Interno '+u.interno+(taken?' · già registrata':'');o.disabled=taken;intSel.appendChild(o)});
     intSel.disabled=false;
   };
   if(pre){ var u=list.find(function(x){return x.unita===pre}); if(u){ palSel.value=u.palazzina; palSel.onchange(); intSel.value=u.interno; } }   // pre-compila (conferma dopo il login)
@@ -354,8 +364,23 @@ function renderBloccato(pr){
   $('hsub').textContent='accesso non confermato';
   $('view-zona').innerHTML='<div class="card"><p style="font-weight:600;margin:0 0 6px;color:var(--bad)">Accesso non disponibile</p>'+
     '<p class="sub" style="margin:0 0 12px">'+esc(pr.motivo||'Non è stato possibile associare la tua unità.')+'</p>'+
-    '<button id="b-logout">Esci e riprova con un\'altra unità</button></div>';
-  $('b-logout').onclick=async function(){ await sb.auth.signOut(); location.reload(); };
+    '<p class="sub" style="margin:0 0 6px">Seleziona la <b>tua</b> unità per riprovare (quelle già registrate non sono selezionabili):</p>'+
+    unitaPickerHTML()+
+    '<button class="btn-primary" style="margin-top:12px" id="bl-go">Cambia unità ed entra</button>'+
+    '<button id="bl-logout" style="margin-top:10px">Esci</button></div>';
+  fillUnitaPicker();
+  $('bl-go').onclick=async function(){
+    var pal=$('u-pal').value, intr=$('u-int').value;
+    if(!pal){$('u-pal').focus();return} if(!intr){$('u-int').focus();return}
+    var unita=findUnitaCode(pal,intr);
+    if(!unita){ alert('Unità non trovata. Controlla palazzina e interno.'); return; }
+    var btn=$('bl-go'); btn.disabled=true; btn.textContent='Un attimo…';
+    var up=await sb.auth.updateUser({ data:{ unita:unita } });
+    if(up.error){ btn.disabled=false; btn.textContent='Cambia unità ed entra'; alert('Errore: '+up.error.message); return; }
+    try{ localStorage.setItem('pendingUnita', unita); }catch(e){}
+    init();
+  };
+  $('bl-logout').onclick=async function(){ await sb.auth.signOut(); location.reload(); };
 }
 
 /* ---------- DATI ---------- */
