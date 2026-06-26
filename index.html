@@ -102,7 +102,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v28';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v29';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='Pal. E';
 let UNITA_LIST=null;
@@ -694,7 +694,7 @@ function openSegnala(sid){
       '<button id="b-ok" style="border-color:var(--ok);color:var(--ok)">✓ Fatto</button>'+
       '<button id="b-no" style="border-color:var(--bad);color:var(--bad)">! Problema</button></div>'+
     '<label style="margin-top:12px;display:block">Foto (puoi sceglierne più di una)</label>'+
-    '<input id="b-foto" type="file" accept="image/*" multiple style="margin-top:4px">'+
+    '<input id="b-foto" type="file" accept="image/*" multiple style="display:none">'+
     '<div id="b-prevs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'+
     '<label style="margin-top:8px;display:block">Nota (facoltativa)</label><textarea id="b-nota" rows="2" placeholder="es. prato secco, irrigazione ferma da giorni">'+esc(existing&&existing.nota?existing.nota:'')+'</textarea>'+
     '<div style="font-size:14px;color:var(--hint);margin-top:8px">firma: '+esc(userNome)+' · '+new Date().toLocaleDateString('it-IT')+' · zona '+esc(curArea)+'</div>'+
@@ -708,9 +708,12 @@ function openSegnala(sid){
     var h='';
     existingUrls.forEach(function(u,i){ h+='<div style="position:relative"><img src="'+esc(u)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-ex="'+i+'" class="rm-ex" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; });
     fotoBlobs.forEach(function(b,i){ h+='<div style="position:relative"><img src="'+URL.createObjectURL(b)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-nw="'+i+'" class="rm-nw" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; });
+    // riquadro "+" SEMPRE in coda → resta a destra dopo le miniature: si capisce che si possono aggiungere altre foto
+    h+='<button type="button" id="b-add" aria-label="Aggiungi foto" style="width:64px;height:64px;border-radius:8px;border:2px dashed var(--ok);background:var(--okbg);color:var(--ok);font-size:34px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">+</button>';
     var p=$('b-prevs'); p.innerHTML=h;
     p.querySelectorAll('.rm-ex').forEach(function(b){b.onclick=function(){existingUrls.splice(+b.dataset.ex,1);renderPrevs();}});
     p.querySelectorAll('.rm-nw').forEach(function(b){b.onclick=function(){fotoBlobs.splice(+b.dataset.nw,1);renderPrevs();}});
+    $('b-add').onclick=function(){ $('b-foto').click(); };
   }
   if(existing && stato){ pick(stato==='ok'?$('b-ok'):$('b-no'), stato==='ok'?'var(--ok)':'var(--bad)'); }
   renderPrevs();
