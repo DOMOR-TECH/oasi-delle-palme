@@ -53,21 +53,21 @@ window.AREE = [
 // Quali servizi compaiono in ciascun TIPO di luogo (mappatura confermata da Corrado 2026-06).
 // Tipi: 'palazzina' (Pal.A–N) · 'collina' · 'piscina' · 'tennis' · 'strade' · 'comune' (Tutto il complesso)
 window.SERVIZIO_DOVE = {
-  irrigazione:         ['palazzina','collina','piscina'],
+  irrigazione:         ['palazzina','collina','piscina','tennis'],
   prato_piscina:       ['piscina'],
   strade:              ['strade'],
   tennis:              ['tennis'],
-  rasatura:            ['palazzina','collina'],
+  rasatura:            ['palazzina','collina','tennis'],
   innaffiatura_pilotis:['palazzina'],
   raccolta_foglie:     ['palazzina','collina'],
   estirpazione:        ['palazzina','collina'],
   ricostruzione_manto: ['palazzina','collina'],
   concimazione:        ['palazzina','collina'],
-  siepi:               ['palazzina','collina','piscina'],
+  siepi:               ['palazzina','collina','piscina','tennis'],
   arieggiatura:        ['palazzina','collina'],
   potatura_alberi:     ['palazzina','collina','piscina'],
   lampioni:            ['strade'],
-  manut_irrigazione:   ['palazzina','collina','piscina'],
+  manut_irrigazione:   ['palazzina','collina','piscina','tennis'],
   disinfestazione:     ['comune'],
   derattizzazione:     ['comune']
 };
