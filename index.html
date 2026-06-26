@@ -102,7 +102,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v31';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v32';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let UNITA_LIST=null;
@@ -580,6 +580,9 @@ async function scaricaContratto(){
 /* ---------- VIEW: ZONA (3 stati: Attuali · Problematici · Chiusi) ---------- */
 var curStato='attuali';
 function srvById(id){return CAPITOLATO_VERDE.find(function(x){return x.id===id})}
+// tipo di luogo di un'area + se un servizio compare in quell'area (mappatura SERVIZIO_DOVE)
+function areaType(a){ return a==='Collina'?'collina':a==='Zona piscina'?'piscina':a==='Campo tennis'?'tennis':a==='Strade interne'?'strade':a==='Tutto il complesso'?'comune':'palazzina'; }
+function serviceInArea(s,a){ var d=(window.SERVIZIO_DOVE&&window.SERVIZIO_DOVE[s.id])||[]; return d.indexOf(areaType(a))>=0; }
 function threadHTML(r){
   var cms=comments.filter(function(c){return c.segnalazione_id===r.id});
   return '<button class="th-tog" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px;margin-top:8px">Discussione'+(cms.length?' ('+cms.length+')':'')+'</button>'+
@@ -603,6 +606,7 @@ function renderZona(){
   // partiziona i servizi attivi
   var attuali=[], problematici=[];
   CAPITOLATO_VERDE.forEach(function(s){
+    if(!serviceInArea(s,curArea)) return;   // solo i servizi che esistono in QUESTO luogo
     if(hasOpenProblem(s.id)) problematici.push(s);
     else if(windowOf(s)) attuali.push(s);
   });
@@ -612,6 +616,7 @@ function renderZona(){
   var win5=new Date(Date.now()-35*86400000);   // ultime 5 settimane: l'ocra resta visibile qui
   var ocraBySrv={}, ocraDaily=0;
   CAPITOLATO_VERDE.forEach(function(s){
+    if(!serviceInArea(s,curArea)) return;
     pastWindows(s,win5).forEach(function(w){
       if(periodOutcome(curArea,s.id,w.id)!=='ocra') return;
       if(s.win==='D') ocraDaily++; else { (ocraBySrv[s.id]=ocraBySrv[s.id]||{s:s,wins:[]}).wins.push(w); }
@@ -765,7 +770,7 @@ function renderBacheca(){
   var v=$('view-bacheca');
   var probByArea={};reports.forEach(function(r){if(isOpen(r)){probByArea[r.area]=(probByArea[r.area]||0)+1}});
   var pw={}; CAPITOLATO_VERDE.forEach(function(s){pw[s.id]=prevWindowOf(s);});
-  function ocraOf(a){var n=0;CAPITOLATO_VERDE.forEach(function(s){var w=pw[s.id];if(w&&periodOutcome(a,s.id,w.id)==='ocra')n++;});return n;}
+  function ocraOf(a){var n=0;CAPITOLATO_VERDE.forEach(function(s){if(!serviceInArea(s,a))return;var w=pw[s.id];if(w&&periodOutcome(a,s.id,w.id)==='ocra')n++;});return n;}
   var ocraByArea={}; AREE.forEach(function(a){ocraByArea[a]=ocraOf(a)});
   var totProb=Object.keys(probByArea).reduce(function(t,k){return t+probByArea[k]},0);
   var totOcra=AREE.reduce(function(t,a){return t+ocraByArea[a]},0);
