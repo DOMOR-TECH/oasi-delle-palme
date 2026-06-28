@@ -102,7 +102,8 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v35';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v36';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let UNITA_LIST=null;
@@ -287,7 +288,8 @@ function userMenu(){
       '<div><label>Email</label><div style="font-size:17px">'+esc(userEmail||'—')+'</div></div>'+
       '<div><label>Stato</label><div style="margin-top:4px">'+statoChip()+'</div></div>'+
     '</div></div>'+
-    '<button id="um-chg" style="width:100%;margin-top:4px">Cambia unità</button>'+
+    '<button id="um-notif" style="width:100%;margin-top:4px;border-color:var(--ok);color:var(--ok)">🔔 Attiva notifiche</button>'+
+    '<button id="um-chg" style="width:100%;margin-top:10px">Cambia unità</button>'+
     '<button id="um-logout" style="width:100%;margin-top:10px">Esci</button>'+
     '<button id="um-del" style="width:100%;margin-top:18px;border-color:var(--bad);color:var(--bad)">Elimina il mio account</button>'+
     '<p class="sub" style="margin-top:8px">Eliminando l\'account si chiude il tuo accesso e si libera la tua unità. <b>Le segnalazioni che hai inviato restano</b> (firmate col tuo nome), perché sono prove condivise della comunità.</p>'+
@@ -295,6 +297,7 @@ function userMenu(){
     '</div>';
   document.body.appendChild(m);
   $('um-x').onclick=function(){m.remove()};
+  $('um-notif').onclick=function(){ attivaNotifiche(); };
   $('um-chg').onclick=function(){ cambiaUnita(m); };
   $('um-logout').onclick=async function(){ if(DEMO){location.href=location.pathname;return;} await sb.auth.signOut(); location.reload(); };
   $('um-del').onclick=function(){ eliminaAccount(m); };
@@ -344,6 +347,24 @@ async function eliminaAccount(menuEl){
   await sb.auth.signOut();
   alert('Account eliminato. Le tue segnalazioni restano nel dossier. A presto!');
   location.reload();
+}
+/* ---------- NOTIFICHE PUSH ---------- */
+function urlB64ToUint8(b64){ var pad='='.repeat((4-b64.length%4)%4); var s=(b64+pad).replace(/-/g,'+').replace(/_/g,'/'); var raw=atob(s); var arr=new Uint8Array(raw.length); for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i); return arr; }
+async function attivaNotifiche(){
+  if(DEMO){ alert('In modalità prova le notifiche non si attivano.'); return; }
+  if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
+    alert('Le notifiche non sono supportate qui.\n\nSu iPhone funzionano SOLO se hai installato l\'app sulla Home (col bottone «Installa») e con iOS 16.4 o successivo.'); return; }
+  try{
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){ alert('Permesso negato. Puoi riattivarlo dalle impostazioni del telefono.'); return; }
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){ sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64ToUint8(VAPID_PUBLIC) }); }
+    var j=sub.toJSON();
+    var up=await sb.from('push_subscriptions').upsert({ endpoint:j.endpoint, autore_id:userId, unita:(userUnita&&userUnita.unita)||null, is_admin:!!isAdmin, sub:j }, {onConflict:'endpoint'});
+    if(up.error){ alert('Errore nel salvataggio: '+up.error.message); return; }
+    alert('Notifiche attivate! 🔔\n\n'+(isAdmin?'Riceverai un avviso a ogni nuova richiesta da approvare.':'Riceverai un avviso quando viene lanciato un nuovo sondaggio.'));
+  }catch(e){ alert('Non è stato possibile attivare le notifiche: '+(e.message||e)+'\n\nSu iPhone serve l\'app installata sulla Home (iOS 16.4+).'); }
 }
 sb.auth.onAuthStateChange(function(_e,sess){ if(sess) init(); });
 
