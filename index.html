@@ -102,12 +102,21 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v39';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v40';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
+async function logLogin(){   // registra l'accesso (una volta per sessione browser)
+  if(DEMO || !userEmail) return;
+  try{
+    if(sessionStorage.getItem('logged_'+userEmail)==='1') return;
+    sessionStorage.setItem('logged_'+userEmail,'1');
+    var r = userRuolo || (userUnita ? ('Pal. '+userUnita.palazzina+' int '+userUnita.interno) : 'condòmino');
+    await sb.from('logs').insert({ email:userEmail, nome:userNome||userEmail, ruolo:r, evento:'accesso' });
+  }catch(e){}
+}
 let UNITA_LIST=null;
 function approvato(){return userStato==='approvato'}
 async function loadUnitaList(){
@@ -236,7 +245,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge(); return;
+    showBadge(); await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -246,7 +255,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge();
+  await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -610,6 +619,7 @@ async function scaricaContratto(){
 
 /* ---------- VIEW: ZONA (3 stati: Attuali · Problematici · Chiusi) ---------- */
 var curStato='attuali';
+var curAdminTab='condomini';   // condomini | speciali | logs
 function srvById(id){return CAPITOLATO_VERDE.find(function(x){return x.id===id})}
 // tipo di luogo di un'area + se un servizio compare in quell'area (mappatura SERVIZIO_DOVE)
 function areaType(a){ return a==='Collina'?'collina':a==='Zona piscina'?'piscina':a==='Campo tennis'?'tennis':a==='Strade interne'?'strade':a==='Tutto il complesso'?'comune':'palazzina'; }
@@ -953,6 +963,7 @@ async function exportPDF(){
 /* ---------- VIEW: ADMIN (conferma condòmini) ---------- */
 var DEMO_ADMINS=[{email:'corradolantieri@gmail.com',super:true},{email:'caratelli@email.it',super:false}];
 var DEMO_ASP=[{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',puo_segnalare:true}];
+var DEMO_LOGS=[{email:'corradolantieri@gmail.com',nome:'Meli Carmela',ruolo:'Pal. I int 9',at:new Date(Date.now()-3600000).toISOString()},{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',at:new Date(Date.now()-2*86400000).toISOString()}];
 var DEMO_ADMIN=[
   {unita:'C/02',palazzina:'C',interno:'2',nome:'Vermigli Andrea',email:'andrea.v@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-verm'},
   {unita:'F/05',palazzina:'F',interno:'5',nome:'Giralico Maria Enrica',email:'giralico@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-gira'},
@@ -985,29 +996,41 @@ async function renderAdmin(){
       '<div style="font-size:15px;color:var(--hint)">Pal. '+esc(r.palazzina)+' · int '+esc(r.interno)+' · '+esc(r.email||'—')+'</div></div></div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">'+actions+'</div></div>';
   }
-  var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 8px">Conferma condòmini</p>';
+  function achip(key,label){ var on=curAdminTab===key; return '<button class="achip" data-t="'+key+'" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'#fff':'var(--muted)')+';font-size:13px;font-weight:600">'+label+'</button>'; }
+  if(curAdminTab==='speciali' && !isSuper) curAdminTab='condomini';
+  var html='<div style="display:flex;gap:6px;margin-bottom:12px">'+achip('condomini','Condòmini')+(isSuper?achip('speciali','Speciali'):'')+achip('logs','Logs')+'</div>';
+  if(curAdminTab==='condomini'){
   html+='<div class="cap-grp">In attesa ('+attesa.length+')</div>'+(attesa.length?attesa.map(card).join(''):'<div class="empty">Nessuna richiesta in attesa.</div>');
   html+='<div class="cap-grp">Approvati ('+appr.length+')</div>'+(appr.length?appr.map(card).join(''):'<div class="empty">Nessuno ancora approvato.</div>');
   if(rif.length) html+='<div class="cap-grp">Rifiutati ('+rif.length+')</div>'+rif.map(card).join('');
-  // ===== SUPERADMIN: gestione subadmin + accessi speciali =====
-  if(isSuper){
-    var admL = DEMO ? {data:DEMO_ADMINS} : await sb.from('admins').select('email,super').order('super',{ascending:false});
+    if(isSuper){   // gestione subadmin (resta nella tab Condòmini)
+      var admL = DEMO ? {data:DEMO_ADMINS} : await sb.from('admins').select('email,super').order('super',{ascending:false});
+      html+='<div class="cap-grp">Amministratori (subadmin)</div><div class="card">';
+      (admL.data||[]).forEach(function(a){ html+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:.5px solid var(--line)"><span style="font-size:15px;word-break:break-all">'+esc(a.email)+(a.super?' · <b>superadmin</b>':' · subadmin')+'</span>'+(a.super?'':'<button class="rm-adm" data-email="'+esc(a.email)+'" style="font-size:13px;padding:5px 10px;border-color:var(--bad);color:var(--bad);flex:none">Rimuovi</button>')+'</div>'; });
+      html+='<div style="display:flex;gap:6px;margin-top:8px"><input id="new-adm" type="email" placeholder="email del condòmino" autocapitalize="none" autocorrect="off" style="flex:1;margin-top:0"><button class="btn-primary" id="add-adm" style="flex:none">＋ Subadmin</button></div>'+
+        '<div class="sub" style="margin-top:6px">Il condòmino deve essersi già registrato con quell\'email. Diventa subadmin (approva/gestisce, non tocca gli amministratori). Tu resti l\'unico superadmin.</div></div>';
+    }
+  } else if(curAdminTab==='speciali'){
     var aspL = DEMO ? {data:DEMO_ASP} : await sb.from('accessi_speciali').select('*').order('created_at',{ascending:true});
-    html+='<div class="cap-grp">⚙️ Gestione accessi — superadmin</div>';
-    html+='<div class="card"><div style="font-weight:600;font-size:16px">Amministratori</div>';
-    (admL.data||[]).forEach(function(a){ html+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:.5px solid var(--line)"><span style="font-size:15px;word-break:break-all">'+esc(a.email)+(a.super?' · <b>superadmin</b>':' · subadmin')+'</span>'+(a.super?'':'<button class="rm-adm" data-email="'+esc(a.email)+'" style="font-size:13px;padding:5px 10px;border-color:var(--bad);color:var(--bad);flex:none">Rimuovi</button>')+'</div>'; });
-    html+='<div style="display:flex;gap:6px;margin-top:8px"><input id="new-adm" type="email" placeholder="email del condòmino" autocapitalize="none" autocorrect="off" style="flex:1;margin-top:0"><button class="btn-primary" id="add-adm" style="flex:none">＋ Subadmin</button></div>'+
-      '<div class="sub" style="margin-top:6px">Il condòmino deve essersi già registrato con quell\'email. Diventa subadmin (approva/gestisce, non tocca gli amministratori). Tu resti l\'unico superadmin.</div></div>';
-    html+='<div class="card"><div style="font-weight:600;font-size:16px">Accessi speciali (custode, avvocato…)</div>';
+    html+='<div class="cap-grp">Utenti speciali (non-condòmini)</div><div class="card">';
+    if(!(aspL.data||[]).length) html+='<div class="sub" style="margin-bottom:4px">Nessun accesso speciale. Creane uno qui sotto (custode, avvocato…).</div>';
     (aspL.data||[]).forEach(function(s){ html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-top:.5px solid var(--line)"><div style="min-width:0"><div style="font-size:15px;font-weight:600">'+esc(s.nome)+' · '+esc(s.ruolo)+'</div><div class="sub" style="word-break:break-all">'+esc(s.email)+(s.puo_segnalare?' · può segnalare':' · sola lettura')+'</div></div><button class="rm-asp" data-email="'+esc(s.email)+'" style="font-size:13px;padding:5px 10px;border-color:var(--bad);color:var(--bad);flex:none">Rimuovi</button></div>'; });
-    html+='<div style="display:grid;gap:6px;margin-top:8px">'+
+    html+='<div style="display:grid;gap:6px;margin-top:10px">'+
       '<input id="asp-nome" placeholder="Nome e cognome" style="margin-top:0">'+
       '<input id="asp-email" type="email" placeholder="email di accesso" autocapitalize="none" autocorrect="off" style="margin-top:0">'+
       '<input id="asp-ruolo" placeholder="Ruolo (es. Custode, Avvocato)" style="margin-top:0">'+
       '<label style="display:flex;align-items:center;gap:8px;font-size:15px"><input type="checkbox" id="asp-seg" checked style="width:auto;margin:0"> Può inviare segnalazioni</label>'+
       '<button class="btn-primary" id="add-asp">Crea accesso speciale</button></div></div>';
+  } else {   // LOGS
+    var logL = DEMO ? {data:DEMO_LOGS} : await sb.from('logs').select('*').order('at',{ascending:false}).limit(200);
+    if(logL.error){ html+='<div class="empty">Errore log: '+esc(logL.error.message)+'</div>'; }
+    else { var seen={}, lastPer=[]; (logL.data||[]).forEach(function(l){ if(!seen[l.email]){ seen[l.email]=1; lastPer.push(l); } });
+      html+='<div class="cap-grp">Ultimo accesso per utente ('+lastPer.length+')</div>';
+      if(!lastPer.length) html+='<div class="empty">Ancora nessun accesso registrato.</div>';
+      lastPer.forEach(function(l){ var d=new Date(l.at); html+='<div class="card" style="padding:11px 14px"><div style="font-size:16px;font-weight:600">'+esc(l.nome||l.email)+'</div><div class="sub" style="word-break:break-all">'+esc(l.ruolo||'')+' · '+esc(l.email)+'</div><div style="font-size:14px;color:var(--hint);margin-top:3px">ultimo accesso: <b>'+d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})+'</b></div></div>'; }); }
   }
   v.innerHTML=html;
+  v.querySelectorAll('.achip').forEach(function(b){b.onclick=function(){curAdminTab=b.dataset.t;renderAdmin();}});
   v.querySelectorAll('.adm').forEach(function(b){b.onclick=async function(){
     var nome=b.dataset.nome||'questo utente';
     if(b.dataset.a==='revoca'){
