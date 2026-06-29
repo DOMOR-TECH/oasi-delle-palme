@@ -102,7 +102,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v40';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v41';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
@@ -1007,7 +1007,7 @@ async function renderAdmin(){
       var admL = DEMO ? {data:DEMO_ADMINS} : await sb.from('admins').select('email,super').order('super',{ascending:false});
       html+='<div class="cap-grp">Amministratori (subadmin)</div><div class="card">';
       (admL.data||[]).forEach(function(a){ html+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:.5px solid var(--line)"><span style="font-size:15px;word-break:break-all">'+esc(a.email)+(a.super?' · <b>superadmin</b>':' · subadmin')+'</span>'+(a.super?'':'<button class="rm-adm" data-email="'+esc(a.email)+'" style="font-size:13px;padding:5px 10px;border-color:var(--bad);color:var(--bad);flex:none">Rimuovi</button>')+'</div>'; });
-      html+='<div style="display:flex;gap:6px;margin-top:8px"><input id="new-adm" type="email" placeholder="email del condòmino" autocapitalize="none" autocorrect="off" style="flex:1;margin-top:0"><button class="btn-primary" id="add-adm" style="flex:none">＋ Subadmin</button></div>'+
+      html+='<div style="display:grid;gap:6px;margin-top:10px"><input id="new-adm" type="email" placeholder="email del condòmino" autocapitalize="none" autocorrect="off" style="margin-top:0"><button class="btn-primary" id="add-adm">＋ Subadmin</button></div>'+
         '<div class="sub" style="margin-top:6px">Il condòmino deve essersi già registrato con quell\'email. Diventa subadmin (approva/gestisce, non tocca gli amministratori). Tu resti l\'unico superadmin.</div></div>';
     }
   } else if(curAdminTab==='speciali'){
