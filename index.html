@@ -102,7 +102,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v42';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v43';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
@@ -309,7 +309,6 @@ function userMenu(){
       '<div><label>Stato</label><div style="margin-top:4px">'+statoChip()+'</div></div>'+
     '</div></div>'+
     '<button id="um-notif" style="width:100%;margin-top:4px;border-color:var(--ok);color:var(--ok)">🔔 Attiva notifiche</button>'+
-    '<button id="um-chg" style="width:100%;margin-top:10px">Cambia unità</button>'+
     '<button id="um-logout" style="width:100%;margin-top:10px">Esci</button>'+
     '<button id="um-del" style="width:100%;margin-top:18px;border-color:var(--bad);color:var(--bad)">Elimina il mio account</button>'+
     '<p class="sub" style="margin-top:8px">Eliminando l\'account si chiude il tuo accesso e si libera la tua unità. <b>Le segnalazioni che hai inviato restano</b> (firmate col tuo nome), perché sono prove condivise della comunità.</p>'+
@@ -318,38 +317,8 @@ function userMenu(){
   document.body.appendChild(m);
   $('um-x').onclick=function(){m.remove()};
   $('um-notif').onclick=function(){ attivaNotifiche(); };
-  $('um-chg').onclick=function(){ cambiaUnita(m); };
   $('um-logout').onclick=async function(){ if(DEMO){location.href=location.pathname;return;} await sb.auth.signOut(); location.reload(); };
   $('um-del').onclick=function(){ eliminaAccount(m); };
-}
-// Cambia unità: l'utente sceglie la sua unità corretta da solo (libera la precedente, aggiorna il metadata, rientra)
-function cambiaUnita(menuEl){
-  menuEl.querySelector('.page-in').innerHTML=
-    '<div class="page-top"><button class="page-x" id="cu-x">×</button><h2 class="page-h">Cambia unità</h2></div>'+
-    '<p class="sub" style="margin:0 0 12px">Scegli la tua unità corretta. La tua unità attuale verrà liberata e dovrai essere riapprovato dall\'amministratore.</p>'+
-    unitaPickerHTML()+
-    '<button class="btn-primary" id="cu-go" style="margin-top:14px">Conferma cambio</button>'+
-    '<p id="cu-msg" class="sub" style="margin-top:10px;display:none;color:var(--bad)"></p>';
-  fillUnitaPicker();
-  $('cu-x').onclick=function(){ menuEl.remove(); };
-  $('cu-go').onclick=async function(){
-    var pal=$('u-pal').value, intr=$('u-int').value;
-    if(!pal){$('u-pal').focus();return} if(!intr){$('u-int').focus();return}
-    var nu=findUnitaCode(pal,intr);
-    if(!nu){ var msg=$('cu-msg'); msg.style.display='block'; msg.textContent='Unità non trovata.'; return; }
-    if(nu===(userUnita&&userUnita.unita)){ menuEl.remove(); return; }
-    if(!confirm('Cambiare la tua unità in '+nu+'?\n\nLa precedente verrà liberata e dovrai essere riapprovato.')) return;
-    if(DEMO){ alert('In modalità prova il cambio unità non è attivo.'); return; }
-    var btn=$('cu-go'); btn.disabled=true; btn.textContent='Un attimo…';
-    // 1) rilascia i miei accessi attuali (primario o comproprietario)
-    await sb.from('proprietari').update({autore_id:null,email:null,stato:'libero'}).eq('autore_id',userId);
-    await sb.from('coproprietari').delete().eq('autore_id',userId);
-    // 2) aggiorna il metadata e rientra pulito
-    var up=await sb.auth.updateUser({ data:{ unita:nu } });
-    if(up.error){ var m2=$('cu-msg'); m2.style.display='block'; m2.textContent='Errore: '+up.error.message; btn.disabled=false; btn.textContent='Conferma cambio'; return; }
-    try{ localStorage.setItem('pendingUnita', nu); }catch(e){}
-    location.reload();
-  };
 }
 async function eliminaAccount(menuEl){
   var c=prompt('Questa azione è IRREVERSIBILE: chiude il tuo accesso e libera la tua unità (le segnalazioni che hai inviato RESTANO, firmate col tuo nome).\n\nPer confermare, scrivi la parola:  ELIMINA');
