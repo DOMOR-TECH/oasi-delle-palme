@@ -102,10 +102,12 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v38';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v39';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
+function canSegnalare(){ return approvato() && puoSegnalare; }
 let UNITA_LIST=null;
 function approvato(){return userStato==='approvato'}
 async function loadUnitaList(){
@@ -218,7 +220,7 @@ async function updateAdminBadge(){
 
 /* ---------- AUTH / INIT ---------- */
 async function init(){
-  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; $('hsub').textContent='MODALITÀ PROVA (senza login)';
+  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; isSuper=true; puoSegnalare=true; $('hsub').textContent='MODALITÀ PROVA (senza login)';
     reports=[
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
@@ -227,12 +229,21 @@ async function init(){
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
+  try{ const { data:adm } = await sb.rpc('is_admin'); isAdmin = !!adm; }catch(e){ isAdmin=false; }
+  try{ const { data:sup } = await sb.rpc('is_super'); isSuper = !!sup; }catch(e){ isSuper=false; }
+  // ACCESSO SPECIALE (non-condòmino: custode/avvocato/…): riconosciuto per email, niente unità
+  var asp=await sb.from('accessi_speciali').select('*').eq('email', userEmail).maybeSingle();
+  if(asp.data){
+    userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
+    $('hsub').textContent=esc(userRuolo);
+    showBadge(); await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge(); return;
+  }
+  // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
   if(!unita){ setApp(false); renderSelezionaUnita(); return; }      // utente senza unità (o vecchio account)
   var pr = await claimUnita(unita);
   if(pr.blocked){ setApp(false); renderBloccato(pr); return; }
-  userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato;   // stato dal primario o dal coproprietario
-  try{ const { data:adm } = await sb.rpc('is_admin'); isAdmin = !!adm; }catch(e){ isAdmin=false; }
+  userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
   await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge();
@@ -268,7 +279,7 @@ function statoChip(){
 function showBadge(){
   var ub=$('user-badge');
   var ini=(userNome||'?').trim().split(/\s+/).map(function(w){return w[0]}).slice(0,2).join('').toUpperCase();
-  var sub = userUnita ? ('Pal. '+userUnita.palazzina+' · int '+userUnita.interno) : 'unità non associata';
+  var sub = userUnita ? ('Pal. '+userUnita.palazzina+' · int '+userUnita.interno) : (userRuolo || 'unità non associata');
   ub.innerHTML='<div style="text-align:right;line-height:1.2"><div style="font-size:15px;font-weight:500">'+esc((userNome||'').split(' ')[0])+(approvato()?'':' ·')+'</div>'+
     '<div style="font-size:14px;color:var(--hint)">'+sub+(approvato()?'':' · in attesa')+'</div></div>'+
     '<div style="width:34px;height:34px;border-radius:50%;background:var(--'+(approvato()?'okbg':'infobg')+');color:var(--'+(approvato()?'ok':'info')+');display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">'+esc(ini)+'</div>';
@@ -279,7 +290,7 @@ function showBadge(){
 /* ---------- MENU UTENTE (I miei dati / Esci / Elimina account) ---------- */
 function userMenu(){
   var m=document.createElement('div'); m.className='page'; m.id='page-user';
-  var sub = userUnita ? ('Palazzina '+userUnita.palazzina+' · interno '+userUnita.interno) : 'unità non associata';
+  var sub = userUnita ? ('Palazzina '+userUnita.palazzina+' · interno '+userUnita.interno) : (userRuolo ? ('Ruolo: '+userRuolo) : 'unità non associata');
   m.innerHTML='<div class="page-in">'+
     '<div class="page-top"><button class="page-x" id="um-x">×</button><h2 class="page-h">I miei dati</h2></div>'+
     '<div class="card"><div style="display:grid;gap:10px">'+
@@ -654,7 +665,7 @@ function renderZona(){
     '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
     '<div style="display:flex;gap:7px;margin:13px 0 4px">'+chip('attuali','Attuali')+chip('problematici','Problematici')+chip('chiusi','Chiusi')+'</div>';
 
-  function segBtn(sid,mio){ return approvato()?'<button class="seg" data-s="'+sid+'">'+(mio?'✎ Modifica':'Segnala')+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>'; }
+  function segBtn(sid,mio){ return canSegnalare()?'<button class="seg" data-s="'+sid+'">'+(mio?'✎ Modifica':'Segnala')+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>'; }
 
   if(curStato==='attuali'){
     html+='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:8px 2px 8px">Cosa controllare in '+esc(curArea)+' · '+oggiLabel()+'</p>';
@@ -940,6 +951,8 @@ async function exportPDF(){
 }
 
 /* ---------- VIEW: ADMIN (conferma condòmini) ---------- */
+var DEMO_ADMINS=[{email:'corradolantieri@gmail.com',super:true},{email:'caratelli@email.it',super:false}];
+var DEMO_ASP=[{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',puo_segnalare:true}];
 var DEMO_ADMIN=[
   {unita:'C/02',palazzina:'C',interno:'2',nome:'Vermigli Andrea',email:'andrea.v@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-verm'},
   {unita:'F/05',palazzina:'F',interno:'5',nome:'Giralico Maria Enrica',email:'giralico@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-gira'},
@@ -976,6 +989,24 @@ async function renderAdmin(){
   html+='<div class="cap-grp">In attesa ('+attesa.length+')</div>'+(attesa.length?attesa.map(card).join(''):'<div class="empty">Nessuna richiesta in attesa.</div>');
   html+='<div class="cap-grp">Approvati ('+appr.length+')</div>'+(appr.length?appr.map(card).join(''):'<div class="empty">Nessuno ancora approvato.</div>');
   if(rif.length) html+='<div class="cap-grp">Rifiutati ('+rif.length+')</div>'+rif.map(card).join('');
+  // ===== SUPERADMIN: gestione subadmin + accessi speciali =====
+  if(isSuper){
+    var admL = DEMO ? {data:DEMO_ADMINS} : await sb.from('admins').select('email,super').order('super',{ascending:false});
+    var aspL = DEMO ? {data:DEMO_ASP} : await sb.from('accessi_speciali').select('*').order('created_at',{ascending:true});
+    html+='<div class="cap-grp">⚙️ Gestione accessi — superadmin</div>';
+    html+='<div class="card"><div style="font-weight:600;font-size:16px">Amministratori</div>';
+    (admL.data||[]).forEach(function(a){ html+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:.5px solid var(--line)"><span style="font-size:15px;word-break:break-all">'+esc(a.email)+(a.super?' · <b>superadmin</b>':' · subadmin')+'</span>'+(a.super?'':'<button class="rm-adm" data-email="'+esc(a.email)+'" style="font-size:13px;padding:5px 10px;border-color:var(--bad);color:var(--bad);flex:none">Rimuovi</button>')+'</div>'; });
+    html+='<div style="display:flex;gap:6px;margin-top:8px"><input id="new-adm" type="email" placeholder="email del condòmino" autocapitalize="none" autocorrect="off" style="flex:1;margin-top:0"><button class="btn-primary" id="add-adm" style="flex:none">＋ Subadmin</button></div>'+
+      '<div class="sub" style="margin-top:6px">Il condòmino deve essersi già registrato con quell\'email. Diventa subadmin (approva/gestisce, non tocca gli amministratori). Tu resti l\'unico superadmin.</div></div>';
+    html+='<div class="card"><div style="font-weight:600;font-size:16px">Accessi speciali (custode, avvocato…)</div>';
+    (aspL.data||[]).forEach(function(s){ html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-top:.5px solid var(--line)"><div style="min-width:0"><div style="font-size:15px;font-weight:600">'+esc(s.nome)+' · '+esc(s.ruolo)+'</div><div class="sub" style="word-break:break-all">'+esc(s.email)+(s.puo_segnalare?' · può segnalare':' · sola lettura')+'</div></div><button class="rm-asp" data-email="'+esc(s.email)+'" style="font-size:13px;padding:5px 10px;border-color:var(--bad);color:var(--bad);flex:none">Rimuovi</button></div>'; });
+    html+='<div style="display:grid;gap:6px;margin-top:8px">'+
+      '<input id="asp-nome" placeholder="Nome e cognome" style="margin-top:0">'+
+      '<input id="asp-email" type="email" placeholder="email di accesso" autocapitalize="none" autocorrect="off" style="margin-top:0">'+
+      '<input id="asp-ruolo" placeholder="Ruolo (es. Custode, Avvocato)" style="margin-top:0">'+
+      '<label style="display:flex;align-items:center;gap:8px;font-size:15px"><input type="checkbox" id="asp-seg" checked style="width:auto;margin:0"> Può inviare segnalazioni</label>'+
+      '<button class="btn-primary" id="add-asp">Crea accesso speciale</button></div></div>';
+  }
   v.innerHTML=html;
   v.querySelectorAll('.adm').forEach(function(b){b.onclick=async function(){
     var nome=b.dataset.nome||'questo utente';
@@ -1005,6 +1036,32 @@ async function renderAdmin(){
     if(userUnita && b.dataset.u===userUnita.unita && b.dataset.aid===userId){ userStato=nuovo; showBadge(); }   // se ho cambiato il MIO accesso, aggiorna il badge
     renderAdmin(); updateAdminBadge();
   }});
+  // ===== gestori superadmin =====
+  if(isSuper){
+    var aAdm=$('add-adm'); if(aAdm) aAdm.onclick=async function(){
+      var em=($('new-adm').value||'').trim().toLowerCase(); if(!em){ $('new-adm').focus(); return; }
+      if(DEMO){ DEMO_ADMINS.push({email:em,super:false}); renderAdmin(); return; }
+      var r=await sb.from('admins').insert({email:em,super:false}); if(r.error){ alert('Errore: '+r.error.message); return; }
+      alert('Subadmin aggiunto: '+em+'.\nDovrà chiudere e riaprire l\'app per avere i poteri.'); renderAdmin();
+    };
+    v.querySelectorAll('.rm-adm').forEach(function(b){b.onclick=async function(){
+      if(!confirm('Togliere i poteri di amministratore a «'+b.dataset.email+'»?')) return;
+      if(DEMO){ DEMO_ADMINS=DEMO_ADMINS.filter(function(x){return x.email!==b.dataset.email}); renderAdmin(); return; }
+      var r=await sb.from('admins').delete().eq('email',b.dataset.email); if(r.error){ alert('Errore: '+r.error.message); return; } renderAdmin();
+    }});
+    var aAsp=$('add-asp'); if(aAsp) aAsp.onclick=async function(){
+      var nome=($('asp-nome').value||'').trim(), email=($('asp-email').value||'').trim().toLowerCase(), ruolo=($('asp-ruolo').value||'').trim(), seg=$('asp-seg').checked;
+      if(!nome||!email||!ruolo){ alert('Compila nome, email e ruolo.'); return; }
+      if(DEMO){ DEMO_ASP.push({email:email,nome:nome,ruolo:ruolo,puo_segnalare:seg}); renderAdmin(); return; }
+      var r=await sb.from('accessi_speciali').upsert({email:email,nome:nome,ruolo:ruolo,puo_segnalare:seg,stato:'approvato'},{onConflict:'email'}); if(r.error){ alert('Errore: '+r.error.message); return; }
+      alert('Accesso creato ✅\n\nDi\' a '+nome+' di andare su oasidellepalme.com e accedere con l\'email:\n'+email+'\n\nEntrerà come «'+ruolo+'».'); renderAdmin();
+    };
+    v.querySelectorAll('.rm-asp').forEach(function(b){b.onclick=async function(){
+      if(!confirm('Rimuovere l\'accesso speciale di «'+b.dataset.email+'»?')) return;
+      if(DEMO){ DEMO_ASP=DEMO_ASP.filter(function(x){return x.email!==b.dataset.email}); renderAdmin(); return; }
+      var r=await sb.from('accessi_speciali').delete().eq('email',b.dataset.email); if(r.error){ alert('Errore: '+r.error.message); return; } renderAdmin();
+    }});
+  }
 }
 
 /* ---------- VIEW: VOTI (sondaggi informali, pesati per millesimi, palesi) ---------- */
@@ -1032,7 +1089,7 @@ async function renderVoti(){
   var proposte=sondaggi.filter(function(s){return s.approvato===false});
   function opzOf(s){return Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto'])}
   var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 10px">Sondaggi della comunità</p>';
-  if(approvato()){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">＋ '+(isAdmin?'Nuovo sondaggio':'Proponi un sondaggio')+'</button>'; }
+  if(approvato() && (isAdmin || userUnita)){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">＋ '+(isAdmin?'Nuovo sondaggio':'Proponi un sondaggio')+'</button>'; }
   else { html+='<div class="sub" style="margin-bottom:12px">Quando sarai un condòmino confermato potrai votare e proporre sondaggi.</div>'; }
   // PROPOSTE (in attesa di avallo dell'admin)
   if(proposte.length){
@@ -1057,10 +1114,12 @@ async function renderVoti(){
     var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
     html+='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(s.domanda)+'</div>'+
       '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(s.chiuso?' · CHIUSO':'')+'</div>';
-    if((!unitVote || mine) && !s.chiuso && approvato()){
+    if((!unitVote || mine) && !s.chiuso && approvato() && userUnita){
       html+='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px">'+opzioni.map(function(o){return '<button class="vt-vote" data-s="'+esc(s.id)+'" data-o="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div>';
     } else if(unitVote && !mine && approvato() && !s.chiuso){
       html+='<div class="sub" style="margin-bottom:4px;color:var(--ocra)">Ha già votato un comproprietario della tua unità. Il voto è <b>dell\'unità</b>: lo vedi, ma non puoi cambiarlo.</div>';
+    } else if(!userUnita && approvato() && !s.chiuso){
+      html+='<div class="sub" style="margin-bottom:4px">Il voto è dell\'unità: i non-condòmini (custode, avvocato…) non votano.</div>';
     } else if(!approvato() && !unitVote && !s.chiuso){
       html+='<div class="sub" style="margin-bottom:4px">Per votare devi essere un condòmino confermato.</div>';
     }
@@ -1091,6 +1150,7 @@ async function renderVoti(){
 async function votaSondaggio(sid,opzione){
   if(DEMO){ DEMO_VOTI=DEMO_VOTI.filter(function(x){return !(x.sondaggio_id===sid&&x.autore_id===userId)}); DEMO_VOTI.push({sondaggio_id:sid,unita:userUnita.unita,autore_id:userId,autore_nome:userNome,millesimi:userUnita.millesimi||0,opzione:opzione}); renderVoti(); return; }
   if(!approvato()){ alert('Devi essere un condòmino confermato per votare.'); return; }
+  if(!userUnita){ alert('Il voto è dell\'unità: i non-condòmini non votano.'); return; }
   var up=await sb.from('voti').upsert({ sondaggio_id:sid, unita:userUnita.unita, autore_id:userId, autore_nome:userNome, millesimi:(userUnita.millesimi||0), opzione:opzione },{onConflict:'sondaggio_id,unita'});
   if(up.error){ alert('Errore: '+up.error.message); return; }
   renderVoti();
