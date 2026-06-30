@@ -84,6 +84,7 @@
   <div id="view-bacheca" class="hide"></div>
   <div id="view-dossier" class="hide"></div>
   <div id="view-voti" class="hide"></div>
+  <div id="view-avvisi" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
 
@@ -92,6 +93,7 @@
   <button data-v="bacheca"><span class="ic">▦</span>Bacheca</button>
   <button data-v="dossier"><span class="ic">▤</span>Dossier</button>
   <button data-v="voti"><span class="ic">☑</span>Voti</button>
+  <button data-v="avvisi"><span class="ic">⚠</span>Avvisi</button>
   <button data-v="admin" id="nav-admin" class="hide"><span class="ic">★</span>Admin</button>
 </nav>
 
@@ -102,10 +104,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v43';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v44';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -245,7 +247,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -255,7 +257,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -470,6 +472,11 @@ async function loadComments(){
   if(DEMO) return;
   const { data, error } = await sb.from('commenti').select('*').order('created_at',{ascending:true});
   comments = error? [] : (data||[]);
+}
+async function loadAvvisi(){
+  if(DEMO) return;  // in demo gli avvisi restano in memoria
+  const { data, error } = await sb.from('avvisi').select('*').order('created_at',{ascending:false});
+  avvisi = error? [] : (data||[]);
 }
 async function addComment(rid, testo){
   if(!testo.trim()) return false;
@@ -1181,8 +1188,144 @@ async function eliminaSondaggio(sid){
   renderVoti();
 }
 
+/* ---------- VIEW: AVVISI FUORI-CAPITOLATO ----------
+   Imprevisti non coperti da alcun contratto fornitore.
+   APRE: chi è abilitato a segnalare (canSegnalare). CHIUDE: l'autore (controllore del suo avviso)
+   OPPURE un admin su qualsiasi avviso. VEDONO e COMMENTANO tutti i loggati. Non cancellabile. */
+var AVVISI_CAT=[
+  {id:'elettrico',label:'Elettrico / centralina',ic:'⚡'},
+  {id:'citofoni',label:'Citofoni',ic:'☎'},
+  {id:'ascensore',label:'Ascensore',ic:'⬍'},
+  {id:'idraulico',label:'Idraulico',ic:'💧'},
+  {id:'illuminazione',label:'Illuminazione',ic:'💡'},
+  {id:'infiltrazioni',label:'Infiltrazioni',ic:'🌧'},
+  {id:'sicurezza',label:'Sicurezza / accessi',ic:'🔒'},
+  {id:'altro',label:'Altro',ic:'•'}
+];
+var AVV_STATI={aperto:{label:'Aperto',col:'bad'},preso_in_carico:{label:'Preso in carico',col:'ocra'},risolto:{label:'Risolto',col:'ok'}};
+var DEMO_AVVISI=[{id:'av-demo1',titolo:'Centralina cancello pedonale ko',categoria:'elettrico',descrizione:'Il cancello pedonale lato Pal. C non si apre con il telecomando: scatta il salvavita della centralina.',foto_urls:[],stato:'aperto',autore_id:'demo2',autore_nome:'Vicino di Pal. C',preso_at:null,preso_da_nome:null,chiuso_il:null,chiuso_da:null,chiuso_da_nome:null,created_at:new Date(Date.now()-2*86400000).toISOString()}];
+function avCat(id){var c=AVVISI_CAT.find(function(x){return x.id===id});return c||{id:id,label:id,ic:'•'};}
+function puoChiudere(a){ return a.autore_id===userId || isAdmin; }   // autore OPPURE admin
+
+function avCard(a){
+  var st=AVV_STATI[a.stato]||AVV_STATI.aperto, cat=avCat(a.categoria);
+  var fotos=fotoListOf(a);
+  var meta='aperto da '+esc(a.autore_nome)+' il '+new Date(a.created_at).toLocaleDateString('it-IT');
+  if(a.preso_at) meta+=' · in carico'+(a.preso_da_nome?' ('+esc(a.preso_da_nome)+')':'')+' dal '+new Date(a.preso_at).toLocaleDateString('it-IT');
+  var h='<div class="card">'+
+    '<div class="row"><span class="pill" style="background:var(--'+st.col+'bg);color:var(--'+st.col+')">'+st.label+'</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(a.titolo)+'</div>'+
+      '<div style="font-size:14px;color:var(--hint)">'+esc(cat.ic)+' '+esc(cat.label)+'</div></div></div>'+
+    (a.descrizione?'<div style="font-size:15px;color:var(--muted);margin-top:8px">'+esc(a.descrizione)+'</div>':'');
+  if(fotos.length){ h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+fotos.map(function(u){return '<img class="av-foto" src="'+esc(u)+'" data-u="'+esc(u)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer">';}).join('')+'</div>'; }
+  h+='<div style="font-size:13px;color:var(--hint);margin-top:8px">'+meta+'</div>';
+  if(a.stato==='risolto' && a.chiuso_da_nome){   // tracciabilità chiusura (visibile a tutti, utile al superadmin)
+    h+='<div style="font-size:13px;color:var(--ok);margin-top:3px">✓ risolto da <b>'+esc(a.chiuso_da_nome)+'</b>'+(a.chiuso_il?' il '+new Date(a.chiuso_il).toLocaleDateString('it-IT'):'')+(a.chiuso_da&&a.chiuso_da!==a.autore_id?' · chiusura da amministrazione':'')+'</div>';
+  }
+  if(puoChiudere(a)){   // autore o admin: cambia stato
+    var b=[];
+    if(a.stato==='aperto') b.push('<button class="av-st" data-id="'+esc(a.id)+'" data-to="preso_in_carico" style="border-color:var(--ocra);color:var(--ocra)">In carico</button>');
+    if(a.stato!=='risolto') b.push('<button class="av-st" data-id="'+esc(a.id)+'" data-to="risolto" style="border-color:var(--ok);color:var(--ok)">✓ Segna risolto</button>');
+    if(a.stato==='risolto') b.push('<button class="av-st" data-id="'+esc(a.id)+'" data-to="aperto" style="color:var(--muted)">Riapri</button>');
+    h+='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px">'+b.join('')+'</div>';
+  }
+  h+=threadHTML(a)+'</div>';
+  return h;
+}
+function renderAvvisi(){
+  var v=$('view-avvisi');
+  var aperti=avvisi.filter(function(a){return a.stato!=='risolto'});
+  var chiusi=avvisi.filter(function(a){return a.stato==='risolto'});
+  var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:2px 2px 4px">Avvisi fuori-capitolato</p>'+
+    '<div class="sub" style="margin:0 2px 12px">Imprevisti non coperti da nessun contratto fornitore (centralina, citofoni, ascensore…). Chi apre un avviso ne segue la chiusura; l\'amministrazione può chiudere qualsiasi avviso.</div>';
+  if(canSegnalare()) html+='<button class="btn-primary" id="av-new" style="margin-bottom:14px">＋ Nuovo avviso</button>';
+  else html+='<div class="pres-note" style="margin:0 0 12px">Per aprire un avviso devi essere un condòmino confermato. Intanto puoi vedere e commentare quelli esistenti.</div>';
+  html+='<div class="metrics"><div class="metric"><label>Aperti</label><div class="n" style="color:var(--bad)">'+aperti.length+'</div></div>'+
+    '<div class="metric"><label>Risolti</label><div class="n" style="color:var(--ok)">'+chiusi.length+'</div></div></div>';
+  html+='<div class="cap-grp" style="margin-top:12px">Aperti ('+aperti.length+')</div>';
+  html+= aperti.length? aperti.map(avCard).join('') : '<div class="empty">Nessun avviso aperto. 👍</div>';
+  if(chiusi.length){ html+='<div class="cap-grp">Risolti ('+chiusi.length+')</div>'+chiusi.map(avCard).join(''); }
+  v.innerHTML=html;
+  var nb=$('av-new'); if(nb) nb.onclick=openNuovoAvviso;
+  v.querySelectorAll('.av-foto').forEach(function(im){im.onclick=function(){openImage(im.dataset.u)}});
+  v.querySelectorAll('.av-st').forEach(function(b){b.onclick=function(){
+    var a=avvisi.find(function(x){return String(x.id)===b.dataset.id});
+    if(a) cambiaStatoAvviso(a,b.dataset.to);
+  }});
+  v.querySelectorAll('.th-tog').forEach(function(b){b.onclick=function(){var t=v.querySelector('.th[data-tid="'+b.dataset.rid+'"]');var show=t.style.display==='none';t.style.display=show?'block':'none';openThreads[b.dataset.rid]=show;}});
+  v.querySelectorAll('.th-send').forEach(function(b){b.onclick=async function(){var inp=v.querySelector('.th-in[data-rid="'+b.dataset.rid+'"]');if(!inp.value.trim())return;openThreads[b.dataset.rid]=true;var ok=await addComment(b.dataset.rid,inp.value);if(ok)renderAvvisi();}});
+  Object.keys(openThreads).forEach(function(rid){if(openThreads[rid]){var t=v.querySelector('.th[data-tid="'+rid+'"]');if(t)t.style.display='block';}});
+}
+async function cambiaStatoAvviso(a,nuovo){
+  if(!a||!a.id){ alert('Avviso senza id: operazione annullata.'); return; }
+  if(!puoChiudere(a)){ alert('Solo chi ha aperto l\'avviso (o l\'amministrazione) può aggiornarlo.'); return; }
+  if(nuovo==='risolto' && !confirm('Segnare questo avviso come RISOLTO?')) return;
+  var patch={stato:nuovo};
+  if(nuovo==='preso_in_carico'){ if(!a.preso_at) patch.preso_at=new Date().toISOString(); patch.preso_da_nome=userNome; }
+  if(nuovo==='risolto'){ patch.chiuso_il=new Date().toISOString(); patch.chiuso_da=userId; patch.chiuso_da_nome=userNome; }
+  if(nuovo==='aperto'){ patch.chiuso_il=null; patch.chiuso_da=null; patch.chiuso_da_nome=null; }   // riapertura azzera la chiusura
+  if(DEMO){ Object.assign(a,patch); renderAvvisi(); return; }
+  var res=await sb.from('avvisi').update(patch).eq('id',a.id).select('id');
+  if(res.error){ alert('Errore: '+res.error.message); return; }
+  if(res.data && res.data.length>1){ alert('Attenzione: toccate '+res.data.length+' righe (atteso 1). Segnalalo.'); }
+  await loadAvvisi(); renderAvvisi();
+}
+function openNuovoAvviso(){
+  if(!canSegnalare()){ alert('Per aprire un avviso devi essere un condòmino confermato.'); return; }
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600">Nuovo avviso fuori-capitolato</div>'+
+    '<div style="font-size:15px;color:var(--hint);margin:2px 0 12px">Imprevisto non coperto da contratti. Lo segui tu fino alla chiusura (anche l\'amministrazione può chiuderlo).</div>'+
+    '<label style="display:block">Titolo</label><input id="av-tit" type="text" placeholder="es. Centralina cancello fuori uso" style="margin-top:4px">'+
+    '<label style="margin-top:10px;display:block">Categoria</label><select id="av-cat" style="margin-top:4px">'+AVVISI_CAT.map(function(c){return '<option value="'+c.id+'">'+esc(c.ic+' '+c.label)+'</option>';}).join('')+'</select>'+
+    '<label style="margin-top:10px;display:block">Descrizione</label><textarea id="av-desc" rows="3" placeholder="Cosa è successo, dove, da quando…" style="min-height:84px;font-size:16px;border:1.5px solid var(--hint);background:var(--surface);border-radius:10px;padding:11px;margin-top:4px"></textarea>'+
+    '<label style="margin-top:10px;display:block">Foto (facoltativa, anche più di una)</label>'+
+    '<input id="av-foto" type="file" accept="image/*" multiple style="display:none">'+
+    '<div id="av-prevs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'+
+    '<div style="font-size:14px;color:var(--hint);margin-top:10px">firma: '+esc(userNome)+' · '+new Date().toLocaleDateString('it-IT')+'</div>'+
+    '<div id="av-warn" style="color:var(--bad);font-size:15px;margin-top:8px;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button id="av-x">Annulla</button>'+
+    '<button class="btn-primary" id="av-send">Pubblica avviso</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  var fotoBlobs=[];
+  function renderPrevs(){
+    var h='';
+    fotoBlobs.forEach(function(b,i){ h+='<div style="position:relative"><img src="'+URL.createObjectURL(b)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-nw="'+i+'" class="rm-nw" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; });
+    h+='<button type="button" id="av-add" aria-label="Aggiungi foto" style="width:64px;height:64px;border-radius:8px;border:2px dashed var(--ok);background:var(--okbg);color:var(--ok);font-size:34px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">+</button>';
+    var p=$('av-prevs'); p.innerHTML=h;
+    p.querySelectorAll('.rm-nw').forEach(function(b){b.onclick=function(){fotoBlobs.splice(+b.dataset.nw,1);renderPrevs();}});
+    $('av-add').onclick=function(){ $('av-foto').click(); };
+  }
+  renderPrevs();
+  $('av-foto').onchange=function(e){ [].slice.call(e.target.files).forEach(function(f){ downscale(f,function(blob){ fotoBlobs.push(blob); renderPrevs(); }); }); e.target.value=''; };
+  $('av-x').onclick=function(){m.remove()};
+  $('av-send').onclick=async function(){
+    var tit=($('av-tit').value||'').trim(), cat=$('av-cat').value, desc=($('av-desc').value||'').trim();
+    if(!tit){ $('av-warn').textContent='Scrivi un titolo per l\'avviso.'; $('av-warn').style.display='block'; return; }
+    if(DEMO){
+      var urlsD=fotoBlobs.map(function(b){return URL.createObjectURL(b)});
+      avvisi.unshift({id:'av'+Date.now(),titolo:tit,categoria:cat,descrizione:desc,foto_urls:urlsD,stato:'aperto',autore_id:userId,autore_nome:userNome,preso_at:null,preso_da_nome:null,chiuso_il:null,chiuso_da:null,chiuso_da_nome:null,created_at:new Date().toISOString()});
+      m.remove(); renderAvvisi(); return;
+    }
+    var btn=$('av-send'); btn.disabled=true; btn.textContent='Pubblico…';
+    try{
+      var urls=[];
+      for(var i=0;i<fotoBlobs.length;i++){
+        var path=userId+'/avviso-'+Date.now()+'-'+i+'.jpg';
+        var up=await sb.storage.from('foto').upload(path, fotoBlobs[i], {contentType:'image/jpeg'});
+        if(up.error) throw up.error;
+        urls.push(sb.storage.from('foto').getPublicUrl(path).data.publicUrl);
+      }
+      var res=await sb.from('avvisi').insert({ titolo:tit, categoria:cat, descrizione:desc, foto_urls:urls, stato:'aperto', autore_id:userId, autore_nome:userNome });
+      if(res.error) throw res.error;
+      m.remove(); await loadAvvisi(); renderAvvisi();
+    }catch(err){ $('av-warn').textContent='Errore: '+err.message; $('av-warn').style.display='block'; btn.disabled=false; btn.textContent='Pubblica avviso'; }
+  };
+}
+
 /* ---------- NAV ---------- */
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,admin:renderAdmin};
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,admin:renderAdmin};
 function renderAll(){var act=document.querySelector('#nav button.active').dataset.v;Object.keys(views).forEach(function(k){$('view-'+k).classList.toggle('hide',k!==act)});views[act]()}
 document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(){document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');renderAll()}});
 
