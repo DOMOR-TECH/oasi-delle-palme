@@ -104,10 +104,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v46';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v47';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -257,7 +257,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -310,6 +310,7 @@ function userMenu(){
       '<div><label>Email</label><div style="font-size:17px">'+esc(userEmail||'—')+'</div></div>'+
       '<div><label>Stato</label><div style="margin-top:4px">'+statoChip()+'</div></div>'+
     '</div></div>'+
+    moroHtml()+
     '<button id="um-notif" style="width:100%;margin-top:4px;border-color:var(--ok);color:var(--ok)">🔔 Attiva notifiche</button>'+
     '<button id="um-logout" style="width:100%;margin-top:10px">Esci</button>'+
     '<button id="um-del" style="width:100%;margin-top:18px;border-color:var(--bad);color:var(--bad)">Elimina il mio account</button>'+
@@ -477,6 +478,24 @@ async function loadAvvisi(){
   if(DEMO){ avvisi=DEMO_AVVISI; return; }  // in demo: esempio in memoria
   const { data, error } = await sb.from('avvisi').select('*').order('created_at',{ascending:false});
   avvisi = error? [] : (data||[]);
+}
+async function loadMorosita(){   // posizione contabile della propria unità (RLS: solo la tua)
+  userMorosita=null;
+  if(!userUnita || !userUnita.unita) return;   // accessi speciali / non associati: nessuna posizione
+  if(DEMO){ userMorosita={unita:userUnita.unita, importo:192.37, aggiornato_al:'2025-12-31'}; return; }
+  const { data } = await sb.from('morosita').select('*').eq('unita',userUnita.unita).maybeSingle();
+  userMorosita = data || null;
+}
+function moroHtml(){   // card "posizione contabile" in I miei dati — Opzione A (onesta, NON "moroso")
+  if(!userUnita) return '';
+  var m=userMorosita;
+  if(!m || !(Number(m.importo)>0)) return '<div class="card" style="margin-top:10px"><label>La tua posizione contabile</label>'+
+    '<div style="font-size:16px;color:var(--ok);margin-top:4px">✓ Nessun importo a saldo risultante dal Bilancio Consuntivo 2025.</div></div>';
+  var eur=Number(m.importo).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+  var d=m.aggiornato_al? new Date(m.aggiornato_al).toLocaleDateString('it-IT'):'31/12/2025';
+  return '<div class="card" style="margin-top:10px"><label>La tua posizione contabile</label>'+
+    '<div style="font-size:24px;font-weight:700;margin-top:2px">€ '+eur+' <span style="font-size:14px;font-weight:400;color:var(--hint)">a saldo</span></div>'+
+    '<div style="font-size:13px;color:var(--hint);margin-top:6px">Saldo dovuto al '+d+' (Bilancio Consuntivo 2025). <b>Include quote a scadere: non è necessariamente scaduto.</b> Per il dettaglio dello scaduto fa fede l\'estratto conto dell\'amministrazione.</div></div>';
 }
 async function addComment(rid, testo){
   if(!testo.trim()) return false;
