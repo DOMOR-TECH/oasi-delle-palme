@@ -104,7 +104,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v45';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v46';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
@@ -491,9 +491,12 @@ function isOpen(r){return r.stato==='problema' && !r.risolto}
 function myReport(area,sid){return reports.find(function(x){return x.autore_id===userId && x.area===area && x.servizio===sid})||null}
 function fotoListOf(r){return (r.foto_urls&&r.foto_urls.length)?r.foto_urls:(r.foto_url?[r.foto_url]:[])}
 async function resolveProblem(r){
-  if(DEMO){ r.risolto=true; return true; }
   if(!r || !r.id){ alert('Segnalazione senza id: operazione annullata.'); return false; }   // mai un update senza id specifico
-  const { data, error } = await sb.from('segnalazioni').update({ risolto:true }).eq('id', r.id).select('id');
+  var altrui = r.autore_id && r.autore_id!==userId;   // admin che chiude il ticket di un altro
+  if(!confirm(altrui ? 'Chiudere questa segnalazione aperta da '+(r.autore_nome||'un altro condòmino')+'?\n(resterà tracciato che l\'hai chiusa tu)' : 'Segnare questa segnalazione come risolta?')) return false;
+  var patch={ risolto:true, chiuso_da:userId, chiuso_da_nome:userNome, chiuso_il:new Date().toISOString() };
+  if(DEMO){ Object.assign(r,patch); return true; }
+  const { data, error } = await sb.from('segnalazioni').update(patch).eq('id', r.id).select('id');
   if(error){ alert('Errore: '+error.message); return false; }
   if(data && data.length>1){ alert('Attenzione: l\'operazione ha toccato '+data.length+' righe (atteso 1). Segnalalo.'); }   // sentinella anti-bug
   await loadReports(); return true;
@@ -694,6 +697,7 @@ function renderZona(){
       html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+col+'bg);color:var(--'+col+')">'+(fatto?'✓':'•')+'</span>'+
         '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s?s.nome:r.servizio)+'</div>'+
         '<div style="font-size:14px;color:var(--hint)">'+(fatto?'fatto':'problema risolto')+' · '+esc(r.autore_nome)+' · '+new Date(r.created_at).toLocaleDateString('it-IT')+' <span style="color:var(--ok)">· completato</span></div></div></div>'+
+        (!fatto && r.chiuso_da_nome?'<div style="font-size:13px;color:var(--ok);margin-top:2px">✓ chiuso da <b>'+esc(r.chiuso_da_nome)+'</b>'+(r.chiuso_il?' il '+new Date(r.chiuso_il).toLocaleDateString('it-IT'):'')+(r.chiuso_da&&r.chiuso_da!==r.autore_id?' · chiusura da amministrazione':'')+'</div>':'')+
         (r.nota?'<div style="font-size:15px;color:var(--muted);margin-top:6px">«'+esc(r.nota)+'»</div>':'')+
         threadHTML(r)+'</div>';
     });
@@ -857,7 +861,7 @@ function renderDossier(){
         '<div style="font-size:14px;color:var(--hint)">'+esc(r.autore_nome)+' · '+fmt(r.created_at)+'</div></div></div>'+
         '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+
         '<button class="th-tog" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px">Discussione'+(cms.length?' ('+cms.length+')':'')+'</button>'+
-        (mine?'<button class="dz-resolve" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px;border-color:var(--ok);color:var(--ok)">✓ Segna risolto</button>':'')+
+        ((mine||isAdmin)?'<button class="dz-resolve" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px;border-color:var(--ok);color:var(--ok)">✓ Segna risolto</button>':'')+
         '</div>'+
         '<div class="th" data-tid="'+r.id+'" style="display:none;margin-top:8px;padding-left:8px;border-left:2px solid var(--line)">'+
           cms.map(function(c){return '<div style="margin-bottom:7px"><div style="font-size:14px"><span style="font-weight:500">'+esc(c.autore_nome)+'</span> <span style="color:var(--hint)">'+new Date(c.created_at).toLocaleDateString('it-IT')+'</span></div><div style="font-size:15px">'+esc(c.testo)+'</div></div>'}).join('')+
