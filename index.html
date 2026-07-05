@@ -102,10 +102,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v57';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v58';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false;   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente)
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -221,7 +221,7 @@ async function updateAdminBadge(){
   var nav=$('nav-admin'); if(!nav) return;
   var n=0;
   if(DEMO){ n=DEMO_ADMIN.filter(function(x){return x.stato==='in_attesa'}).length; }
-  else if(isAdmin){ try{ var r=await sb.from('proprietari').select('unita',{count:'exact',head:true}).eq('stato','in_attesa'); var rc=await sb.from('coproprietari').select('unita',{count:'exact',head:true}).eq('stato','in_attesa'); n=(r.count||0)+(rc.count||0); }catch(e){ n=0; } }
+  else if(adminView()){ try{ var r=await sb.from('proprietari').select('unita',{count:'exact',head:true}).eq('stato','in_attesa'); var rc=await sb.from('coproprietari').select('unita',{count:'exact',head:true}).eq('stato','in_attesa'); n=(r.count||0)+(rc.count||0); }catch(e){ n=0; } }
   var b=nav.querySelector('.navbadge');
   if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; nav.appendChild(b); } b.textContent=n; b.style.display='flex'; }
   else if(b){ b.style.display='none'; }
@@ -310,6 +310,7 @@ function userMenu(){
     '</div></div>'+
     moroHtml()+
     '<button id="um-notif" style="width:100%;margin-top:4px;border-color:var(--ok);color:var(--ok)">🔔 Attiva notifiche</button>'+
+    (isAdmin ? '<button id="um-adminmode" style="width:100%;margin-top:10px;border-color:#c9962f;color:#c9962f;font-weight:600">'+(adminView()?'👤 Torna alla vista condòmino':'🛠️ Passa alla vista amministratore')+'</button>' : '')+
     '<button id="um-logout" style="width:100%;margin-top:10px">Esci</button>'+
     '<button id="um-del" style="width:100%;margin-top:18px;border-color:var(--bad);color:var(--bad)">Elimina il mio account</button>'+
     '<p class="sub" style="margin-top:8px">Eliminando l\'account si chiude il tuo accesso e si libera la tua unità. <b>Le segnalazioni che hai inviato restano</b> (firmate col tuo nome), perché sono prove condivise della comunità.</p>'+
@@ -318,6 +319,7 @@ function userMenu(){
   document.body.appendChild(m);
   $('um-x').onclick=function(){m.remove()};
   $('um-notif').onclick=function(){ attivaNotifiche(); };
+  var uam=$('um-adminmode'); if(uam) uam.onclick=function(){ m.remove(); toggleAdminView(); };
   $('um-logout').onclick=async function(){ if(DEMO){location.href=location.pathname;return;} await sb.auth.signOut(); location.reload(); };
   $('um-del').onclick=function(){ eliminaAccount(m); };
 }
@@ -892,7 +894,7 @@ function renderDossier(){
         '<div style="font-size:14px;color:var(--hint)">'+esc(r.autore_nome)+' · '+fmt(r.created_at)+'</div></div></div>'+
         '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+
         '<button class="th-tog" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px">Discussione'+(cms.length?' ('+cms.length+')':'')+'</button>'+
-        ((mine||isAdmin)?'<button class="dz-resolve" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px;border-color:var(--ok);color:var(--ok)">✓ Segna risolto</button>':'')+
+        ((mine||adminView())?'<button class="dz-resolve" data-rid="'+r.id+'" style="font-size:14px;padding:7px 12px;border-color:var(--ok);color:var(--ok)">✓ Segna risolto</button>':'')+
         '</div>'+
         '<div class="th" data-tid="'+r.id+'" style="display:none;margin-top:8px;padding-left:8px;border-left:2px solid var(--line)">'+
           cms.map(function(c){return '<div style="margin-bottom:7px"><div style="font-size:14px"><span style="font-weight:500">'+esc(c.autore_nome)+'</span> <span style="color:var(--hint)">'+new Date(c.created_at).toLocaleDateString('it-IT')+'</span></div><div style="font-size:15px">'+esc(c.testo)+'</div></div>'}).join('')+
@@ -1121,10 +1123,10 @@ async function renderVoti(){
     var rv=await sb.from('voti').select('*'); voti=rv.error?[]:(rv.data||[]);
   }
   var attivi=sondaggi.filter(function(s){return s.approvato!==false});
-  var proposte=sondaggi.filter(function(s){return s.approvato===false});
+  var proposte=sondaggi.filter(function(s){return s.approvato===false && (adminView() || s.proposto_da===userId)});   // in vista condòmino l'admin vede solo le proprie proposte
   function opzOf(s){return Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto'])}
   var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 10px">Sondaggi della comunità</p>';
-  if(approvato() && (isAdmin || userUnita)){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">＋ '+(isAdmin?'Nuovo sondaggio':'Proponi un sondaggio')+'</button>'; }
+  if(approvato() && (adminView() || userUnita)){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">＋ '+(adminView()?'Nuovo sondaggio':'Proponi un sondaggio')+'</button>'; }
   else { html+='<div class="sub" style="margin-bottom:12px">Quando sarai un condòmino confermato potrai votare e proporre sondaggi.</div>'; }
   // PROPOSTE (in attesa di avallo dell'admin)
   if(proposte.length){
@@ -1132,14 +1134,14 @@ async function renderVoti(){
     proposte.forEach(function(s){
       html+='<div class="card"><div style="font-weight:600;font-size:17px">'+esc(s.domanda)+'</div>'+
         '<div style="font-size:14px;color:var(--hint);margin:3px 0 8px">proposto da '+esc(s.autore_nome||'—')+' · opzioni: '+esc(opzOf(s).join(' / '))+'</div>';
-      if(isAdmin){ html+='<div style="display:flex;gap:7px"><button class="vt-appr" data-s="'+esc(s.id)+'" style="border-color:var(--ok);color:var(--ok)">✓ Avalla</button>'+
+      if(adminView()){ html+='<div style="display:flex;gap:7px"><button class="vt-appr" data-s="'+esc(s.id)+'" style="border-color:var(--ok);color:var(--ok)">✓ Avalla</button>'+
         '<button class="vt-del" data-s="'+esc(s.id)+'" style="border-color:var(--bad);color:var(--bad)">Elimina</button></div>'; }
       else { html+='<div class="sub">In attesa che l\'amministratore la approvi.</div>'; }
       html+='</div>';
     });
     html+='<div class="cap-grp">Sondaggi attivi</div>';
   }
-  if(!attivi.length){ html+='<div class="empty">Nessun sondaggio attivo.'+(approvato()?' '+(isAdmin?'Creane uno':'Proponine uno')+' col pulsante qui sopra.':'')+'</div>'; }
+  if(!attivi.length){ html+='<div class="empty">Nessun sondaggio attivo.'+(approvato()?' '+(adminView()?'Creane uno':'Proponine uno')+' col pulsante qui sopra.':'')+'</div>'; }
   attivi.forEach(function(s){
     var sv=voti.filter(function(x){return x.sondaggio_id===s.id});
     var myVote=sv.find(function(x){return x.autore_id===userId});
@@ -1168,7 +1170,7 @@ async function renderVoti(){
         '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--ok)"></div></div>'+
         (ov.length?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+ov.map(function(x){return esc(x.autore_nome)}).join(', ')+'</div>':'')+'</div>';
     });
-    if(isAdmin){ html+='<div style="display:flex;gap:7px;margin-top:12px">'+
+    if(adminView()){ html+='<div style="display:flex;gap:7px;margin-top:12px">'+
       '<button class="vt-close" data-s="'+esc(s.id)+'" data-chiuso="'+(s.chiuso?'1':'0')+'" style="font-size:14px">'+(s.chiuso?'Riapri':'Chiudi')+'</button>'+
       '<button class="vt-del" data-s="'+esc(s.id)+'" style="font-size:14px;border-color:var(--bad);color:var(--bad)">Elimina</button></div>'; }
     html+='</div>';
@@ -1176,7 +1178,7 @@ async function renderVoti(){
   v.innerHTML=html;
   v.querySelectorAll('.vt-vote').forEach(function(b){b.onclick=function(){votaSondaggio(b.dataset.s,b.dataset.o)}});
   var nb=$('vt-new'); if(nb) nb.onclick=nuovoSondaggio;
-  if(isAdmin){
+  if(adminView()){
     v.querySelectorAll('.vt-appr').forEach(function(b){b.onclick=function(){approveSondaggio(b.dataset.s)}});
     v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=function(){toggleSondaggio(b.dataset.s,b.dataset.chiuso!=='1')}});
     v.querySelectorAll('.vt-del').forEach(function(b){b.onclick=function(){eliminaSondaggio(b.dataset.s)}});
@@ -1192,15 +1194,15 @@ async function votaSondaggio(sid,opzione){
 }
 async function nuovoSondaggio(){
   if(!approvato()){ alert('Devi essere un condòmino confermato.'); return; }
-  var d=prompt(isAdmin?'Domanda del sondaggio:':'Proponi una domanda (l\'amministratore la valuterà):'); if(!d||!d.trim())return;
+  var d=prompt(adminView()?'Domanda del sondaggio:':'Proponi una domanda (l\'amministratore la valuterà):'); if(!d||!d.trim())return;
   var opz=prompt('Opzioni separate da virgola:','Sì, No, Astenuto');
   var opzioni=(opz&&opz.trim())?opz.split(',').map(function(s){return s.trim()}).filter(Boolean):['Sì','No','Astenuto'];
   if(opzioni.length<2){ alert('Servono almeno 2 opzioni.'); return; }
-  if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d.trim(),opzioni:opzioni,chiuso:false,approvato:isAdmin,proposto_da:userId,autore_nome:userNome}); renderVoti(); if(!isAdmin)alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
-  var rec={domanda:d.trim(),opzioni:opzioni,autore_nome:userNome,approvato:isAdmin,proposto_da:userId};
+  if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d.trim(),opzioni:opzioni,chiuso:false,approvato:adminView(),proposto_da:userId,autore_nome:userNome}); renderVoti(); if(!adminView())alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
+  var rec={domanda:d.trim(),opzioni:opzioni,autore_nome:userNome,approvato:adminView(),proposto_da:userId};
   var up=await sb.from('sondaggi').insert(rec);
   if(up.error){ alert('Errore: '+up.error.message); return; }
-  if(!isAdmin) alert('Proposta inviata! L\'amministratore la valuterà.');
+  if(!adminView()) alert('Proposta inviata! L\'amministratore la valuterà.');
   renderVoti();
 }
 async function approveSondaggio(sid){
@@ -1240,7 +1242,7 @@ var AVVISI_CAT=[
 var AVV_STATI={aperto:{label:'Aperto',col:'bad'},preso_in_carico:{label:'Preso in carico',col:'ocra'},risolto:{label:'Risolto',col:'ok'}};
 var DEMO_AVVISI=[{id:'av-demo1',titolo:'Centralina cancello pedonale ko',categoria:'elettrico',descrizione:'Il cancello pedonale lato Pal. C non si apre con il telecomando: scatta il salvavita della centralina.',foto_urls:[],stato:'aperto',autore_id:'demo2',autore_nome:'Vicino di Pal. C',preso_at:null,preso_da_nome:null,chiuso_il:null,chiuso_da:null,chiuso_da_nome:null,created_at:new Date(Date.now()-2*86400000).toISOString()}];
 function avCat(id){var c=AVVISI_CAT.find(function(x){return x.id===id});return c||{id:id,label:id,ic:'•'};}
-function puoChiudere(a){ return a.autore_id===userId || isAdmin; }   // autore OPPURE admin
+function puoChiudere(a){ return a.autore_id===userId || adminView(); }   // autore OPPURE admin (in vista admin)
 
 function avCard(a){
   var st=AVV_STATI[a.stato]||AVV_STATI.aperto, cat=avCat(a.categoria);
@@ -1380,12 +1382,12 @@ function richiesteHtml(){
       '<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">'+esc(r.oggetto)+'</div>'+
       (r.descrizione?'<div style="font-size:14px;color:var(--muted)">'+esc(r.descrizione)+'</div>':'')+
       '<div style="font-size:12px;color:var(--hint)">'+esc(r.autore_nome)+' · '+new Date(r.created_at).toLocaleDateString('it-IT')+' · '+(conf?('confermata dal gestore'+(r.confermata_da?' ('+esc(r.confermata_da)+')':'')+' → all\'amministratore'):'in attesa del gestore')+'</div></div>'+
-      ((!conf && (isGestore()||isAdmin))?'<button class="rq-conf" data-id="'+esc(r.id)+'" style="border-color:var(--ok);color:var(--ok)">✓ Conferma</button>':'')+'</div></div>';
+      ((!conf && (isGestore()||adminView()))?'<button class="rq-conf" data-id="'+esc(r.id)+'" style="border-color:var(--ok);color:var(--ok)">✓ Conferma</button>':'')+'</div></div>';
   });
   return h;
 }
 async function confermaRichiesta(r){
-  if(!(isGestore()||isAdmin)){ alert('Solo il gestore può confermare la richiesta.'); return; }
+  if(!(isGestore()||adminView())){ alert('Solo il gestore può confermare la richiesta.'); return; }
   if(!confirm('Confermare la richiesta "'+r.oggetto+'"? Passerà all\'amministratore.')) return;
   var patch={stato:'confermata',confermata_da:(userNome||userRuolo||'Gestore'),confermata_il:new Date().toISOString()};
   if(DEMO){ Object.assign(r,patch); renderPiscina(); return; }
@@ -1393,7 +1395,7 @@ async function confermaRichiesta(r){
   await loadRichieste(); renderPiscina();
 }
 function nuovaRichiesta(){
-  if(!(isPoolStaff()||isAdmin)){ alert('Solo bagnino, gestore o amministratore.'); return; }
+  if(!(isPoolStaff()||adminView())){ alert('Solo bagnino, gestore o amministratore.'); return; }
   var m=document.createElement('div');
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
   m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
@@ -1436,7 +1438,7 @@ async function loadMagazzino(){   // prodotti/acquisti (lettura pubblica)
   magazzino = data||[];
 }
 function magazzinoHtml(){
-  var canWrite = isPoolStaff()||isAdmin;
+  var canWrite = isPoolStaff()||adminView();
   var h='<div class="cap-grp" style="margin-top:14px">Magazzino piscina</div>';
   if(canWrite) h+='<button class="btn-primary" id="mag-new" style="margin:2px 0 10px">＋ Aggiungi prodotto</button>';
   else h+='<div class="sub" style="margin:0 2px 8px">Prodotti/consumabili registrati dal gestore.</div>';
@@ -1452,7 +1454,7 @@ function magazzinoHtml(){
   return h;
 }
 function aggiungiProdotto(){
-  if(!(isPoolStaff()||isAdmin)){ alert('Solo gestore, bagnino o amministratore.'); return; }
+  if(!(isPoolStaff()||adminView())){ alert('Solo gestore, bagnino o amministratore.'); return; }
   var m=document.createElement('div');
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
   m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
@@ -1605,7 +1607,7 @@ async function loadAnalisi(){   // registro analisi acqua (lettura pubblica)
   const { data } = await sb.from('analisi_acqua').select('*').order('created_at',{ascending:false}).limit(30);
   analisiAcqua = data||[];
 }
-function puoRegistrareAnalisi(){ return isAdmin || (!!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0); }
+function puoRegistrareAnalisi(){ return adminView() || (!!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0); }
 function renderPiscina(){
   var v=$('view-piscina'), last=analisiAcqua[0];
   var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 4px">Piscina</p>'+
@@ -1620,7 +1622,7 @@ function renderPiscina(){
     var lf=fotoListOf(last); if(lf.length) html+=' · <span class="aa-foto" data-u="'+esc(lf[0])+'" style="color:var(--ok);cursor:pointer">📷 prova</span>';
     html+='</div></div>';
   } else { html+='<div class="empty">Nessuna analisi registrata ancora.</div>'; }
-  if(isPoolStaff()||isAdmin){   // personale piscina: presenze + compiti + analisi
+  if(isPoolStaff()||adminView()){   // personale piscina (o admin in vista admin): presenze + compiti + analisi
     html+=staffPresenzeHtml();
     html+=compitiHtml();
     if(puoRegistrareAnalisi()) html+='<button class="btn-primary" id="aa-new" style="margin:12px 0">＋ Registra analisi acqua</button>';
@@ -1701,10 +1703,22 @@ function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y
 var curV='zona';
 function hubOf(v){return HUBS.find(function(h){return h.views.indexOf(v)>=0})||HUBS[0];}
 function isPoolStaff(){ return !!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0; }   // personale piscina: vive solo nel modulo Piscina
+// "vista amministratore": l'admin è residente di default; i poteri/le viste admin compaiono SOLO quando ha attivato la modalità.
+// isAdmin resta la CAPACITÀ dell'account (es. ricevere le push admin); adminView() è ciò che governa la PRESENTAZIONE.
+function adminView(){ return isAdmin && adminMode; }
+function toggleAdminView(){
+  if(!isAdmin) return;
+  adminMode=!adminMode;
+  $('hsub').textContent = adminView() ? ((DEMO?'PROVA · ':'')+'🛠️ vista amministratore') : (DEMO?'MODALITÀ PROVA (senza login)':'il controllo del capitolato è di tutti');
+  buildNav(); showBadge();
+  if(adminView()){ curV='admin'; showView('admin'); }        // entrando in vista admin atterri sulla gestione
+  else { if(curV==='admin') curV='zona'; showView(curV); }    // uscendo torni al Controllo
+  updateAdminBadge();
+}
 function buildNav(){
   var nav=$('nav'); nav.innerHTML='';
   HUBS.forEach(function(h){
-    if(h.adminOnly && !isAdmin) return;
+    if(h.adminOnly && !adminView()) return;
     if(h.seasonal && !inStagione() && !isPoolStaff()) return;   // condòmini: Piscina solo in stagione; personale piscina: sempre (gestisce anche l'inverno)
     if(isPoolStaff() && h.id!=='piscina') return;                // PRIVILEGI: bagnino/gestore vedono SOLO l'hub Piscina
     var b=document.createElement('button'); b.dataset.hub=h.id;
@@ -1716,6 +1730,7 @@ function buildNav(){
 }
 function showView(v){
   if(!views[v]) v='zona';
+  if(v==='admin' && !adminView()) v='zona';   // la vista admin è raggiungibile solo in modalità amministratore
   curV=v; var hub=hubOf(v);
   $('nav').querySelectorAll('button').forEach(function(b){b.classList.toggle('active', b.dataset.hub===hub.id);});
   var sn=$('subnav');
