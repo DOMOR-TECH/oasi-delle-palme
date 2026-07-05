@@ -102,7 +102,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v56';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v57';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
@@ -858,7 +858,19 @@ function renderDossier(){
       '<div class="sub" style="margin-bottom:4px">'+penali.length+' inadempiment'+(penali.length>1?'i':'o')+' · €100 a inadempimento + €30/giorno di ritardo (matura finché non risolto)</div>'+
       penList+'</div>';
   }
-  if(!probs.length){ v.innerHTML=html+'<div class="empty">Nessuna inadempienza aperta. Le segnalazioni di "problema" compariranno qui, pronte per il legale o l\'assemblea.</div>'; return; }
+  // RICHIESTE PISCINA confermate dal gestore → entrano nel dossier settimanale all'amministrazione
+  var rqConf=(typeof richieste!=='undefined'?richieste:[]).filter(function(r){return r.stato==='confermata';});
+  if(rqConf.length){
+    html+='<div class="card"><div class="row"><span style="font-size:26px">📩</span><div><div style="font-weight:600;font-size:18px">Richieste piscina confermate</div><div class="sub">da inoltrare all\'amministrazione nel dossier settimanale</div></div></div>';
+    rqConf.forEach(function(r){
+      html+='<div style="border-top:.5px solid var(--line);padding:8px 0"><div style="font-size:16px;font-weight:600">'+esc(r.oggetto)+'</div>'+
+        (r.descrizione?'<div style="font-size:14px;color:var(--muted)">'+esc(r.descrizione)+'</div>':'')+
+        '<div style="font-size:13px;color:var(--hint)">'+esc(r.autore_nome)+' · confermata'+(r.confermata_da?' da '+esc(r.confermata_da):'')+(r.confermata_il?' il '+new Date(r.confermata_il).toLocaleDateString('it-IT'):'')+'</div></div>';
+    });
+    html+='</div>';
+  }
+  if(!probs.length && !rqConf.length){ v.innerHTML=html+'<div class="empty">Nessuna inadempienza aperta. Le segnalazioni di "problema" compariranno qui, pronte per il legale o l\'assemblea.</div>'; return; }
+  if(!probs.length){ v.innerHTML=html+'<button class="btn-primary" id="dz-export" style="margin-top:6px">Esporta PDF firmato</button>'; var ex0=$('dz-export'); if(ex0) ex0.onclick=exportPDF; return; }
   Object.keys(bySrv).forEach(function(sid){
     var s=CAPITOLATO_VERDE.find(function(x){return x.id===sid}),rs=bySrv[sid];
     html+='<div class="card"><div style="font-weight:600;font-size:17px">'+esc(s?s.nome:sid)+'</div>'+
@@ -1348,7 +1360,10 @@ function openNuovoAvviso(){
 }
 
 /* ---------- NAV ---------- */
-var DEMO_RICHIESTE=[{id:'rq1',oggetto:'Tubo di ricambio 3/4"',descrizione:'Il tubo dell\'aspiratore perde',foto_urls:[],autore_nome:'Marco B. (Bagnino)',stato:'aperta',created_at:new Date(Date.now()-4*3600000).toISOString()}];
+var DEMO_RICHIESTE=[
+  {id:'rq1',oggetto:'Tubo di ricambio 3/4"',descrizione:'Il tubo dell\'aspiratore perde',foto_urls:[],autore_nome:'Marco B. (Bagnino)',stato:'aperta',created_at:new Date(Date.now()-4*3600000).toISOString()},
+  {id:'rq2',oggetto:'Compressore manuale per sanitizzante',descrizione:'Per vaporizzare sul mattonato al mattino',foto_urls:[],autore_nome:'Marco B. (Bagnino)',stato:'confermata',confermata_da:'Gestore piscina',confermata_il:new Date(Date.now()-86400000).toISOString(),created_at:new Date(Date.now()-2*86400000).toISOString()}
+];
 async function loadRichieste(){   // richieste bagnino→gestore→amministratore
   if(DEMO){ richieste=DEMO_RICHIESTE; return; }
   const { data } = await sb.from('richieste_piscina').select('*').order('created_at',{ascending:false}).limit(40);
