@@ -102,10 +102,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v55';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v56';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -229,12 +229,12 @@ async function updateAdminBadge(){
 
 /* ---------- AUTH / INIT ---------- */
 async function init(){
-  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; isSuper=true; puoSegnalare=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; var _dr=new URLSearchParams(location.search).get('ruolo'); if(_dr){ if(['bagnino','gestore'].indexOf(_dr.toLowerCase())>=0){ userRuolo=_dr; userUnita=null; } else if(_dr==='condomino'){ isAdmin=false; isSuper=false; } $('hsub').textContent='PROVA · '+_dr; }
+  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; isSuper=true; puoSegnalare=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; var _dr=new URLSearchParams(location.search).get('ruolo'); if(_dr){ if(['bagnino','gestore'].indexOf(_dr.toLowerCase())>=0){ userRuolo=_dr; userUnita=null; isAdmin=false; isSuper=false; } else if(_dr==='condomino'){ isAdmin=false; isSuper=false; } $('hsub').textContent='PROVA · '+_dr; }
     reports=[
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
     ];
-    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); setApp(true); renderAll(); updateAdminBadge(); return; }
+    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -245,7 +245,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -255,7 +255,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -1348,6 +1348,72 @@ function openNuovoAvviso(){
 }
 
 /* ---------- NAV ---------- */
+var DEMO_RICHIESTE=[{id:'rq1',oggetto:'Tubo di ricambio 3/4"',descrizione:'Il tubo dell\'aspiratore perde',foto_urls:[],autore_nome:'Marco B. (Bagnino)',stato:'aperta',created_at:new Date(Date.now()-4*3600000).toISOString()}];
+async function loadRichieste(){   // richieste bagnino→gestore→amministratore
+  if(DEMO){ richieste=DEMO_RICHIESTE; return; }
+  const { data } = await sb.from('richieste_piscina').select('*').order('created_at',{ascending:false}).limit(40);
+  richieste = data||[];
+}
+function isGestore(){ return !!userRuolo && userRuolo.trim().toLowerCase()==='gestore'; }
+function richiesteHtml(){
+  var h='<div class="cap-grp" style="margin-top:14px">Richieste · bagnino → gestore → amministratore</div>';
+  h+='<button class="btn-primary" id="rq-new" style="margin:2px 0 10px">＋ Nuova richiesta</button>';
+  if(!richieste.length) h+='<div class="empty">Nessuna richiesta.</div>';
+  richieste.slice(0,20).forEach(function(r){
+    var conf=r.stato==='confermata';
+    h+='<div class="card" style="padding:11px 12px"><div class="row"><span class="pill" style="background:var(--'+(conf?'ok':'ocra')+'bg);color:var(--'+(conf?'ok':'ocra')+')">'+(conf?'✓':'●')+'</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">'+esc(r.oggetto)+'</div>'+
+      (r.descrizione?'<div style="font-size:14px;color:var(--muted)">'+esc(r.descrizione)+'</div>':'')+
+      '<div style="font-size:12px;color:var(--hint)">'+esc(r.autore_nome)+' · '+new Date(r.created_at).toLocaleDateString('it-IT')+' · '+(conf?('confermata dal gestore'+(r.confermata_da?' ('+esc(r.confermata_da)+')':'')+' → all\'amministratore'):'in attesa del gestore')+'</div></div>'+
+      ((!conf && (isGestore()||isAdmin))?'<button class="rq-conf" data-id="'+esc(r.id)+'" style="border-color:var(--ok);color:var(--ok)">✓ Conferma</button>':'')+'</div></div>';
+  });
+  return h;
+}
+async function confermaRichiesta(r){
+  if(!(isGestore()||isAdmin)){ alert('Solo il gestore può confermare la richiesta.'); return; }
+  if(!confirm('Confermare la richiesta "'+r.oggetto+'"? Passerà all\'amministratore.')) return;
+  var patch={stato:'confermata',confermata_da:(userNome||userRuolo||'Gestore'),confermata_il:new Date().toISOString()};
+  if(DEMO){ Object.assign(r,patch); renderPiscina(); return; }
+  var res=await sb.from('richieste_piscina').update(patch).eq('id',r.id).select('id'); if(res.error){ alert('Errore: '+res.error.message); return; }
+  await loadRichieste(); renderPiscina();
+}
+function nuovaRichiesta(){
+  if(!(isPoolStaff()||isAdmin)){ alert('Solo bagnino, gestore o amministratore.'); return; }
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600">Nuova richiesta</div>'+
+    '<div style="font-size:15px;color:var(--hint);margin:2px 0 12px">Cosa ti serve per il lavoro (un tubo, un compressore…). Va al gestore, poi all\'amministratore.</div>'+
+    '<label>Cosa serve</label><input id="rq-ogg" type="text" placeholder="es. compressore manuale per sanitizzante" style="margin-top:4px;width:100%">'+
+    '<label style="margin-top:10px;display:block">Dettagli (facoltativo)</label><input id="rq-desc" type="text" placeholder="perché, urgenza…" style="margin-top:4px;width:100%">'+
+    '<label style="margin-top:10px;display:block">Foto (facoltativa)</label>'+
+    '<input id="rq-foto" type="file" accept="image/*" style="display:none">'+
+    '<div id="rq-prevs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'+
+    '<div style="font-size:14px;color:var(--hint);margin-top:10px">firma: '+esc(userNome||userRuolo||'—')+' · '+new Date().toLocaleDateString('it-IT')+'</div>'+
+    '<div id="rq-warn" style="color:var(--bad);font-size:15px;margin-top:8px;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button id="rq-x">Annulla</button>'+
+    '<button class="btn-primary" id="rq-send">Invia richiesta</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  var blobs=[];
+  function prevs(){ var h=''; blobs.forEach(function(b,i){ h+='<div style="position:relative"><img src="'+URL.createObjectURL(b)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-nw="'+i+'" class="rm-nw" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; }); h+='<button type="button" id="rq-add" style="width:64px;height:64px;border-radius:8px;border:2px dashed var(--ok);background:var(--okbg);color:var(--ok);font-size:34px;line-height:1">+</button>'; var p=$('rq-prevs'); p.innerHTML=h; p.querySelectorAll('.rm-nw').forEach(function(b){b.onclick=function(){blobs.splice(+b.dataset.nw,1);prevs();}}); $('rq-add').onclick=function(){$('rq-foto').click();}; }
+  prevs();
+  $('rq-foto').onchange=function(e){ [].slice.call(e.target.files).forEach(function(f){ downscale(f,function(b){blobs.push(b);prevs();}); }); e.target.value=''; };
+  $('rq-x').onclick=function(){m.remove();};
+  $('rq-send').onclick=async function(){
+    var ogg=($('rq-ogg').value||'').trim();
+    if(!ogg){ $('rq-warn').textContent='Scrivi cosa ti serve.'; $('rq-warn').style.display='block'; return; }
+    var rec={oggetto:ogg,descrizione:($('rq-desc').value||'').trim()||null,autore_id:userId,autore_nome:(userNome||userRuolo||'—'),stato:'aperta'};
+    if(DEMO){ richieste.unshift(Object.assign({id:'rq'+Date.now(),foto_urls:blobs.map(function(b){return URL.createObjectURL(b);}),created_at:new Date().toISOString()},rec)); m.remove(); renderPiscina(); return; }
+    var btn=$('rq-send'); btn.disabled=true; btn.textContent='Invio…';
+    try{
+      var urls=[];
+      for(var i=0;i<blobs.length;i++){ var path=userId+'/richiesta-'+Date.now()+'-'+i+'.jpg'; var up=await sb.storage.from('foto').upload(path,blobs[i],{contentType:'image/jpeg'}); if(up.error) throw up.error; urls.push(sb.storage.from('foto').getPublicUrl(path).data.publicUrl); }
+      rec.foto_urls=urls;
+      var res=await sb.from('richieste_piscina').insert(rec); if(res.error) throw res.error;
+      m.remove(); await loadRichieste(); renderPiscina();
+    }catch(err){ $('rq-warn').textContent='Errore: '+err.message; $('rq-warn').style.display='block'; btn.disabled=false; btn.textContent='Invia richiesta'; }
+  };
+}
 var DEMO_MAGAZZINO=[{id:'m1',prodotto:'Cloro granulare',descrizione:'Marca X',quantita:'2 fusti da 25 kg',foto_urls:[],autore_nome:'Gestore piscina',created_at:new Date(Date.now()-2*86400000).toISOString()}];
 async function loadMagazzino(){   // prodotti/acquisti (lettura pubblica)
   if(DEMO){ magazzino=DEMO_MAGAZZINO; return; }
@@ -1550,6 +1616,7 @@ function renderPiscina(){
           '<div style="font-size:13px;color:var(--hint)">'+esc(a.autore_nome)+' · '+new Date(a.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</div></div>';
       });
     }
+    html+=richiesteHtml();
   } else {   // condòmino: accesso/check-in
     html+=accessiHtml();
   }
@@ -1563,6 +1630,8 @@ function renderPiscina(){
   v.querySelectorAll('.acc-osp').forEach(function(b){b.onclick=function(){onOsp(+b.dataset.n);}});
   var mn=$('mag-new'); if(mn) mn.onclick=aggiungiProdotto;
   v.querySelectorAll('.mag-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
+  var rqn=$('rq-new'); if(rqn) rqn.onclick=nuovaRichiesta;
+  v.querySelectorAll('.rq-conf').forEach(function(b){b.onclick=function(){var r=richieste.find(function(x){return String(x.id)===b.dataset.id;});if(r)confermaRichiesta(r);}});
 }
 function registraAnalisi(){
   if(!puoRegistrareAnalisi()){ alert('Solo bagnino, gestore o amministratore possono registrare l\'analisi.'); return; }
