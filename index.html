@@ -102,10 +102,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v50';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v51';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -234,7 +234,7 @@ async function init(){
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
     ];
-    showBadge(); await loadMorosita(); setApp(true); renderAll(); updateAdminBadge(); return; }
+    showBadge(); await loadMorosita(); await loadAnalisi(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -245,7 +245,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -255,7 +255,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -1018,7 +1018,7 @@ async function renderAdmin(){
     html+='<div style="display:grid;gap:6px;margin-top:10px">'+
       '<input id="asp-nome" placeholder="Nome e cognome" style="margin-top:0">'+
       '<input id="asp-email" type="email" placeholder="email di accesso" autocapitalize="none" autocorrect="off" style="margin-top:0">'+
-      '<input id="asp-ruolo" placeholder="Ruolo (es. Custode, Avvocato)" style="margin-top:0">'+
+      '<input id="asp-ruolo" placeholder="Ruolo (es. Custode, Bagnino, Gestore, Avvocato)" style="margin-top:0">'+
       '<label style="display:flex;align-items:center;gap:8px;font-size:15px"><input type="checkbox" id="asp-seg" checked style="width:auto;margin:0"> Può inviare segnalazioni</label>'+
       '<button class="btn-primary" id="add-asp">Crea accesso speciale</button></div></div>';
   } else {   // LOGS
@@ -1348,11 +1348,80 @@ function openNuovoAvviso(){
 }
 
 /* ---------- NAV ---------- */
+var DEMO_ANALISI=[{id:'aa1',autore_nome:'Marco B. (Bagnino)',cloro:1.2,ph:7.4,temperatura:27,foto_urls:[],note:'',created_at:new Date(Date.now()-3600000).toISOString()}];
+async function loadAnalisi(){   // registro analisi acqua (lettura pubblica)
+  if(DEMO){ analisiAcqua=DEMO_ANALISI; return; }
+  const { data } = await sb.from('analisi_acqua').select('*').order('created_at',{ascending:false}).limit(30);
+  analisiAcqua = data||[];
+}
+function puoRegistrareAnalisi(){ return isAdmin || (!!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0); }
 function renderPiscina(){
-  var v=$('view-piscina');
-  v.innerHTML='<p style="font-size:16px;font-weight:600;margin:2px 2px 4px">Piscina — accessi</p>'+
-    '<div class="sub" style="margin:0 2px 12px">Stagione aperta (dal 13/06 al 13/09). Qui vivrà il <b>sistema di accessi</b>: check-in del condòmino (verde) e ospiti (blu) col contatore presenze, e sopra i <b>valori dell\'acqua</b> dichiarati dal bagnino.</div>'+
-    '<div class="empty">In costruzione — passi 4-5 del modulo piscina.</div>';
+  var v=$('view-piscina'), last=analisiAcqua[0];
+  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 4px">Piscina</p>'+
+    '<div style="font-size:13px;color:var(--hint);margin:6px 2px 6px">Qualità dell\'acqua</div>';
+  if(last){
+    function metric(lbl,val,unit){ return '<div style="flex:1;padding:10px 4px;text-align:center"><div style="font-size:12px;color:var(--hint)">'+lbl+'</div><div style="font-size:20px;font-weight:600">'+(val!=null&&val!==''?val:'—')+'</div><div style="font-size:11px;color:var(--hint)">'+unit+'</div></div>'; }
+    html+='<div class="card" style="padding:0"><div style="display:flex">'+
+      metric('Cloro',last.cloro,'mg/l')+'<div style="width:.5px;background:var(--line)"></div>'+
+      metric('pH',last.ph,'&nbsp;')+'<div style="width:.5px;background:var(--line)"></div>'+
+      metric('Temp.',(last.temperatura!=null?last.temperatura+'°':null),'acqua')+'</div>'+
+      '<div style="border-top:.5px solid var(--line);padding:9px 12px;font-size:13px;color:var(--hint)">'+esc(last.autore_nome)+' · '+new Date(last.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    var lf=fotoListOf(last); if(lf.length) html+=' · <span class="aa-foto" data-u="'+esc(lf[0])+'" style="color:var(--ok);cursor:pointer">📷 prova</span>';
+    html+='</div></div>';
+  } else { html+='<div class="empty">Nessuna analisi registrata ancora.</div>'; }
+  if(puoRegistrareAnalisi()) html+='<button class="btn-primary" id="aa-new" style="margin:12px 0">＋ Registra analisi acqua</button>';
+  if(analisiAcqua.length>1){
+    html+='<div class="cap-grp">Storico recente</div>';
+    analisiAcqua.slice(0,10).forEach(function(a){
+      html+='<div class="card" style="padding:10px 12px"><div style="font-size:14px">Cloro '+(a.cloro!=null?a.cloro:'—')+' · pH '+(a.ph!=null?a.ph:'—')+' · '+(a.temperatura!=null?a.temperatura+'°':'—')+'</div>'+
+        '<div style="font-size:13px;color:var(--hint)">'+esc(a.autore_nome)+' · '+new Date(a.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</div></div>';
+    });
+  }
+  html+='<div class="sub" style="margin-top:14px;padding-top:10px;border-top:.5px solid var(--line)">Il <b>sistema di accessi</b> (check-in condòmini/ospiti) arriva al passo 4.</div>';
+  v.innerHTML=html;
+  var nb=$('aa-new'); if(nb) nb.onclick=registraAnalisi;
+  v.querySelectorAll('.aa-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
+}
+function registraAnalisi(){
+  if(!puoRegistrareAnalisi()){ alert('Solo bagnino, gestore o amministratore possono registrare l\'analisi.'); return; }
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600">Registra analisi acqua</div>'+
+    '<div style="font-size:15px;color:var(--hint);margin:2px 0 12px">Valori dichiarati + foto della prova (provette). La riga è firmata col tuo nome.</div>'+
+    '<div style="display:flex;gap:9px"><div style="flex:1"><label>Cloro (mg/l)</label><input id="aa-cloro" type="number" step="0.1" inputmode="decimal" style="margin-top:4px"></div>'+
+    '<div style="flex:1"><label>pH</label><input id="aa-ph" type="number" step="0.1" inputmode="decimal" style="margin-top:4px"></div>'+
+    '<div style="flex:1"><label>Temp °C</label><input id="aa-temp" type="number" step="0.1" inputmode="decimal" style="margin-top:4px"></div></div>'+
+    '<label style="margin-top:10px;display:block">Nota (facoltativa)</label><input id="aa-nota" type="text" placeholder="es. valori nella norma" style="margin-top:4px">'+
+    '<label style="margin-top:10px;display:block">Foto della prova (facoltativa)</label>'+
+    '<input id="aa-foto" type="file" accept="image/*" style="display:none">'+
+    '<div id="aa-prevs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'+
+    '<div style="font-size:14px;color:var(--hint);margin-top:10px">firma: '+esc(userNome||userRuolo||'—')+' · '+new Date().toLocaleDateString('it-IT')+'</div>'+
+    '<div id="aa-warn" style="color:var(--bad);font-size:15px;margin-top:8px;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button id="aa-x">Annulla</button>'+
+    '<button class="btn-primary" id="aa-send">Registra</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  var blobs=[];
+  function prevs(){ var h=''; blobs.forEach(function(b,i){ h+='<div style="position:relative"><img src="'+URL.createObjectURL(b)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-nw="'+i+'" class="rm-nw" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; });
+    h+='<button type="button" id="aa-add" style="width:64px;height:64px;border-radius:8px;border:2px dashed var(--ok);background:var(--okbg);color:var(--ok);font-size:34px;line-height:1">+</button>';
+    var p=$('aa-prevs'); p.innerHTML=h; p.querySelectorAll('.rm-nw').forEach(function(b){b.onclick=function(){blobs.splice(+b.dataset.nw,1);prevs();}}); $('aa-add').onclick=function(){$('aa-foto').click();}; }
+  prevs();
+  $('aa-foto').onchange=function(e){ [].slice.call(e.target.files).forEach(function(f){ downscale(f,function(b){blobs.push(b);prevs();}); }); e.target.value=''; };
+  $('aa-x').onclick=function(){m.remove();};
+  $('aa-send').onclick=async function(){
+    var cloro=parseFloat($('aa-cloro').value), ph=parseFloat($('aa-ph').value), temp=parseFloat($('aa-temp').value);
+    if(isNaN(cloro)&&isNaN(ph)&&isNaN(temp)){ $('aa-warn').textContent='Inserisci almeno un valore.'; $('aa-warn').style.display='block'; return; }
+    var rec={ autore_id:userId, autore_nome:(userNome||userRuolo||'—'), cloro:isNaN(cloro)?null:cloro, ph:isNaN(ph)?null:ph, temperatura:isNaN(temp)?null:temp, note:($('aa-nota').value||'').trim() };
+    if(DEMO){ analisiAcqua.unshift(Object.assign({id:'aa'+Date.now(),foto_urls:blobs.map(function(b){return URL.createObjectURL(b);}),created_at:new Date().toISOString()},rec)); m.remove(); renderPiscina(); return; }
+    var btn=$('aa-send'); btn.disabled=true; btn.textContent='Registro…';
+    try{
+      var urls=[];
+      for(var i=0;i<blobs.length;i++){ var path=userId+'/analisi-'+Date.now()+'-'+i+'.jpg'; var up=await sb.storage.from('foto').upload(path,blobs[i],{contentType:'image/jpeg'}); if(up.error) throw up.error; urls.push(sb.storage.from('foto').getPublicUrl(path).data.publicUrl); }
+      rec.foto_urls=urls;
+      var res=await sb.from('analisi_acqua').insert(rec); if(res.error) throw res.error;
+      m.remove(); await loadAnalisi(); renderPiscina();
+    }catch(err){ $('aa-warn').textContent='Errore: '+err.message; $('aa-warn').style.display='block'; btn.disabled=false; btn.textContent='Registra'; }
+  };
 }
 var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,admin:renderAdmin};
 var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',admin:'Admin'};
