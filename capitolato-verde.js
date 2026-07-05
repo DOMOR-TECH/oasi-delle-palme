@@ -40,7 +40,21 @@ window.CAPITOLATO_VERDE = [
   { id: "disinfestazione",    nome: "Disinfestazione globale del complesso",      freq: "5×/anno (2 prim, 2 est, 1 aut)", win: "M", cadence: 70, mesi: [4,5,7,8,10],          fonte: "Capitolato HG, pag. 7",
     testo: "Disinfestazione globale del complesso: 5 volte l'anno (2 interventi primaverili, 2 estivi, 1 autunnale)." },
   { id: "derattizzazione",    nome: "Derattizzazione (intercapedini, garage…)",   freq: "5×/anno (2 prim, 2 est, 1 aut)", win: "M", cadence: 70, mesi: [4,5,7,8,10],          fonte: "Capitolato HG, pag. 7",
-    testo: "Derattizzazione: 5 volte l'anno (intercapedini, garage, cantine, scoli, griglie)." }
+    testo: "Derattizzazione: 5 volte l'anno (intercapedini, garage, cantine, scoli, griglie)." },
+
+  // --- IMPIANTO PISCINA — fornitore WaterForYou (contratto in vigore). Cadenze dal capitolato Acqua & Arte 2022-25 (WFY non le specifica). Spogliatoi/bagni ESCLUSI 2026 (in ristrutturazione).
+  { id: "pisc_apertura",      nome: "Apertura piscina (vasca + sala macchine)",   freq: "giornaliera (stagione)",      win: "D",   cadence: 1,   mesi: [6,7,8,9],             fornitore: "WaterForYou", fonte: "Capitolato piscina (WaterForYou in vigore; cadenze da Acqua & Arte 2022-25)",
+    testo: "Approntamento della vasca, controllo e accensione della sala macchine, ad apertura giornaliera durante la stagione balneare." },
+  { id: "pisc_pulizia_piano", nome: "Pulizia piano e bordo vasca",                freq: "giornaliera (stagione)",      win: "D",   cadence: 1,   mesi: [6,7,8,9],             fornitore: "WaterForYou", fonte: "Capitolato piscina (WaterForYou in vigore; cadenze da Acqua & Arte 2022-25)",
+    testo: "Pulizia giornaliera del piano, del bordo vasca e della vaschetta nettapiedi durante la stagione. (Spogliatoi e bagni sospesi 2026: locali in ristrutturazione.)" },
+  { id: "pisc_disinfezione",  nome: "Disinfezione piano vasca",                   freq: "giornaliera (stagione)",      win: "D",   cadence: 1,   mesi: [6,7,8,9],             fornitore: "WaterForYou", fonte: "Capitolato piscina (WaterForYou in vigore; cadenze da Acqua & Arte 2022-25)",
+    testo: "Disinfezione giornaliera del piano vasca con antimicotico a nebulizzazione." },
+  { id: "pisc_fondo",         nome: "Pulizia fondo vasca (nettafondo/robot)",     freq: "giornaliera (stagione)",      win: "D",   cadence: 1,   mesi: [6,7,8,9],             fornitore: "WaterForYou", fonte: "Capitolato piscina (WaterForYou in vigore; cadenze da Acqua & Arte 2022-25)",
+    testo: "Pulizia della vasca a mezzo nettafondo (pompa carrellata esterna) e/o robot, durante la stagione." },
+  { id: "pisc_vasca_inv",     nome: "Pulizia vasca pareti e fondo (invernale)",   freq: "quindicinale (fuori stagione)", win: "X10", cadence: 15, mesi: [1,2,3,4,5,10,11,12],  fornitore: "WaterForYou", fonte: "Capitolato piscina (WaterForYou in vigore; cadenza quindicinale da Acqua & Arte 2022-25)",
+    testo: "Pulizia della vasca (pareti e fondo) quindicinale nel periodo di inattività, con tartaruga/mezzo idoneo, lavapiedi e docce." },
+  { id: "pisc_operatore_inv", nome: "Verifica impianto e livello acqua (invernale)", freq: "≥2×/settimana (fuori stagione)", win: "W", cadence: 3, mesi: [1,2,3,4,5,10,11,12],  fornitore: "WaterForYou", fonte: "Capitolato piscina (WaterForYou in vigore; cadenza ≥2×/sett da Acqua & Arte 2022-25)",
+    testo: "Intervento dell'operatore almeno due volte la settimana per verifica dei meccanismi e controllo del livello dell'acqua (perdita nota), a tutela delle pompe." }
 ];
 
 // Aree del complesso (verde si osserva zona per zona)
@@ -69,5 +83,11 @@ window.SERVIZIO_DOVE = {
   lampioni:            ['strade'],
   manut_irrigazione:   ['palazzina','collina','piscina','tennis'],
   disinfestazione:     ['comune'],
-  derattizzazione:     ['comune']
+  derattizzazione:     ['comune'],
+  pisc_apertura:       ['piscina'],
+  pisc_pulizia_piano:  ['piscina'],
+  pisc_disinfezione:   ['piscina'],
+  pisc_fondo:          ['piscina'],
+  pisc_vasca_inv:      ['piscina'],
+  pisc_operatore_inv:  ['piscina']
 };

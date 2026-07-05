@@ -96,13 +96,13 @@
 <nav id="nav" style="display:none"></nav>
 
 <script src="config.js?v=2"></script>
-<script src="capitolato-verde.js?v=2"></script>
+<script src="capitolato-verde.js?v=3"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v49';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v50';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
@@ -617,6 +617,10 @@ async function scaricaContratto(){
 var curStato='attuali';
 var curAdminTab='condomini';   // condomini | speciali | logs
 function srvById(id){return CAPITOLATO_VERDE.find(function(x){return x.id===id})}
+function fornitoreOf(s){return (s&&s.fornitore)||'House & Garden';}
+function fornTag(s){ if(areaType(curArea)!=='piscina') return '';   // il tag serve solo dove convivono 2 fornitori (piscina)
+  var f=fornitoreOf(s), w=f==='WaterForYou';
+  return '<div style="margin-top:3px"><span style="font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:'+(w?'#E6F1FB':'var(--todobg)')+';color:'+(w?'#185FA5':'var(--muted)')+'">'+esc(f)+'</span></div>'; }
 // tipo di luogo di un'area + se un servizio compare in quell'area (mappatura SERVIZIO_DOVE)
 function areaType(a){ return a==='Collina'?'collina':a==='Zona piscina'?'piscina':a==='Campo tennis'?'tennis':a==='Strade interne'?'strade':a==='Tutto il complesso'?'comune':'palazzina'; }
 function serviceInArea(s,a){ var d=(window.SERVIZIO_DOVE&&window.SERVIZIO_DOVE[s.id])||[]; return d.indexOf(areaType(a))>=0; }
@@ -680,7 +684,7 @@ function renderZona(){
       var w=windowOf(s), st=pillStato(curArea,s.id), c=st==='ok'?'ok':'todo', ic=st==='ok'?'✓':'?';
       var mio=myReportP(curArea,s.id), scadTxt= st==='ok'?'verificato in questa finestra':w.label;
       html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
-        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+fornTag(s)+
         '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+' · <b>'+esc(scadTxt)+'</b>'+(mio?' · <b style="color:var(--ok)">tua: fatto</b>':'')+'</div></div>'+segBtn(s.id,mio)+'</div>'+
         '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
     });
@@ -691,7 +695,7 @@ function renderZona(){
       var probs=reports.filter(function(r){return r.area===curArea&&r.servizio===s.id&&isOpen(r)});
       var mio=myReportP(curArea,s.id);
       html+='<div class="card"><div class="row"><span class="pill" style="background:var(--badbg);color:var(--bad)">!</span>'+
-        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+fornTag(s)+
         '<div style="font-size:15px;color:var(--bad)"><b>'+probs.length+(probs.length>1?' problemi aperti':' problema aperto')+'</b></div></div>'+segBtn(s.id,mio)+'</div>'+
         (probs[0]&&probs[0].nota?'<div style="font-size:15px;color:var(--muted);margin-top:6px">«'+esc(probs[0].nota)+'»</div>':'')+
         '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
