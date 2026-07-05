@@ -46,6 +46,9 @@
   nav button.active{color:var(--ok)}
   nav button{position:relative}
   nav .ic{font-size:24px}
+  #subnav{display:flex;gap:8px;padding:10px 12px 2px;overflow-x:auto}
+  #subnav .subchip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 15px;font-size:14px;font-weight:500}
+  #subnav .subchip.active{background:var(--okbg);border-color:var(--ok);color:var(--ok)}
   .navbadge{position:absolute;top:4px;right:calc(50% - 26px);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--bad);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
   .hide{display:none}
   .seg{flex:none;padding:10px 16px;font-size:16px}
@@ -80,22 +83,17 @@
     </div>
     <div id="user-badge" class="hide" style="display:flex;align-items:center;gap:7px;flex:none"></div>
   </header>
+  <div id="subnav" style="display:none"></div>
   <div id="view-zona"><div class="spin">Carico…</div></div>
   <div id="view-bacheca" class="hide"></div>
   <div id="view-dossier" class="hide"></div>
   <div id="view-voti" class="hide"></div>
   <div id="view-avvisi" class="hide"></div>
+  <div id="view-piscina" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
 
-<nav id="nav" style="display:none">
-  <button data-v="zona" class="active"><span class="ic">◎</span>Controlla</button>
-  <button data-v="bacheca"><span class="ic">▦</span>Bacheca</button>
-  <button data-v="dossier"><span class="ic">▤</span>Dossier</button>
-  <button data-v="voti"><span class="ic">☑</span>Voti</button>
-  <button data-v="avvisi"><span class="ic">⚠</span>Avvisi</button>
-  <button data-v="admin" id="nav-admin" class="hide"><span class="ic">★</span>Admin</button>
-</nav>
+<nav id="nav" style="display:none"></nav>
 
 <script src="config.js?v=2"></script>
 <script src="capitolato-verde.js?v=2"></script>
@@ -216,7 +214,7 @@ function pillStato(area,sid){
   if(reports.some(function(r){return r.area===area&&r.servizio===sid&&isOpen(r)}))return 'problema';
   var l=latestP(area,sid);return (l&&l.stato==='ok')?'ok':'todo';
 }
-function setApp(on){$('nav').style.display=on?'flex':'none'; $('nav-admin').classList.toggle('hide',!isAdmin); if(!on)$('user-badge').classList.add('hide')}
+function setApp(on){$('nav').style.display=on?'flex':'none'; if(on)buildNav(); if(!on){$('user-badge').classList.add('hide'); $('subnav').style.display='none';}}
 
 // Pallino rosso col numero di richieste IN ATTESA sul tab Admin
 async function updateAdminBadge(){
@@ -830,9 +828,7 @@ function renderBacheca(){
 }
 function goToArea(a){
   curArea=a;
-  document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('active')});
-  document.querySelector('#nav button[data-v="zona"]').classList.add('active');
-  renderAll(); window.scrollTo(0,0);
+  showView('zona'); window.scrollTo(0,0);
 }
 
 /* ---------- VIEW: DOSSIER ---------- */
@@ -1348,9 +1344,49 @@ function openNuovoAvviso(){
 }
 
 /* ---------- NAV ---------- */
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,admin:renderAdmin};
-function renderAll(){var act=document.querySelector('#nav button.active').dataset.v;Object.keys(views).forEach(function(k){$('view-'+k).classList.toggle('hide',k!==act)});views[act]()}
-document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(){document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');renderAll()}});
+function renderPiscina(){
+  var v=$('view-piscina');
+  v.innerHTML='<p style="font-size:16px;font-weight:600;margin:2px 2px 4px">Piscina — accessi</p>'+
+    '<div class="sub" style="margin:0 2px 12px">Stagione aperta (dal 13/06 al 13/09). Qui vivrà il <b>sistema di accessi</b>: check-in del condòmino (verde) e ospiti (blu) col contatore presenze, e sopra i <b>valori dell\'acqua</b> dichiarati dal bagnino.</div>'+
+    '<div class="empty">In costruzione — passi 4-5 del modulo piscina.</div>';
+}
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,admin:renderAdmin};
+var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',admin:'Admin'};
+var HUBS=[
+  {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier']},
+  {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true},
+  {id:'comunita',label:'Comunità',ic:'☑',views:['voti','avvisi']},
+  {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true}
+];
+function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y,5,13) && n<=new Date(y,8,13,23,59,59); }
+var curV='zona';
+function hubOf(v){return HUBS.find(function(h){return h.views.indexOf(v)>=0})||HUBS[0];}
+function buildNav(){
+  var nav=$('nav'); nav.innerHTML='';
+  HUBS.forEach(function(h){
+    if(h.adminOnly && !isAdmin) return;
+    if(h.seasonal && !inStagione()) return;
+    var b=document.createElement('button'); b.dataset.hub=h.id;
+    if(h.id==='admin') b.id='nav-admin';
+    b.innerHTML='<span class="ic">'+h.ic+'</span>'+h.label;
+    b.onclick=function(){ showView(h.views.indexOf(curV)>=0?curV:h.views[0]); };
+    nav.appendChild(b);
+  });
+}
+function showView(v){
+  if(!views[v]) v='zona';
+  curV=v; var hub=hubOf(v);
+  $('nav').querySelectorAll('button').forEach(function(b){b.classList.toggle('active', b.dataset.hub===hub.id);});
+  var sn=$('subnav');
+  if(hub.views.length>1){
+    sn.style.display='flex';
+    sn.innerHTML=hub.views.map(function(x){return '<button class="subchip'+(x===v?' active':'')+'" data-v="'+x+'">'+VIEW_LABEL[x]+'</button>';}).join('');
+    sn.querySelectorAll('.subchip').forEach(function(b){b.onclick=function(){showView(b.dataset.v);};});
+  } else { sn.style.display='none'; sn.innerHTML=''; }
+  Object.keys(views).forEach(function(k){ var el=$('view-'+k); if(el) el.classList.toggle('hide',k!==v); });
+  views[v]();
+}
+function renderAll(){ showView(curV); }
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){})}
 init();
