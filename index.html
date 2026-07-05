@@ -102,10 +102,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v52';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v53';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -234,7 +234,7 @@ async function init(){
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
     ];
-    showBadge(); await loadMorosita(); await loadAnalisi(); setApp(true); renderAll(); updateAdminBadge(); return; }
+    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -245,7 +245,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -255,7 +255,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -1348,6 +1348,39 @@ function openNuovoAvviso(){
 }
 
 /* ---------- NAV ---------- */
+var COMPITI_BAGNINO=[
+  {id:'bag_mattonato',     nome:'Pulizia del mattonato',                      freq:'ogni giorno'},
+  {id:'bag_robot',         nome:'Pulizia vasca col robot (chiusura serale)',  freq:'ogni sera'},
+  {id:'bag_aspiratore',    nome:'Pulizia vasca con aspiratore a mano (asta)', freq:'2× a settimana'},
+  {id:'bag_controlavaggio',nome:'Controlavaggio dei filtri',                  freq:'2× a settimana'},
+  {id:'bag_arredi',        nome:'Sistemazione tavoli, sedie e sdraio',        freq:'ogni giorno'}
+];
+var DEMO_COMPITI=[{id:'dc1',compito_id:'bag_mattonato',compito_nome:'Pulizia del mattonato',autore_nome:'Marco B.',giorno:'oggi'}];
+function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+async function loadCompiti(){   // completamenti di oggi (lettura pubblica)
+  if(DEMO){ compitiOggi=DEMO_COMPITI; return; }
+  const { data } = await sb.from('compiti_piscina').select('*').eq('giorno',todayStr());
+  compitiOggi = data||[];
+}
+async function toggleCompito(c){
+  var ex=compitiOggi.find(function(r){return r.compito_id===c.id;});
+  if(DEMO){ if(ex) compitiOggi=compitiOggi.filter(function(r){return r.compito_id!==c.id;}); else compitiOggi.push({id:'c'+Date.now(),compito_id:c.id,compito_nome:c.nome,autore_id:userId,autore_nome:(userNome||userRuolo||'—'),giorno:'oggi'}); renderPiscina(); return; }
+  if(ex){ var d=await sb.from('compiti_piscina').delete().eq('id',ex.id); if(d.error){ alert('Errore: '+d.error.message); return; } }
+  else { var ins=await sb.from('compiti_piscina').insert({compito_id:c.id,compito_nome:c.nome,autore_id:userId,autore_nome:(userNome||userRuolo||'—'),giorno:todayStr()}); if(ins.error){ alert('Errore: '+ins.error.message); return; } }
+  await loadCompiti(); renderPiscina();
+}
+function compitiHtml(){
+  if(!puoRegistrareAnalisi()) return '';   // solo bagnino/gestore/admin
+  var done={}; compitiOggi.forEach(function(r){ done[r.compito_id]=r; });
+  var h='<div class="cap-grp" style="margin-top:14px">I tuoi compiti di oggi</div>';
+  COMPITI_BAGNINO.forEach(function(c){
+    var d=!!done[c.id];
+    h+='<div class="card" style="padding:11px 12px"><div class="row"><span class="pill" style="background:var(--'+(d?'ok':'todo')+'bg);color:var(--'+(d?'ok':'todo')+')">'+(d?'✓':'○')+'</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">'+esc(c.nome)+'</div><div style="font-size:13px;color:var(--hint)">'+esc(c.freq)+'</div></div>'+
+      '<button class="cmp-tog" data-id="'+esc(c.id)+'" style="border-color:var(--'+(d?'line':'ok')+');color:var(--'+(d?'muted':'ok')+')">'+(d?'Annulla':'✓ Fatto')+'</button></div></div>';
+  });
+  return h;
+}
 var DEMO_ANALISI=[{id:'aa1',autore_nome:'Marco B. (Bagnino)',cloro:1.2,ph:7.4,temperatura:27,foto_urls:[],note:'',created_at:new Date(Date.now()-3600000).toISOString()}];
 async function loadAnalisi(){   // registro analisi acqua (lettura pubblica)
   if(DEMO){ analisiAcqua=DEMO_ANALISI; return; }
@@ -1369,6 +1402,7 @@ function renderPiscina(){
     var lf=fotoListOf(last); if(lf.length) html+=' · <span class="aa-foto" data-u="'+esc(lf[0])+'" style="color:var(--ok);cursor:pointer">📷 prova</span>';
     html+='</div></div>';
   } else { html+='<div class="empty">Nessuna analisi registrata ancora.</div>'; }
+  html+=compitiHtml();
   if(puoRegistrareAnalisi()) html+='<button class="btn-primary" id="aa-new" style="margin:12px 0">＋ Registra analisi acqua</button>';
   if(analisiAcqua.length>1){
     html+='<div class="cap-grp">Storico recente</div>';
@@ -1381,6 +1415,7 @@ function renderPiscina(){
   v.innerHTML=html;
   var nb=$('aa-new'); if(nb) nb.onclick=registraAnalisi;
   v.querySelectorAll('.aa-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
+  v.querySelectorAll('.cmp-tog').forEach(function(b){b.onclick=function(){var c=COMPITI_BAGNINO.find(function(x){return x.id===b.dataset.id;});if(c)toggleCompito(c);}});
 }
 function registraAnalisi(){
   if(!puoRegistrareAnalisi()){ alert('Solo bagnino, gestore o amministratore possono registrare l\'analisi.'); return; }
