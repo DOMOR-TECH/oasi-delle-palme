@@ -102,10 +102,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v54';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v55';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], openThreads={}, curArea='';   // vuoto = nessun luogo scelto → l'utente deve selezionare "Dove ti trovi ora?"
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -234,7 +234,7 @@ async function init(){
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
     ];
-    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); setApp(true); renderAll(); updateAdminBadge(); return; }
+    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -245,7 +245,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -255,7 +255,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -1348,6 +1348,68 @@ function openNuovoAvviso(){
 }
 
 /* ---------- NAV ---------- */
+var DEMO_MAGAZZINO=[{id:'m1',prodotto:'Cloro granulare',descrizione:'Marca X',quantita:'2 fusti da 25 kg',foto_urls:[],autore_nome:'Gestore piscina',created_at:new Date(Date.now()-2*86400000).toISOString()}];
+async function loadMagazzino(){   // prodotti/acquisti (lettura pubblica)
+  if(DEMO){ magazzino=DEMO_MAGAZZINO; return; }
+  const { data } = await sb.from('magazzino_piscina').select('*').order('created_at',{ascending:false}).limit(40);
+  magazzino = data||[];
+}
+function magazzinoHtml(){
+  var canWrite = isPoolStaff()||isAdmin;
+  var h='<div class="cap-grp" style="margin-top:14px">Magazzino piscina</div>';
+  if(canWrite) h+='<button class="btn-primary" id="mag-new" style="margin:2px 0 10px">＋ Aggiungi prodotto</button>';
+  else h+='<div class="sub" style="margin:0 2px 8px">Prodotti/consumabili registrati dal gestore.</div>';
+  if(!magazzino.length) h+='<div class="empty">Nessun prodotto registrato.</div>';
+  magazzino.slice(0,15).forEach(function(m){
+    var f=fotoListOf(m);
+    h+='<div class="card" style="padding:10px 12px"><div class="row">'+
+      (f.length?'<img class="mag-foto" data-u="'+esc(f[0])+'" src="'+esc(f[0])+'" style="width:48px;height:48px;object-fit:cover;border-radius:8px;cursor:pointer">':'')+
+      '<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">'+esc(m.prodotto)+(m.quantita?' <span style="font-weight:400;color:var(--hint)">· '+esc(m.quantita)+'</span>':'')+'</div>'+
+      (m.descrizione?'<div style="font-size:13px;color:var(--muted)">'+esc(m.descrizione)+'</div>':'')+
+      '<div style="font-size:12px;color:var(--hint)">'+esc(m.autore_nome)+' · '+new Date(m.created_at).toLocaleDateString('it-IT')+'</div></div></div></div>';
+  });
+  return h;
+}
+function aggiungiProdotto(){
+  if(!(isPoolStaff()||isAdmin)){ alert('Solo gestore, bagnino o amministratore.'); return; }
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600">Aggiungi prodotto a magazzino</div>'+
+    '<div style="font-size:15px;color:var(--hint);margin:2px 0 12px">Cosa è stato acquistato — visibile a tutti i condòmini.</div>'+
+    '<label>Prodotto</label><input id="mag-nome" type="text" placeholder="es. Cloro granulare" style="margin-top:4px;width:100%">'+
+    '<label style="margin-top:10px;display:block">Quantità</label><input id="mag-qta" type="text" placeholder="es. 2 fusti da 25 kg" style="margin-top:4px;width:100%">'+
+    '<label style="margin-top:10px;display:block">Descrizione (facoltativa)</label><input id="mag-desc" type="text" placeholder="marca, note…" style="margin-top:4px;width:100%">'+
+    '<label style="margin-top:10px;display:block">Foto (facoltativa)</label>'+
+    '<input id="mag-foto" type="file" accept="image/*" style="display:none">'+
+    '<div id="mag-prevs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'+
+    '<div style="font-size:14px;color:var(--hint);margin-top:10px">firma: '+esc(userNome||userRuolo||'—')+' · '+new Date().toLocaleDateString('it-IT')+'</div>'+
+    '<div id="mag-warn" style="color:var(--bad);font-size:15px;margin-top:8px;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button id="mag-x">Annulla</button>'+
+    '<button class="btn-primary" id="mag-send">Aggiungi</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  var blobs=[];
+  function prevs(){ var h=''; blobs.forEach(function(b,i){ h+='<div style="position:relative"><img src="'+URL.createObjectURL(b)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px"><button data-nw="'+i+'" class="rm-nw" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;border:none;font-size:14px;line-height:1;padding:0">×</button></div>'; });
+    h+='<button type="button" id="mag-add" style="width:64px;height:64px;border-radius:8px;border:2px dashed var(--ok);background:var(--okbg);color:var(--ok);font-size:34px;line-height:1">+</button>';
+    var p=$('mag-prevs'); p.innerHTML=h; p.querySelectorAll('.rm-nw').forEach(function(b){b.onclick=function(){blobs.splice(+b.dataset.nw,1);prevs();}}); $('mag-add').onclick=function(){$('mag-foto').click();}; }
+  prevs();
+  $('mag-foto').onchange=function(e){ [].slice.call(e.target.files).forEach(function(f){ downscale(f,function(b){blobs.push(b);prevs();}); }); e.target.value=''; };
+  $('mag-x').onclick=function(){m.remove();};
+  $('mag-send').onclick=async function(){
+    var nome=($('mag-nome').value||'').trim();
+    if(!nome){ $('mag-warn').textContent='Scrivi il nome del prodotto.'; $('mag-warn').style.display='block'; return; }
+    var rec={prodotto:nome,quantita:($('mag-qta').value||'').trim()||null,descrizione:($('mag-desc').value||'').trim()||null,autore_id:userId,autore_nome:(userNome||userRuolo||'—')};
+    if(DEMO){ magazzino.unshift(Object.assign({id:'m'+Date.now(),foto_urls:blobs.map(function(b){return URL.createObjectURL(b);}),created_at:new Date().toISOString()},rec)); m.remove(); renderPiscina(); return; }
+    var btn=$('mag-send'); btn.disabled=true; btn.textContent='Aggiungo…';
+    try{
+      var urls=[];
+      for(var i=0;i<blobs.length;i++){ var path=userId+'/magazzino-'+Date.now()+'-'+i+'.jpg'; var up=await sb.storage.from('foto').upload(path,blobs[i],{contentType:'image/jpeg'}); if(up.error) throw up.error; urls.push(sb.storage.from('foto').getPublicUrl(path).data.publicUrl); }
+      rec.foto_urls=urls;
+      var res=await sb.from('magazzino_piscina').insert(rec); if(res.error) throw res.error;
+      m.remove(); await loadMagazzino(); renderPiscina();
+    }catch(err){ $('mag-warn').textContent='Errore: '+err.message; $('mag-warn').style.display='block'; btn.disabled=false; btn.textContent='Aggiungi'; }
+  };
+}
 var DEMO_PRESENZE=[
   {autore_id:'p1',autore_nome:'Rossi Marco',unita:'A/03',ospiti:2,is_staff:false,giorno:'oggi'},
   {autore_id:'p2',autore_nome:'Bianchi Ada',unita:'C/05',ospiti:0,is_staff:false,giorno:'oggi'},
@@ -1491,6 +1553,7 @@ function renderPiscina(){
   } else {   // condòmino: accesso/check-in
     html+=accessiHtml();
   }
+  html+=magazzinoHtml();   // magazzino: tutti leggono, gestore/bagnino/admin scrivono
   v.innerHTML=html;
   var nb=$('aa-new'); if(nb) nb.onclick=registraAnalisi;
   v.querySelectorAll('.aa-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
@@ -1498,6 +1561,8 @@ function renderPiscina(){
   var am=$('acc-me'); if(am) am.onclick=togglePresenza;
   var ast=$('acc-staff'); if(ast) ast.onclick=toggleStaff;
   v.querySelectorAll('.acc-osp').forEach(function(b){b.onclick=function(){onOsp(+b.dataset.n);}});
+  var mn=$('mag-new'); if(mn) mn.onclick=aggiungiProdotto;
+  v.querySelectorAll('.mag-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
 }
 function registraAnalisi(){
   if(!puoRegistrareAnalisi()){ alert('Solo bagnino, gestore o amministratore possono registrare l\'analisi.'); return; }
@@ -1506,9 +1571,9 @@ function registraAnalisi(){
   m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
     '<div style="font-size:18px;font-weight:600">Registra analisi acqua</div>'+
     '<div style="font-size:15px;color:var(--hint);margin:2px 0 12px">Valori dichiarati + foto della prova (provette). La riga è firmata col tuo nome.</div>'+
-    '<div style="display:flex;gap:9px"><div style="flex:1"><label>Cloro (mg/l)</label><input id="aa-cloro" type="number" step="0.1" inputmode="decimal" style="margin-top:4px"></div>'+
-    '<div style="flex:1"><label>pH</label><input id="aa-ph" type="number" step="0.1" inputmode="decimal" style="margin-top:4px"></div>'+
-    '<div style="flex:1"><label>Temp °C</label><input id="aa-temp" type="number" step="0.1" inputmode="decimal" style="margin-top:4px"></div></div>'+
+    '<div style="display:flex;gap:9px"><div style="flex:1;min-width:0"><label>Cloro (mg/l)</label><input id="aa-cloro" type="number" step="0.1" inputmode="decimal" style="margin-top:4px;width:100%"></div>'+
+    '<div style="flex:1;min-width:0"><label>pH</label><input id="aa-ph" type="number" step="0.1" inputmode="decimal" style="margin-top:4px;width:100%"></div>'+
+    '<div style="flex:1;min-width:0"><label>Temp °C</label><input id="aa-temp" type="number" step="0.1" inputmode="decimal" style="margin-top:4px;width:100%"></div></div>'+
     '<label style="margin-top:10px;display:block">Nota (facoltativa)</label><input id="aa-nota" type="text" placeholder="es. valori nella norma" style="margin-top:4px">'+
     '<label style="margin-top:10px;display:block">Foto della prova (facoltativa)</label>'+
     '<input id="aa-foto" type="file" accept="image/*" style="display:none">'+
