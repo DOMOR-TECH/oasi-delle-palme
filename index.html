@@ -106,7 +106,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v72';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v73';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[];   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -2187,7 +2187,34 @@ function registraPacco(){
     res.innerHTML=list.map(function(x){return '<button class="pk-pick" data-u="'+esc(x.unita)+'" data-n="'+esc(x.nome||'')+'" data-id="'+esc(x.autore_id||'')+'" style="display:block;width:100%;text-align:left;padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:5px;background:var(--surface)">'+esc(x.nome||'—')+' <span style="color:var(--hint)">('+esc(x.unita)+')</span></button>';}).join('');
     res.querySelectorAll('.pk-pick').forEach(function(b){b.onclick=function(){ chosen={unita:b.dataset.u,nome:b.dataset.n,id:b.dataset.id||null}; $('pk-chosen').textContent='Destinatario: '+chosen.nome+' ('+chosen.unita+')'; res.innerHTML=''; $('pk-search').value=chosen.nome; };});
   };
-  $('pk-foto').onchange=function(e){ var f=e.target.files[0]; if(!f)return; downscale(f,function(b){ blob=b; $('pk-prev').innerHTML='<img src="'+URL.createObjectURL(b)+'" style="width:90px;height:90px;object-fit:cover;border-radius:10px;vertical-align:middle"> <button type="button" id="pk-rmfoto">Rimuovi</button>'; $('pk-rmfoto').onclick=function(){ blob=null; addFotoBtn(); }; }); e.target.value=''; };
+  function leggiEtichettaBlob(b){
+    var res=$('pk-ocr-res'), btn=$('pk-ocr');
+    if(DEMO){ res.textContent='In modalità prova l\'OCR non è attivo — scegli il destinatario manualmente.'; return; }
+    btn.disabled=true; btn.textContent='Leggo…'; res.textContent='';
+    var fr=new FileReader();
+    fr.onload=async function(){
+      try{
+        var r=await sb.functions.invoke('leggi-etichetta',{ body:{ image: fr.result } });
+        btn.disabled=false; btn.textContent='🔎 Leggi destinatario';
+        if(r&&r.error){ res.textContent='Non riuscito: '+(r.error.message||r.error); return; }
+        var d=(r&&r.data)||{};
+        if(d.error){ res.innerHTML='<span style="color:var(--bad)">'+esc(d.error)+'</span>'; return; }
+        if(d.unita){
+          var row=anagraficaPacchi.find(function(x){return x.unita===d.unita;});
+          chosen={unita:d.unita,nome:(row&&row.nome)||d.nome||'',id:(row&&row.autore_id)||null};
+          $('pk-chosen').textContent='Destinatario: '+chosen.nome+' ('+chosen.unita+') · confidenza '+(d.confidenza||'—');
+          $('pk-search').value=chosen.nome; $('pk-results').innerHTML='';
+          res.innerHTML='Letto: "'+esc(d.letto||'')+'". <b>Controlla e conferma.</b>';
+        } else { res.innerHTML='Letto: "'+esc(d.letto||'—')+'" — nessun abbinamento sicuro, scegli manualmente.'; }
+      }catch(err){ btn.disabled=false; btn.textContent='🔎 Leggi destinatario'; res.textContent='Errore: '+(err.message||err); }
+    };
+    fr.readAsDataURL(b);
+  }
+  $('pk-foto').onchange=function(e){ var f=e.target.files[0]; if(!f)return; downscale(f,function(b){ blob=b;
+    $('pk-prev').innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><img src="'+URL.createObjectURL(b)+'" style="width:80px;height:80px;object-fit:cover;border-radius:10px"><button type="button" id="pk-ocr" style="border-color:var(--info);color:var(--info)">🔎 Leggi destinatario</button><button type="button" id="pk-rmfoto">Rimuovi</button></div><div id="pk-ocr-res" style="font-size:13px;color:var(--hint);margin-top:6px"></div>';
+    $('pk-rmfoto').onclick=function(){ blob=null; addFotoBtn(); };
+    $('pk-ocr').onclick=function(){ leggiEtichettaBlob(b); };
+  }); e.target.value=''; };
   $('pk-x').onclick=function(){m.remove();};
   $('pk-ok').onclick=async function(){
     if(!chosen){ warn('Scegli il destinatario dall\'elenco.'); return; }
