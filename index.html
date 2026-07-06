@@ -93,6 +93,7 @@
   <div id="view-tennis" class="hide"></div>
   <div id="view-tornei" class="hide"></div>
   <div id="view-sala" class="hide"></div>
+  <div id="view-pacchi" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
 
@@ -105,10 +106,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v71';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v72';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[];   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[];   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -237,7 +238,7 @@ async function init(){
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
     ];
-    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); await loadSala(); setApp(true); renderAll(); updateAdminBadge(); return; }
+    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); await loadSala(); await loadPacchi(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -248,7 +249,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); await loadSala(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); await loadSala(); await loadPacchi(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -258,7 +259,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='Siamo tutti custodi';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); await loadSala(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); await loadSala(); await loadPacchi(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -2104,13 +2105,129 @@ async function annullaSala(id){
   var d=await sb.from('prenotazioni_sala').delete().eq('id',id); if(d.error){ alert('Errore: '+d.error.message); return; }
   await loadSala(); renderSala();
 }
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,admin:renderAdmin};
-var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',admin:'Admin'};
+/* ---------- PACCHI IN CUSTODIA — il custode registra, il condòmino ritira ----------
+   Core: destinatario (da anagrafica) + foto etichetta facoltativa + notifica in-app + ritiro tracciato.
+   OCR automatico dell'etichetta = fase 2. Privacy: il condòmino vede solo i pacchi della PROPRIA unità. */
+function isCustode(){ return !!userRuolo && /custod|portier/i.test(userRuolo); }
+function pacchiManager(){ return isCustode() || adminView(); }
+var anagraficaPacchi=[];
+var DEMO_PACCHI=[
+  {id:'pk1',unita:'A/03',destinatario_nome:'Rossi Marco',note:'Amazon · scatola media',stato:'in_giacenza',creato_da:'Custode',created_at:new Date(Date.now()-3600000).toISOString()},
+  {id:'pk2',unita:'I/08',destinatario_nome:'Lantieri',note:'BRT · busta imbottita',stato:'in_giacenza',creato_da:'Custode',created_at:new Date(Date.now()-7200000).toISOString()},
+  {id:'pk3',unita:'C/05',destinatario_nome:'Bianchi Ada',note:'DHL',stato:'ritirato',creato_da:'Custode',ritirato_da:'Bianchi Ada',ritirato_il:new Date(Date.now()-86400000).toISOString(),created_at:new Date(Date.now()-2*86400000).toISOString()}
+];
+async function loadPacchi(){
+  if(DEMO){ pacchi=DEMO_PACCHI; return; }
+  var r=await sb.from('pacchi').select('*').order('created_at',{ascending:false}).limit(200);
+  pacchi=r.data||[];
+}
+async function loadAnagraficaPacchi(){
+  if(anagraficaPacchi.length) return;
+  if(DEMO){ anagraficaPacchi=[{unita:'A/03',nome:'Rossi Marco'},{unita:'C/05',nome:'Bianchi Ada'},{unita:'I/08',nome:'Lantieri'},{unita:'I/09',nome:'Meli Carmela'}]; return; }
+  var r=await sb.from('proprietari').select('unita,nome,autore_id').order('unita'); anagraficaPacchi=r.data||[];
+}
+function pacchiGiacenza(){ return pacchi.filter(function(p){return p.stato==='in_giacenza';}); }
+function pacchiMiei(){ return pacchi.filter(function(p){ return userUnita && p.unita===userUnita.unita; }); }
+function paccoCard(p,mgr){
+  var conf=p.stato==='ritirato';
+  var h='<div class="card"><div style="display:flex;justify-content:space-between;gap:8px">'+
+    '<div style="font-weight:600;font-size:16px">'+esc(p.destinatario_nome||'—')+' <span style="color:var(--hint);font-size:14px">('+esc(p.unita)+')</span></div>'+
+    '<span style="font-size:13px;color:'+(conf?'var(--hint)':'var(--ocra)')+';font-weight:600">'+(conf?'ritirato':'in giacenza')+'</span></div>'+
+    (p.note?'<div style="font-size:14px;margin-top:3px">'+esc(p.note)+'</div>':'')+
+    '<div style="font-size:13px;color:var(--hint);margin-top:3px">arrivato '+new Date(p.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+(p.creato_da?' · '+esc(p.creato_da):'')+(conf&&p.ritirato_da?' · ritirato da '+esc(p.ritirato_da):'')+'</div>';
+  if(p.foto_url) h+='<img class="photo-thumb pk-foto" data-u="'+esc(p.foto_url)+'" src="'+esc(p.foto_url)+'" style="margin-top:8px;cursor:pointer">';
+  if(!conf) h+='<div style="display:flex;gap:7px;margin-top:10px"><button class="pk-ritira" data-id="'+esc(p.id)+'" style="border-color:var(--ok);color:var(--ok);font-size:14px;padding:7px 12px">Segna ritirato</button>'+(mgr?'<button class="pk-del" data-id="'+esc(p.id)+'" style="border-color:var(--bad);color:var(--bad);font-size:14px;padding:7px 12px">Elimina</button>':'')+'</div>';
+  return h+'</div>';
+}
+function renderPacchi(){
+  var v=$('view-pacchi'), mgr=pacchiManager(), html='';
+  if(mgr){
+    var giac=pacchiGiacenza(), ritirati=pacchi.filter(function(p){return p.stato==='ritirato';});
+    html+='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Pacchi in custodia</p>'+
+      '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Registra un pacco arrivato: destinatario + foto dell\'etichetta. Il condòmino viene avvisato di passare a ritirarlo.</div>'+
+      '<button class="btn-primary" id="pk-new" style="margin-bottom:12px">＋ Registra pacco</button>'+
+      '<div class="cap-grp">In giacenza ('+giac.length+')</div>';
+    if(!giac.length) html+='<div class="empty">Nessun pacco in giacenza.</div>'; else giac.forEach(function(p){ html+=paccoCard(p,true); });
+    if(ritirati.length){ html+='<div class="cap-grp">Ritirati di recente</div>'; ritirati.slice(0,10).forEach(function(p){ html+=paccoCard(p,true); }); }
+  } else {
+    var miei=pacchiMiei(), mieiGiac=miei.filter(function(p){return p.stato==='in_giacenza';});
+    html+='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">I tuoi pacchi</p>';
+    if(mieiGiac.length) html+='<div class="pres-note" style="margin:0 0 10px"><b>Hai '+mieiGiac.length+' pacc'+(mieiGiac.length>1?'hi':'o')+' da ritirare</b> in custodia dal portiere.</div>';
+    else html+='<div class="empty">Nessun pacco in custodia per te.</div>';
+    miei.forEach(function(p){ html+=paccoCard(p,false); });
+  }
+  v.innerHTML=html;
+  var nb=$('pk-new'); if(nb) nb.onclick=registraPacco;
+  v.querySelectorAll('.pk-ritira').forEach(function(b){b.onclick=function(){segnaRitirato(b.dataset.id);}});
+  v.querySelectorAll('.pk-del').forEach(function(b){b.onclick=function(){eliminaPacco(b.dataset.id);}});
+  v.querySelectorAll('.pk-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
+}
+function registraPacco(){
+  if(!pacchiManager()){ alert('Solo il custode o l\'amministrazione.'); return; }
+  loadAnagraficaPacchi();
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600;margin-bottom:12px">Registra pacco</div>'+
+    '<label>Destinatario</label><input id="pk-search" type="text" placeholder="cerca per cognome o unità (es. Rossi, A/03)" style="margin:4px 0 6px;width:100%">'+
+    '<div id="pk-results" style="max-height:170px;overflow:auto;margin-bottom:4px"></div>'+
+    '<div id="pk-chosen" style="font-size:15px;margin:2px 0 10px;color:var(--ok)"></div>'+
+    '<label>Nota (facoltativa)</label><input id="pk-note" type="text" placeholder="es. Amazon · scatola voluminosa" style="margin:4px 0 10px;width:100%">'+
+    '<label style="display:block">Foto dell\'etichetta (facoltativa)</label><input id="pk-foto" type="file" accept="image/*" style="display:none"><div id="pk-prev" style="margin:6px 0"></div>'+
+    '<div id="pk-warn" style="color:var(--bad);font-size:14px;margin:4px 0;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="pk-x">Annulla</button><button class="btn-primary" id="pk-ok">Registra e avvisa</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  var chosen=null, blob=null;
+  function warn(t){ $('pk-warn').textContent=t; $('pk-warn').style.display='block'; }
+  function addFotoBtn(){ $('pk-prev').innerHTML='<button type="button" id="pk-addfoto" style="width:100%;border:2px dashed var(--ok);color:var(--ok);background:var(--okbg);border-radius:10px;padding:12px">📷 Aggiungi foto dell\'etichetta</button>'; $('pk-addfoto').onclick=function(){$('pk-foto').click();}; }
+  addFotoBtn();
+  $('pk-search').oninput=function(e){ chosen=null; $('pk-chosen').textContent=''; var q=(e.target.value||'').trim().toLowerCase(), res=$('pk-results');
+    if(q.length<2){ res.innerHTML=''; return; }
+    var list=anagraficaPacchi.filter(function(x){return (x.nome||'').toLowerCase().indexOf(q)>=0 || (x.unita||'').toLowerCase().indexOf(q)>=0;}).slice(0,8);
+    res.innerHTML=list.map(function(x){return '<button class="pk-pick" data-u="'+esc(x.unita)+'" data-n="'+esc(x.nome||'')+'" data-id="'+esc(x.autore_id||'')+'" style="display:block;width:100%;text-align:left;padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:5px;background:var(--surface)">'+esc(x.nome||'—')+' <span style="color:var(--hint)">('+esc(x.unita)+')</span></button>';}).join('');
+    res.querySelectorAll('.pk-pick').forEach(function(b){b.onclick=function(){ chosen={unita:b.dataset.u,nome:b.dataset.n,id:b.dataset.id||null}; $('pk-chosen').textContent='Destinatario: '+chosen.nome+' ('+chosen.unita+')'; res.innerHTML=''; $('pk-search').value=chosen.nome; };});
+  };
+  $('pk-foto').onchange=function(e){ var f=e.target.files[0]; if(!f)return; downscale(f,function(b){ blob=b; $('pk-prev').innerHTML='<img src="'+URL.createObjectURL(b)+'" style="width:90px;height:90px;object-fit:cover;border-radius:10px;vertical-align:middle"> <button type="button" id="pk-rmfoto">Rimuovi</button>'; $('pk-rmfoto').onclick=function(){ blob=null; addFotoBtn(); }; }); e.target.value=''; };
+  $('pk-x').onclick=function(){m.remove();};
+  $('pk-ok').onclick=async function(){
+    if(!chosen){ warn('Scegli il destinatario dall\'elenco.'); return; }
+    var rec={unita:chosen.unita,destinatario_nome:chosen.nome||null,destinatario_id:chosen.id||null,note:($('pk-note').value||'').trim()||null,creato_da:(userNome||userRuolo||'Custode'),creato_da_id:userId};
+    if(DEMO){ pacchi.unshift(Object.assign({id:'pk'+Date.now(),stato:'in_giacenza',created_at:new Date().toISOString(),foto_url:blob?URL.createObjectURL(blob):null},rec)); m.remove(); renderPacchi(); updatePacchiBadge(); return; }
+    var btn=$('pk-ok'); btn.disabled=true; btn.textContent='Registro…';
+    try{
+      if(blob){ var path='pacchi/'+Date.now()+'.jpg'; var up=await sb.storage.from('foto').upload(path,blob,{contentType:'image/jpeg'}); if(up.error) throw up.error; rec.foto_url=sb.storage.from('foto').getPublicUrl(path).data.publicUrl; }
+      var res=await sb.from('pacchi').insert(rec); if(res.error) throw res.error;
+      m.remove(); await loadPacchi(); renderPacchi(); updatePacchiBadge();
+    }catch(err){ warn('Errore: '+(err.message||err)); btn.disabled=false; btn.textContent='Registra e avvisa'; }
+  };
+}
+async function segnaRitirato(id){
+  var patch={stato:'ritirato',ritirato_il:new Date().toISOString(),ritirato_da:(userNome||userRuolo||'—')};
+  if(DEMO){ var p=pacchi.find(function(x){return String(x.id)===String(id);}); if(p)Object.assign(p,patch); renderPacchi(); updatePacchiBadge(); return; }
+  var r=await sb.from('pacchi').update(patch).eq('id',id); if(r.error){ alert('Errore: '+r.error.message); return; }
+  await loadPacchi(); renderPacchi(); updatePacchiBadge();
+}
+async function eliminaPacco(id){
+  if(!confirm('Eliminare questo pacco?')) return;
+  if(DEMO){ pacchi=pacchi.filter(function(x){return String(x.id)!==String(id);}); renderPacchi(); updatePacchiBadge(); return; }
+  var d=await sb.from('pacchi').delete().eq('id',id); if(d.error){ alert('Errore: '+d.error.message); return; }
+  await loadPacchi(); renderPacchi(); updatePacchiBadge();
+}
+function updatePacchiBadge(){
+  var nav=document.querySelector('#nav button[data-hub="pacchi"]'); if(!nav) return;
+  var n=pacchiManager()?pacchiGiacenza().length:pacchiMiei().filter(function(p){return p.stato==='in_giacenza';}).length;
+  var b=nav.querySelector('.navbadge');
+  if(n>0){ if(!b){ b=document.createElement('span'); b.className='navbadge'; nav.appendChild(b); } b.textContent=n; b.style.display='flex'; }
+  else if(b){ b.style.display='none'; }
+}
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,admin:renderAdmin};
+var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',admin:'Admin'};
 var HUBS=[
   {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier']},
   {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true},
   {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei']},
   {id:'comunita',label:'Comunità',ic:'☑',views:['voti','avvisi','sala']},
+  {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi']},
   {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true}
 ];
 function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y,5,13) && n<=new Date(y,8,13,23,59,59); }
@@ -2141,6 +2258,7 @@ function buildNav(){
     b.onclick=function(){ showView(h.views.indexOf(curV)>=0?curV:h.views[0]); };
     nav.appendChild(b);
   });
+  updatePacchiBadge();
 }
 function showView(v){
   if(!views[v]) v='zona';
