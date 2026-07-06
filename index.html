@@ -104,7 +104,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v65';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v66';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -628,11 +628,15 @@ function openCapitolatoPiscina(sid){
   p.innerHTML='<div class="page-in">'+
     '<div class="page-top"><button class="page-x" id="cap-x">×</button><h2 class="page-h">Capitolato piscina</h2></div>'+
     '<p class="lead" style="font-size:16px;color:var(--muted)">Gestione della piscina affidata a <b>WaterForYou ASD</b> (contratto in vigore). Le <b>cadenze</b> qui sotto derivano dal capitolato del gestore precedente <b>Acqua &amp; Arte 2022–25</b> (unico documento che le specifica). Spogliatoi e bagni <b>esclusi nel 2026</b> (locali in ristrutturazione). Ogni voce è un obbligo di servizio: se non eseguita è un\'inadempienza del <b>gestore piscina</b> — <b>non</b> di House &amp; Garden.</p>'+
+    '<button class="btn-primary" id="cap-pdf-wfy" style="margin:0 0 8px">📄 Contratto del gestore piscina (WaterForYou, in vigore)</button>'+
+    '<button class="btn-primary" id="cap-pdf-aa" style="margin:0 0 14px;background:var(--surface);color:var(--info);border:1px solid var(--info)">📄 Capitolato di riferimento (Acqua &amp; Arte 2022–25)</button>'+
     body+
-    '<p class="sub" style="margin-top:14px">Il contratto originale del gestore piscina non è ancora caricato nell\'app. Le cadenze rispecchiano il capitolato Acqua &amp; Arte 2022–25; per ogni contestazione fa fede il documento del gestore in vigore.</p>'+
+    '<p class="sub" style="margin-top:14px">Le cadenze rispecchiano il capitolato Acqua &amp; Arte 2022–25 (unico documento che le specifica); il gestore in vigore è WaterForYou. Per ogni contestazione fanno fede i documenti originali scaricabili qui sopra.</p>'+
     '</div>';
   document.body.appendChild(p);
   $('cap-x').onclick=function(){p.remove()};
+  $('cap-pdf-wfy').onclick=function(){ scaricaDoc('contratto-piscina-waterforyou.pdf','cap-pdf-wfy','📄 Contratto del gestore piscina (WaterForYou, in vigore)'); };
+  $('cap-pdf-aa').onclick=function(){ scaricaDoc('contratto-piscina-acquaearte-2022-25.pdf','cap-pdf-aa','📄 Capitolato di riferimento (Acqua & Arte 2022–25)'); };
   if(sid){ var el=document.getElementById('cap-'+sid); if(el){ el.scrollIntoView({block:'start'}); el.classList.add('hl'); } }
 }
 // Scarica il contratto originale (PDF) — solo condòmini loggati, link temporaneo
@@ -646,6 +650,18 @@ async function scaricaContratto(){
     else { window.open(r.data.signedUrl,'_blank'); }
   }catch(e){ alert('Errore: '+(e.message||e)); }
   if(btn){btn.disabled=false;btn.textContent='📄 Scarica il contratto originale (PDF)';}
+}
+// Scarica un documento dal bucket privato "documenti" (link firmato temporaneo) — solo condòmini loggati
+async function scaricaDoc(file,btnId,label){
+  if(DEMO){ alert('In modalità prova il download non è attivo. Nella versione vera si scarica il PDF originale.'); return; }
+  if(!userId){ alert('Accedi come condòmino per scaricare il documento.'); return; }
+  var btn=document.getElementById(btnId); if(btn){btn.disabled=true;btn.textContent='Preparo il download…';}
+  try{
+    var r=await sb.storage.from('documenti').createSignedUrl(file,120);
+    if(r.error||!r.data){ alert('Il documento non è ancora disponibile.'); }
+    else { window.open(r.data.signedUrl,'_blank'); }
+  }catch(e){ alert('Errore: '+(e.message||e)); }
+  if(btn){btn.disabled=false;btn.textContent=label;}
 }
 
 /* ---------- VIEW: ZONA (3 stati: Attuali · Problematici · Chiusi) ---------- */
