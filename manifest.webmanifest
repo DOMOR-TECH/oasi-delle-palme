@@ -1,7 +1,7 @@
 {
-  "name": "Custodi 451",
-  "short_name": "Custodi451",
-  "description": "Controllo civico del capitolato di manutenzione — Condominio Via Cina 451",
+  "name": "Oasi delle Palme",
+  "short_name": "Oasi Palme",
+  "description": "App della comunità di Via Cina 451 «Oasi delle Palme» — trasparenza e cura del bene comune. Siamo tutti custodi.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f6f5f1",
