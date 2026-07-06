@@ -105,7 +105,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v70';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v71';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[];   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -2012,9 +2012,15 @@ async function resetRisultato(pid){
    Uso del locale sociale per fini ricreativi: richiesta + firma nel registro (riga palese) + assunzione di
    responsabilità danni (obbligatoria). Chiavi dal custode. Granularità: data + fascia (pomeriggio/sera). */
 var FASCE_SALA={pomeriggio:'Pomeriggio',sera:'Sera'};
+var SPAZI_LABEL={sala:'Sala condominiale',collina:'Collina',piscina:'Area piscina'};
+var SPAZI_REGOLE={
+  sala:"Locale sociale (Regolamento Art. 34): responsabilità per eventuali danni · chiavi dal custode · se ci sono minori di 14 anni dev'essere presente un adulto · lascia la sala in ordine.",
+  collina:"Lascia lo spazio come l'hai trovato, se non meglio · se prendi tavoli e sedie dall'area piscina, rimettili esattamente al loro posto · l'uso termina alle 24, poi silenzio · responsabilità per eventuali danni.",
+  piscina:"Lascia lo spazio in ordine come l'hai trovato · rimetti a posto tavoli e sedie · l'uso termina alle 24, poi silenzio · responsabilità per eventuali danni."
+};
 var DEMO_SALA=[
-  {id:'sl1',giorno:tennisDayStr(3),fascia:'sera',motivo:'Festa di compleanno',minori:true,autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03',stato:'confermata',confermata_da:'Custode'},
-  {id:'sl2',giorno:tennisDayStr(6),fascia:'pomeriggio',motivo:'Riunione di palazzina',minori:false,autore_id:'demo3',autore_nome:'Bianchi Ada',unita:'C/05',stato:'richiesta'}
+  {id:'sl1',spazio:'collina',giorno:tennisDayStr(3),fascia:'sera',motivo:'Festa di compleanno',minori:true,autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03',stato:'confermata',confermata_da:'Custode'},
+  {id:'sl2',spazio:'sala',giorno:tennisDayStr(6),fascia:'pomeriggio',motivo:'Riunione di palazzina',minori:false,autore_id:'demo3',autore_nome:'Bianchi Ada',unita:'C/05',stato:'richiesta'}
 ];
 async function loadSala(){
   if(DEMO){ prenotazioniSala=DEMO_SALA; return; }
@@ -2024,14 +2030,14 @@ async function loadSala(){
 function dSala(g){ return new Date(g+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'long'}); }
 function renderSala(){
   var v=$('view-sala');
-  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Prenota la sala condominiale</p>'+
-    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Il locale sociale, per feste ed eventi (Regolamento Art. 34). Chi prenota si assume la responsabilità per eventuali danni; le chiavi si ritirano dal custode. Se ci sono minori di 14 anni, dev\'essere presente un adulto.</div>';
+  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Prenota uno spazio per la festa</p>'+
+    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Prenota uno spazio del complesso (sala, collina) per una festa o un evento privato. Ogni spazio ha le sue <b>regole d\'uso</b>, che accetti al momento della richiesta. Chi prenota lascia lo spazio in ordine, come l\'ha trovato.</div>';
   if(approvato()&&userUnita) html+='<button class="btn-primary" id="sala-new" style="margin-bottom:12px">＋ Richiedi la sala</button>';
   else html+='<div class="pres-note" style="margin:0 0 10px">Per prenotare devi essere un condòmino confermato.</div>';
   if(!prenotazioniSala.length){ html+='<div class="empty">Nessuna prenotazione in programma.</div>'; }
   else prenotazioniSala.forEach(function(p){
     var conf=p.stato==='confermata', mine=p.autore_id===userId;
-    html+='<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div style="font-weight:600;font-size:16px">'+dSala(p.giorno)+' · '+(FASCE_SALA[p.fascia]||p.fascia)+'</div>'+
+    html+='<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div style="font-weight:600;font-size:16px">'+(SPAZI_LABEL[p.spazio]||'Sala')+' · '+dSala(p.giorno)+' · '+(FASCE_SALA[p.fascia]||p.fascia)+'</div>'+
       '<span style="font-size:13px;color:'+(conf?'var(--ok)':'var(--ocra)')+';font-weight:600">'+(conf?'confermata':'in attesa')+'</span></div>'+
       (p.motivo?'<div style="font-size:15px;margin-top:3px">'+esc(p.motivo)+'</div>':'')+
       '<div style="font-size:13px;color:var(--hint);margin-top:3px">'+esc(p.autore_nome)+(p.unita?' ('+esc(p.unita)+')':'')+(p.minori?' · con minori <14 (adulto presente)':'')+(conf&&p.confermata_da?' · chiavi: '+esc(p.confermata_da):'')+'</div>';
@@ -2051,31 +2057,37 @@ function richiediSala(){
   var m=document.createElement('div');
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
   m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
-    '<div style="font-size:18px;font-weight:600;margin-bottom:12px">Richiedi la sala</div>'+
+    '<div style="font-size:18px;font-weight:600;margin-bottom:12px">Richiedi uno spazio</div>'+
+    '<label>Spazio</label><div style="display:flex;gap:8px;margin:4px 0 6px">'+
+      '<button type="button" class="sala-sp" data-s="sala" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--surface)">Sala</button>'+
+      '<button type="button" class="sala-sp" data-s="collina" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--surface)">Collina</button></div>'+
+    '<div id="sala-regole" style="font-size:13px;color:var(--hint);margin:0 0 10px"></div>'+
     '<label>Giorno</label><input id="sala-g" type="date" min="'+todayStr()+'" style="margin:4px 0 10px;width:100%">'+
     '<label>Fascia</label><div style="display:flex;gap:8px;margin:4px 0 10px">'+
       '<button type="button" class="sala-f" data-f="pomeriggio" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--surface)">Pomeriggio</button>'+
       '<button type="button" class="sala-f" data-f="sera" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--surface)">Sera</button></div>'+
     '<label>Motivo / evento</label><input id="sala-motivo" type="text" placeholder="es. Festa di compleanno" style="margin:4px 0 10px;width:100%">'+
     '<label style="display:flex;align-items:center;gap:8px;margin:8px 0;font-size:15px"><input id="sala-minori" type="checkbox"> Ci saranno minori di 14 anni (sarà presente un adulto)</label>'+
-    '<label style="display:flex;align-items:flex-start;gap:8px;margin:8px 0;font-size:14px"><input id="sala-decl" type="checkbox" style="margin-top:3px"> <span>Dichiaro di assumermi la responsabilità per eventuali danni arrecati a beni condominiali, persone e cose durante l\'uso del locale sociale (Regolamento Art. 34).</span></label>'+
+    '<label style="display:flex;align-items:flex-start;gap:8px;margin:8px 0;font-size:14px"><input id="sala-decl" type="checkbox" style="margin-top:3px"> <span>Dichiaro di assumermi la responsabilità per eventuali danni e di <b>lasciare lo spazio in ordine, come l\'ho trovato</b> (rimettendo a posto tavoli e sedie eventualmente presi dall\'area piscina). L\'uso termina entro le 24.</span></label>'+
     '<div id="sala-warn" style="color:var(--bad);font-size:14px;margin:4px 0;display:none"></div>'+
     '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="sala-x">Annulla</button><button class="btn-primary" id="sala-ok">Invia richiesta</button></div></div>';
   document.querySelector('.wrap').appendChild(m);
-  var fascia='';
+  var spazio='', fascia='';
+  m.querySelectorAll('.sala-sp').forEach(function(b){ b.onclick=function(){ spazio=b.dataset.s; m.querySelectorAll('.sala-sp').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='#185FA5';b.style.color='#fff';b.style.borderColor='#185FA5'; $('sala-regole').innerHTML='<b>Regole d\'uso — '+esc(SPAZI_LABEL[spazio])+':</b> '+esc(SPAZI_REGOLE[spazio]); }; });
   m.querySelectorAll('.sala-f').forEach(function(b){ b.onclick=function(){ fascia=b.dataset.f; m.querySelectorAll('.sala-f').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='#185FA5';b.style.color='#fff';b.style.borderColor='#185FA5'; }; });
   function warn(t){ $('sala-warn').textContent=t; $('sala-warn').style.display='block'; }
   $('sala-x').onclick=function(){m.remove();};
   $('sala-ok').onclick=async function(){
+    if(!spazio){ warn('Scegli lo spazio.'); return; }
     var g=$('sala-g').value;
     if(!g){ warn('Scegli il giorno.'); return; }
     if(!fascia){ warn('Scegli la fascia (pomeriggio o sera).'); return; }
-    if(!$('sala-decl').checked){ warn('Devi accettare la dichiarazione di responsabilità.'); return; }
-    var rec={giorno:g,fascia:fascia,motivo:($('sala-motivo').value||'').trim()||null,minori:$('sala-minori').checked,dichiarazione:true,autore_id:userId,autore_nome:userNome,unita:(userUnita&&userUnita.unita)||null};
+    if(!$('sala-decl').checked){ warn('Devi accettare le regole d\'uso e la responsabilità.'); return; }
+    var rec={spazio:spazio,giorno:g,fascia:fascia,motivo:($('sala-motivo').value||'').trim()||null,minori:$('sala-minori').checked,dichiarazione:true,autore_id:userId,autore_nome:userNome,unita:(userUnita&&userUnita.unita)||null};
     if(DEMO){ prenotazioniSala.push(Object.assign({id:'sl'+Date.now(),stato:'richiesta'},rec)); prenotazioniSala.sort(function(a,b){return a.giorno<b.giorno?-1:1;}); m.remove(); renderSala(); return; }
     var btn=$('sala-ok'); btn.disabled=true; btn.textContent='Invio…';
     var res=await sb.from('prenotazioni_sala').insert(rec);
-    if(res.error){ warn(/duplicate|unique|sala_uno/i.test(res.error.message)?'Quella fascia è già prenotata per quel giorno.':'Errore: '+res.error.message); btn.disabled=false; btn.textContent='Invia richiesta'; return; }
+    if(res.error){ warn(/duplicate|unique|sala_uno/i.test(res.error.message)?'Quello spazio è già prenotato per quel giorno e fascia.':'Errore: '+res.error.message); btn.disabled=false; btn.textContent='Invia richiesta'; return; }
     m.remove(); await loadSala(); renderSala();
   };
 }
@@ -2093,7 +2105,7 @@ async function annullaSala(id){
   await loadSala(); renderSala();
 }
 var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,admin:renderAdmin};
-var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Sala',admin:'Admin'};
+var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',admin:'Admin'};
 var HUBS=[
   {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier']},
   {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true},
