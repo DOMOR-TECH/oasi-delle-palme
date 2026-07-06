@@ -104,7 +104,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v63';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v64';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -1893,13 +1893,23 @@ function creaTorneo(){
     m.remove(); await loadTornei(); renderTornei();
   };
 }
-async function iscriviti(tid){
+function iscriviti(tid){
   if(!(approvato()&&userUnita)){ alert('Devi essere un condòmino confermato.'); return; }
-  var ab=prompt('La tua abilità nel tennis, da 1 (principiante) a 10 (molto forte):\n\nServe solo per formare squadre/coppie equilibrate — nessuno conosce il livello degli altri.','');
-  if(ab===null) return;                       // annullato
-  var abN=parseInt(ab,10);
-  if(isNaN(abN)||abN<1||abN>10){ alert('Inserisci un numero da 1 a 10.'); return; }
-  var rec={torneo_id:tid,autore_id:userId,autore_nome:userNome,unita:(userUnita&&userUnita.unita)||null,abilita:abN};
+  // selettore abilità 1-10 (chiaro, al posto del prompt)
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  var btns=''; for(var n=1;n<=10;n++){ btns+='<button class="ab-n" data-n="'+n+'" style="flex:1 0 17%;padding:13px 0;border-radius:10px;font-size:17px;font-weight:600;border:1px solid var(--line);background:var(--surface)">'+n+'</button>'; }
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;border-radius:16px 16px 0 0;padding:16px 16px 24px">'+
+    '<div style="font-size:18px;font-weight:600">La tua abilità nel tennis</div>'+
+    '<div style="font-size:14px;color:var(--hint);margin:4px 0 14px">Tocca un numero da <b>1</b> (principiante) a <b>10</b> (molto forte). Serve solo per formare squadre equilibrate — nessuno conosce il livello degli altri, sii sincero.</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px">'+btns+'</div>'+
+    '<button id="ab-x" style="width:100%;margin-top:16px">Annulla</button></div>';
+  document.querySelector('.wrap').appendChild(m);
+  $('ab-x').onclick=function(){m.remove();};
+  m.querySelectorAll('.ab-n').forEach(function(b){ b.onclick=function(){ var ab=+b.dataset.n; m.remove(); doIscrivi(tid,ab); }; });
+}
+async function doIscrivi(tid,ab){
+  var rec={torneo_id:tid,autore_id:userId,autore_nome:userNome,unita:(userUnita&&userUnita.unita)||null,abilita:ab};
   if(DEMO){ iscrizioniTorneo.push(Object.assign({id:'is'+Date.now()},rec)); renderTornei(); return; }
   var res=await sb.from('iscrizioni_torneo').insert(rec); if(res.error){ alert(/duplicate|unique|iscr_uno/i.test(res.error.message)?'Sei già iscritto.':'Errore: '+res.error.message); }
   await loadTornei(); renderTornei();
