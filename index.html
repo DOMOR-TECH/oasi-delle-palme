@@ -90,6 +90,7 @@
   <div id="view-voti" class="hide"></div>
   <div id="view-avvisi" class="hide"></div>
   <div id="view-piscina" class="hide"></div>
+  <div id="view-tennis" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
 
@@ -102,10 +103,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v58';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v59';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false;   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente)
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0;   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -234,7 +235,7 @@ async function init(){
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
     ];
-    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); setApp(true); renderAll(); updateAdminBadge(); return; }
+    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -245,7 +246,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -255,7 +256,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -1691,11 +1692,75 @@ function registraAnalisi(){
     }catch(err){ $('aa-warn').textContent='Errore: '+err.message; $('aa-warn').style.display='block'; btn.disabled=false; btn.textContent='Registra'; }
   };
 }
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,admin:renderAdmin};
-var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',admin:'Admin'};
+/* ---------- TENNIS — prenotazione campo (registro digitale, Regolamento Capo IX Art. 25-33) ----------
+   Non è controllo-capitolato: verde/pulizia (HG) è in Controllo; questo è il "registro" dell'Art. 32.
+   Regole rispecchiate: slot 60 min, max 1/giorno per condòmino, oggi o domani, no 14-16 in estate. */
+var TENNIS_ORA_START=8, TENNIS_ORA_END=21;   // slot orari: 08:00…20:00→21:00 (60 min ciascuno) — DA CONFERMARE con Corrado gli orari reali
+function tennisDayStr(off){ var d=new Date(); d.setDate(d.getDate()+off); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function tennisDayLabel(off){ var d=new Date(); d.setDate(d.getDate()+off); return (off===0?'Oggi':'Domani')+' · '+d.toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'2-digit'}); }
+function tennisEstate(giornoStr){ var m=+giornoStr.slice(5,7); return m>=6&&m<=9; }
+function tennisSlotChiusoEstate(giornoStr,ora){ return tennisEstate(giornoStr) && (ora===14||ora===15); }   // vietato 14-16 in estate (Art. 32.3)
+var DEMO_TENNIS=[
+  {id:'tn1',giorno:tennisDayStr(0),ora_inizio:18,autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03'},
+  {id:'tn2',giorno:tennisDayStr(0),ora_inizio:9, autore_id:'demo3',autore_nome:'Bianchi Ada', unita:'C/05'}
+];
+async function loadTennis(){
+  if(DEMO){ prenotazioniTennis=DEMO_TENNIS; return; }
+  var g0=tennisDayStr(0), g1=tennisDayStr(1);
+  const { data } = await sb.from('prenotazioni_tennis').select('*').in('giorno',[g0,g1]).order('ora_inizio');
+  prenotazioniTennis = data||[];
+}
+function tennisMioSlot(giornoStr){ return prenotazioniTennis.find(function(p){return p.giorno===giornoStr && p.autore_id===userId;}); }
+function tennisOccupato(giornoStr,ora){ return prenotazioniTennis.find(function(p){return p.giorno===giornoStr && p.ora_inizio===ora;}); }
+function renderTennis(){
+  var v=$('view-tennis'), g=tennisDayStr(curGiornoTennis);
+  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Prenota il campo da tennis</p>'+
+    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Slot da 60 minuti · max 1 al giorno per condòmino · per oggi o domani (Regolamento Art. 32)</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+[0,1].map(function(o){return '<button class="tn-day" data-o="'+o+'" style="flex:1;padding:10px;border-radius:10px;font-size:14px;'+(o===curGiornoTennis?'background:#185FA5;color:#fff;border:none':'background:var(--surface);color:var(--muted);border:1px solid var(--line)')+'">'+tennisDayLabel(o)+'</button>';}).join('')+'</div>';
+  var mine=tennisMioSlot(g);
+  if(mine){ html+='<div class="pres-note" style="margin:0 0 10px">La tua prenotazione '+(curGiornoTennis===0?'di oggi':'di domani')+': <b>'+pad2(mine.ora_inizio)+':00–'+pad2(mine.ora_inizio+1)+':00</b>. Una sola al giorno.</div>'; }
+  else if(!(approvato()&&userUnita)){ html+='<div class="pres-note" style="margin:0 0 10px">Per prenotare devi essere un condòmino confermato.</div>'; }
+  for(var ora=TENNIS_ORA_START; ora<TENNIS_ORA_END; ora++){
+    var occ=tennisOccupato(g,ora), estate=tennisSlotChiusoEstate(g,ora), isMine=occ&&occ.autore_id===userId;
+    html+='<div class="card" style="padding:11px 13px;display:flex;align-items:center;gap:10px'+(estate?';opacity:.55':'')+'">'+
+      '<div style="font-weight:600;font-size:16px;min-width:112px">'+pad2(ora)+':00 – '+pad2(ora+1)+':00</div><div style="flex:1;min-width:0">';
+    if(estate) html+='<span style="font-size:13px;color:var(--hint)">chiuso 14–16 (estate)</span>';
+    else if(occ) html+='<span style="font-size:15px">'+esc(occ.autore_nome)+(occ.unita?' <span style="color:var(--hint)">('+esc(occ.unita)+')</span>':'')+'</span>';
+    else html+='<span style="font-size:14px;color:var(--ok)">libero</span>';
+    html+='</div>';
+    if(estate){}
+    else if(isMine) html+='<button class="tn-cancel" data-id="'+esc(occ.id)+'" style="border-color:var(--bad);color:var(--bad);font-size:14px;padding:8px 12px">Annulla</button>';
+    else if(occ) html+='<span style="font-size:13px;color:var(--hint)">occupato</span>';
+    else if(approvato()&&userUnita&&!mine) html+='<button class="tn-book" data-o="'+ora+'" style="border-color:var(--ok);color:var(--ok);font-size:14px;padding:8px 14px">Prenota</button>';
+    html+='</div>';
+  }
+  html+='<div style="font-size:12px;color:var(--hint);margin:12px 2px">Solo per il gioco del tennis, con tenuta e calzature adeguate. L\'uso cessa mezz\'ora dopo il tramonto. I tornei (in arrivo) lasceranno almeno metà delle ore ai non partecipanti (Regolamento Art. 32).</div>';
+  v.innerHTML=html;
+  v.querySelectorAll('.tn-day').forEach(function(b){b.onclick=function(){curGiornoTennis=+b.dataset.o; renderTennis();}});
+  v.querySelectorAll('.tn-book').forEach(function(b){b.onclick=function(){prenotaTennis(g,+b.dataset.o);}});
+  v.querySelectorAll('.tn-cancel').forEach(function(b){b.onclick=function(){annullaTennis(b.dataset.id);}});
+}
+async function prenotaTennis(giornoStr,ora){
+  if(!(approvato()&&userUnita)){ alert('Devi essere un condòmino confermato per prenotare.'); return; }
+  if(tennisMioSlot(giornoStr)){ alert('Hai già una prenotazione per questo giorno (max 1 al giorno, Regolamento Art. 32).'); return; }
+  var rec={ giorno:giornoStr, ora_inizio:ora, autore_id:userId, autore_nome:userNome, unita:(userUnita&&userUnita.unita)||null };
+  if(DEMO){ prenotazioniTennis.push(Object.assign({id:'tn'+Date.now()},rec)); renderTennis(); return; }
+  var res=await sb.from('prenotazioni_tennis').insert(rec);
+  if(res.error){ alert(/duplicate|unique|tennis_uno/i.test(res.error.message)?'Slot non più disponibile, oppure hai già prenotato per questo giorno.':'Errore: '+res.error.message); }
+  await loadTennis(); renderTennis();
+}
+async function annullaTennis(id){
+  if(DEMO){ prenotazioniTennis=prenotazioniTennis.filter(function(p){return String(p.id)!==String(id);}); renderTennis(); return; }
+  var d=await sb.from('prenotazioni_tennis').delete().eq('id',id);
+  if(d.error){ alert('Errore: '+d.error.message); return; }
+  await loadTennis(); renderTennis();
+}
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,admin:renderAdmin};
+var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Tennis',admin:'Admin'};
 var HUBS=[
   {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier']},
   {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true},
+  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis']},
   {id:'comunita',label:'Comunità',ic:'☑',views:['voti','avvisi']},
   {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true}
 ];
