@@ -104,7 +104,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v61';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v62';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -1764,11 +1764,11 @@ var DEMO_TORNEI=[
   {id:'to2',nome:'Torneo di primavera',descrizione:'Girone unico, in corso.',quando:'Maggio',max_iscritti:null,stato:'in_corso',created_at:new Date(Date.now()-40*86400000).toISOString()}
 ];
 var DEMO_ISCR=[
-  {id:'is1',torneo_id:'to1',autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03'},
-  {id:'is2',torneo_id:'to1',autore_id:'demo3',autore_nome:'Bianchi Ada',unita:'C/05'},
-  {id:'is3',torneo_id:'to2',autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03'},
-  {id:'is4',torneo_id:'to2',autore_id:'demo3',autore_nome:'Bianchi Ada',unita:'C/05'},
-  {id:'is5',torneo_id:'to2',autore_id:'demo4',autore_nome:'Verdi Luca',unita:'B/07'}
+  {id:'is1',torneo_id:'to1',autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03',abilita:7},
+  {id:'is2',torneo_id:'to1',autore_id:'demo3',autore_nome:'Bianchi Ada',unita:'C/05',abilita:5},
+  {id:'is3',torneo_id:'to2',autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03',abilita:7},
+  {id:'is4',torneo_id:'to2',autore_id:'demo3',autore_nome:'Bianchi Ada',unita:'C/05',abilita:5},
+  {id:'is5',torneo_id:'to2',autore_id:'demo4',autore_nome:'Verdi Luca',unita:'B/07',abilita:8}
 ];
 var DEMO_PARTITE=[
   {id:'pt1',torneo_id:'to2',a_id:'demo2',a_nome:'Rossi Marco',a_unita:'A/03',b_id:'demo3',b_nome:'Bianchi Ada',b_unita:'C/05',vincitore:'a',stato:'giocato'},
@@ -1817,7 +1817,11 @@ function renderTornei(){
     else if(aperto && full){ html+='<div class="sub" style="margin-top:8px">Posti esauriti.</div>'; }
     else if(aperto && !(approvato()&&userUnita)){ html+='<div class="sub" style="margin-top:8px">Per iscriverti devi essere un condòmino confermato.</div>'; }
     // iscritti (prima che il calendario esista)
-    if(isc.length && !haCal){ html+='<div style="margin-top:10px;border-top:.5px solid var(--line);padding-top:8px"><div style="font-size:13px;color:var(--hint);margin-bottom:4px">Iscritti</div>'+isc.map(function(x){return '<div style="font-size:14px">'+esc(x.autore_nome)+(x.unita?' <span style="color:var(--hint)">('+esc(x.unita)+')</span>':'')+'</div>';}).join('')+'</div>'; }
+    if(isc.length && !haCal){
+      var iscSort=isc.slice().sort(function(a,b){ return (b.abilita||0)-(a.abilita||0); });   // per abilità: aiuta a formare coppie/squadre equilibrate
+      html+='<div style="margin-top:10px;border-top:.5px solid var(--line);padding-top:8px"><div style="font-size:13px;color:var(--hint);margin-bottom:4px">Iscritti'+(adminView()?' · per abilità (base per squadre equilibrate)':'')+'</div>'+
+        iscSort.map(function(x){return '<div style="font-size:14px;display:flex;justify-content:space-between;gap:8px"><span>'+esc(x.autore_nome)+(x.unita?' <span style="color:var(--hint)">('+esc(x.unita)+')</span>':'')+'</span>'+(x.abilita!=null?'<span style="color:var(--hint);white-space:nowrap">abilità '+x.abilita+'/10</span>':'')+'</div>';}).join('')+'</div>';
+    }
     // CLASSIFICA + CALENDARIO (quando il calendario è stato generato)
     if(haCal){
       var cl=classificaDi(t.id), concluso=(t.stato==='concluso');
@@ -1876,7 +1880,11 @@ async function creaTorneo(){
 }
 async function iscriviti(tid){
   if(!(approvato()&&userUnita)){ alert('Devi essere un condòmino confermato.'); return; }
-  var rec={torneo_id:tid,autore_id:userId,autore_nome:userNome,unita:(userUnita&&userUnita.unita)||null};
+  var ab=prompt('La tua abilità nel tennis, da 1 (principiante) a 10 (molto forte):\n\nServe solo per formare squadre/coppie equilibrate — nessuno conosce il livello degli altri.','');
+  if(ab===null) return;                       // annullato
+  var abN=parseInt(ab,10);
+  if(isNaN(abN)||abN<1||abN>10){ alert('Inserisci un numero da 1 a 10.'); return; }
+  var rec={torneo_id:tid,autore_id:userId,autore_nome:userNome,unita:(userUnita&&userUnita.unita)||null,abilita:abN};
   if(DEMO){ iscrizioniTorneo.push(Object.assign({id:'is'+Date.now()},rec)); renderTornei(); return; }
   var res=await sb.from('iscrizioni_torneo').insert(rec); if(res.error){ alert(/duplicate|unique|iscr_uno/i.test(res.error.message)?'Sei già iscritto.':'Errore: '+res.error.message); }
   await loadTornei(); renderTornei();
