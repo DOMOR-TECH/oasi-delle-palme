@@ -91,6 +91,7 @@
   <div id="view-avvisi" class="hide"></div>
   <div id="view-piscina" class="hide"></div>
   <div id="view-tennis" class="hide"></div>
+  <div id="view-tornei" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
 
@@ -103,10 +104,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v59';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v60';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0;   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[];   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -235,7 +236,7 @@ async function init(){
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
     ];
-    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); setApp(true); renderAll(); updateAdminBadge(); return; }
+    showBadge(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); setApp(true); renderAll(); updateAdminBadge(); return; }
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ setApp(false); renderLogin(); return; }
   userId=session.user.id; userEmail=session.user.email||null;
@@ -246,7 +247,7 @@ async function init(){
   if(asp.data){
     userUnita=null; userRuolo=asp.data.ruolo; userNome=asp.data.nome; userStato=asp.data.stato||'approvato'; puoSegnalare=!!asp.data.puo_segnalare;
     $('hsub').textContent=esc(userRuolo);
-    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
+    showBadge(); await loadReports(); await loadComments(); await loadAvvisi(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); setApp(true); renderAll(); updateAdminBadge(); logLogin(); return;
   }
   // CONDÒMINO
   var unita=(session.user.user_metadata && session.user.user_metadata.unita) || null;
@@ -256,7 +257,7 @@ async function init(){
   userUnita = pr.row; userNome = pr.row.nome; userStato = pr.stato; puoSegnalare=true;   // stato dal primario o dal coproprietario
   $('hsub').textContent='il controllo del capitolato è di tutti';
   showBadge();
-  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
+  await loadReports(); await loadComments(); await loadAvvisi(); await loadMorosita(); await loadAnalisi(); await loadCompiti(); await loadPresenze(); await loadMagazzino(); await loadRichieste(); await loadTennis(); await loadTornei(); setApp(true); renderAll(); updateAdminBadge(); logLogin();
 }
 
 // Lega l'utente alla sua unità. Più comproprietari possono condividere la stessa unità:
@@ -1755,12 +1756,95 @@ async function annullaTennis(id){
   if(d.error){ alert('Errore: '+d.error.message); return; }
   await loadTennis(); renderTennis();
 }
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,admin:renderAdmin};
-var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Tennis',admin:'Admin'};
+/* ---------- TENNIS FASE 2 — TORNEI (coinvolgimento comunità, Regolamento Art. 32.5) ----------
+   L'admin crea un torneo; i condòmini approvati si iscrivono/ritirano; lista iscritti palese.
+   Art. 32.5: i tornei lasciano ≥50% delle ore ai non partecipanti (per ora nota testuale). */
+var DEMO_TORNEI=[{id:'to1',nome:'Torneo estivo di doppio',descrizione:'Doppio maschile/femminile/misto, gironi + finale.',quando:'Sabato 26 luglio, dalle 15:00',max_iscritti:16,stato:'aperto',created_at:new Date(Date.now()-3*86400000).toISOString()}];
+var DEMO_ISCR=[{id:'is1',torneo_id:'to1',autore_id:'demo2',autore_nome:'Rossi Marco',unita:'A/03'},{id:'is2',torneo_id:'to1',autore_id:'demo3',autore_nome:'Bianchi Ada',unita:'C/05'}];
+async function loadTornei(){
+  if(DEMO){ tornei=DEMO_TORNEI; iscrizioniTorneo=DEMO_ISCR; return; }
+  var t=await sb.from('tornei').select('*').order('created_at',{ascending:false}); tornei=t.data||[];
+  var i=await sb.from('iscrizioni_torneo').select('*'); iscrizioniTorneo=i.data||[];
+}
+function iscrittiDi(tid){ return iscrizioniTorneo.filter(function(x){return x.torneo_id===tid;}); }
+function mioIscr(tid){ return iscrizioniTorneo.find(function(x){return x.torneo_id===tid && x.autore_id===userId;}); }
+function renderTornei(){
+  var v=$('view-tornei');
+  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Tornei di tennis</p>'+
+    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Iscriviti e partecipa. I tornei lasciano almeno metà delle ore del campo ai non partecipanti (Regolamento Art. 32).</div>';
+  if(adminView()) html+='<button class="btn-primary" id="to-new" style="margin-bottom:12px">＋ Nuovo torneo</button>';
+  if(!tornei.length){ html+='<div class="empty">Nessun torneo al momento.'+(adminView()?' Creane uno col pulsante qui sopra.':' Quando ne verrà organizzato uno, comparirà qui.')+'</div>'; v.innerHTML=html; var nb0=$('to-new'); if(nb0)nb0.onclick=creaTorneo; return; }
+  tornei.forEach(function(t){
+    var isc=iscrittiDi(t.id), mio=mioIscr(t.id), full=(t.max_iscritti!=null && isc.length>=t.max_iscritti), aperto=(t.stato==='aperto');
+    var statoLbl=t.stato==='aperto'?'iscrizioni aperte':(t.stato==='chiuso'?'iscrizioni chiuse':'concluso');
+    var statoCol=t.stato==='aperto'?'var(--ok)':(t.stato==='concluso'?'var(--hint)':'var(--ocra)');
+    html+='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(t.nome)+'</div>'+
+      (t.quando?'<div style="font-size:14px;color:var(--muted);margin-top:2px">🗓️ '+esc(t.quando)+'</div>':'')+
+      (t.descrizione?'<div style="font-size:14px;margin-top:4px">'+esc(t.descrizione)+'</div>':'')+
+      '<div style="font-size:13px;margin-top:6px"><span style="color:'+statoCol+';font-weight:600">'+statoLbl+'</span> · '+isc.length+(t.max_iscritti!=null?'/'+t.max_iscritti:'')+' iscritt'+(isc.length===1?'o':'i')+'</div>';
+    if(mio){ html+='<button class="to-leave" data-id="'+esc(t.id)+'" style="margin-top:10px;border-color:var(--bad);color:var(--bad)">Ritira l\'iscrizione</button>'; }
+    else if(aperto && approvato() && userUnita && !full){ html+='<button class="to-join" data-id="'+esc(t.id)+'" style="margin-top:10px;border-color:var(--ok);color:var(--ok)">Iscrivimi</button>'; }
+    else if(aperto && full){ html+='<div class="sub" style="margin-top:8px">Posti esauriti.</div>'; }
+    else if(aperto && !(approvato()&&userUnita)){ html+='<div class="sub" style="margin-top:8px">Per iscriverti devi essere un condòmino confermato.</div>'; }
+    if(isc.length){ html+='<div style="margin-top:10px;border-top:.5px solid var(--line);padding-top:8px"><div style="font-size:13px;color:var(--hint);margin-bottom:4px">Iscritti</div>'+isc.map(function(x){return '<div style="font-size:14px">'+esc(x.autore_nome)+(x.unita?' <span style="color:var(--hint)">('+esc(x.unita)+')</span>':'')+'</div>';}).join('')+'</div>'; }
+    if(adminView()){
+      html+='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:12px">'+
+        '<button class="to-stato" data-id="'+esc(t.id)+'" data-s="'+(t.stato==='aperto'?'chiuso':'aperto')+'" style="font-size:13px">'+(t.stato==='aperto'?'Chiudi iscrizioni':'Riapri iscrizioni')+'</button>'+
+        (t.stato!=='concluso'?'<button class="to-stato" data-id="'+esc(t.id)+'" data-s="concluso" style="font-size:13px">Segna concluso</button>':'')+
+        '<button class="to-del" data-id="'+esc(t.id)+'" style="font-size:13px;border-color:var(--bad);color:var(--bad)">Elimina</button></div>';
+    }
+    html+='</div>';
+  });
+  v.innerHTML=html;
+  var nb=$('to-new'); if(nb) nb.onclick=creaTorneo;
+  v.querySelectorAll('.to-join').forEach(function(b){b.onclick=function(){iscriviti(b.dataset.id);}});
+  v.querySelectorAll('.to-leave').forEach(function(b){b.onclick=function(){ritira(b.dataset.id);}});
+  v.querySelectorAll('.to-stato').forEach(function(b){b.onclick=function(){cambiaStatoTorneo(b.dataset.id,b.dataset.s);}});
+  v.querySelectorAll('.to-del').forEach(function(b){b.onclick=function(){eliminaTorneo(b.dataset.id);}});
+}
+async function creaTorneo(){
+  if(!adminView()) return;
+  var nome=prompt('Nome del torneo:'); if(!nome||!nome.trim())return;
+  var quando=prompt('Quando (data/orario, testo libero):','')||'';
+  var descrizione=prompt('Descrizione (facoltativa):','')||'';
+  var maxS=prompt('Numero massimo di iscritti (vuoto = illimitato):',''); var maxN=(maxS&&!isNaN(+maxS))?parseInt(maxS,10):null;
+  var rec={nome:nome.trim(),quando:quando.trim()||null,descrizione:descrizione.trim()||null,max_iscritti:maxN,stato:'aperto',created_by:userId};
+  if(DEMO){ tornei.unshift(Object.assign({id:'to'+Date.now(),created_at:new Date().toISOString()},rec)); renderTornei(); return; }
+  var res=await sb.from('tornei').insert(rec); if(res.error){ alert('Errore: '+res.error.message); return; }
+  await loadTornei(); renderTornei();
+}
+async function iscriviti(tid){
+  if(!(approvato()&&userUnita)){ alert('Devi essere un condòmino confermato.'); return; }
+  var rec={torneo_id:tid,autore_id:userId,autore_nome:userNome,unita:(userUnita&&userUnita.unita)||null};
+  if(DEMO){ iscrizioniTorneo.push(Object.assign({id:'is'+Date.now()},rec)); renderTornei(); return; }
+  var res=await sb.from('iscrizioni_torneo').insert(rec); if(res.error){ alert(/duplicate|unique|iscr_uno/i.test(res.error.message)?'Sei già iscritto.':'Errore: '+res.error.message); }
+  await loadTornei(); renderTornei();
+}
+async function ritira(tid){
+  var mio=mioIscr(tid); if(!mio) return;
+  if(DEMO){ iscrizioniTorneo=iscrizioniTorneo.filter(function(x){return x!==mio;}); renderTornei(); return; }
+  var d=await sb.from('iscrizioni_torneo').delete().eq('id',mio.id); if(d.error){ alert('Errore: '+d.error.message); return; }
+  await loadTornei(); renderTornei();
+}
+async function cambiaStatoTorneo(tid,stato){
+  if(!adminView()) return;
+  if(DEMO){ var t=tornei.find(function(x){return x.id===tid;}); if(t)t.stato=stato; renderTornei(); return; }
+  var u=await sb.from('tornei').update({stato:stato}).eq('id',tid); if(u.error){ alert('Errore: '+u.error.message); return; }
+  await loadTornei(); renderTornei();
+}
+async function eliminaTorneo(tid){
+  if(!adminView()) return;
+  if(!confirm('Eliminare questo torneo e tutte le iscrizioni?')) return;
+  if(DEMO){ tornei=tornei.filter(function(x){return x.id!==tid;}); iscrizioniTorneo=iscrizioniTorneo.filter(function(x){return x.torneo_id!==tid;}); renderTornei(); return; }
+  var d=await sb.from('tornei').delete().eq('id',tid); if(d.error){ alert('Errore: '+d.error.message); return; }
+  await loadTornei(); renderTornei();
+}
+var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,admin:renderAdmin};
+var VIEW_LABEL={zona:'Controlla',bacheca:'Bacheca',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',admin:'Admin'};
 var HUBS=[
   {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier']},
   {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true},
-  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis']},
+  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei']},
   {id:'comunita',label:'Comunità',ic:'☑',views:['voti','avvisi']},
   {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true}
 ];
