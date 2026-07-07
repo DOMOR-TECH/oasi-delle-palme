@@ -107,7 +107,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v75';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v76';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[];   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -537,20 +537,21 @@ function openImage(url){
 function presentazione(){
   var p=document.createElement('div'); p.className='page'; p.id='page-pres';
   p.innerHTML='<div class="page-in">'+
-    '<div class="page-top"><button class="page-x" id="pres-x">×</button><h2 class="page-h">Come funziona</h2></div>'+
-    '<p class="lead">Il nostro è uno dei condomìni più belli di Roma. Per mantenerlo servono dei lavori: sono <b>scritti nel contratto che paghiamo</b>. Quest\'app serve a verificare, <b>tutti insieme</b>, che quei lavori vengano fatti davvero. <b>Siamo tutti custodi.</b></p>'+
-    '<div class="pres-step"><div class="pres-n">1</div><div><b>Dove sei</b><br><span class="sub">Seleziona la zona in cui ti trovi (la tua palazzina, la piscina, il viale…).</span></div></div>'+
-    '<div class="pres-step"><div class="pres-n">2</div><div><b>Cosa dovrebbe essere fatto</b><br><span class="sub">L\'app ti mostra le voci del capitolato previste per oggi in quella zona, con il punto del contratto.</span></div></div>'+
-    '<div class="pres-step"><div class="pres-n">3</div><div><b>Segnala</b><br><span class="sub">Tocca «Fatto» o «Problema», aggiungi una foto e una nota. La segnalazione è condivisa col tuo nome e con la data.</span></div></div>'+
-    '<div class="pres-note">Ogni voce dell\'app è presa <b>dal contratto</b>. Una foto datata e firmata vale come <b>prova</b>: mette a confronto ciò che è <b>dovuto</b> (capitolato) con ciò che è <b>constatato</b> (la realtà).</div>'+
-    '<p class="lead" style="font-size:16px;color:var(--muted)">Non è una denuncia e non è una cosa personale: è uno strumento di <b>trasparenza, a favore di tutta la comunità</b>. Più siamo a guardare, più la cura del verde torna ad essere di tutti.</p>'+
-    '<button class="src-link" id="pres-cap" style="font-size:16px;margin:6px 0 16px">📄 Sfoglia il contratto del verde (capitolato House &amp; Garden)</button>'+
-    '<button class="btn-primary" id="pres-go">Ho capito, inizia</button>'+
+    '<div class="page-top"><button class="page-x" id="pres-x">×</button><h2 class="page-h">Benvenuto</h2></div>'+
+    '<p class="lead">C\'è un posto, qui a Roma, che in tanti chiamano casa da una vita: l\'<b>Oasi delle Palme</b>. È bello perché qualcuno se n\'è preso cura — e resta bello solo se continuiamo a prendercene cura <b>insieme</b>.</p>'+
+    '<p class="lead">Questa app serve a questo: mettere intorno allo stesso tavolo chi c\'è da sempre e chi è arrivato ieri, ognuno con la sua voce. Nessuno comanda, <b>tutti partecipano</b>. Ogni segnalazione, ogni voto, ogni idea conta e porta <b>il tuo nome</b>.</p>'+
+    '<p class="lead">Più siamo a guardare e a proporre, più le cose funzionano.</p>'+
+    '<div class="cap-grp">Le aree</div>'+
+    '<div class="pres-step"><div class="pres-n">▤</div><div><b>Controllo</b><br><span class="sub">Verifichiamo insieme che i lavori dei contratti (verde, strade, piscina) siano fatti davvero: «fatto» o «problema», con una foto. La <i>Mappa</i> mostra lo stato del complesso, il <i>Dossier</i> raccoglie le prove, gli <i>Avvisi</i> segnalano gli imprevisti fuori contratto (ascensore, citofoni…).</span></div></div>'+
+    '<div class="pres-step"><div class="pres-n">≈</div><div><b>Piscina</b> <span class="sub">(d\'estate)</span><br><span class="sub">I controlli sull\'acqua e l\'accesso alla vasca.</span></div></div>'+
+    '<div class="pres-step"><div class="pres-n">🎾</div><div><b>Tennis</b><br><span class="sub">Prenoti il campo e ti iscrivi ai tornei.</span></div></div>'+
+    '<div class="pres-step"><div class="pres-n">☑</div><div><b>Comunità</b><br><span class="sub">La <i>Bacheca</i> con gli avvisi, i <i>Voti</i> (sondaggi aperti a tutti) e le <i>Feste</i> per prenotare gli spazi comuni (sala, collina).</span></div></div>'+
+    '<div class="pres-step"><div class="pres-n">📦</div><div><b>Pacchi</b><br><span class="sub">I pacchi arrivati in portineria: l\'app ti avvisa quando puoi ritirarli.</span></div></div>'+
+    '<button class="btn-primary" id="pres-go" style="margin-top:16px">Ho capito, iniziamo</button>'+
     '</div>';
   document.body.appendChild(p);
   function close(){p.remove()}
   $('pres-x').onclick=close; $('pres-go').onclick=close;
-  $('pres-cap').onclick=function(){openCapitolato();};
 }
 
 /* ---------- PAGINA: CONTRATTO / CAPITOLATO ---------- */
