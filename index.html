@@ -143,7 +143,9 @@ async function loadTaken(){
 }
 const meseOggi=new Date().getMonth()+1;
 const $=function(id){return document.getElementById(id)};
-function esc(s){return (s||'').replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+function esc(s){return (s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+// URL sicura per attributi src/href: solo http(s)/data-image, altrimenti stringa vuota (blocca javascript:, ecc.)
+function safeUrl(u){ u=(u||'').trim(); return (/^https?:\/\//i.test(u)||/^data:image\//i.test(u)||/^blob:/i.test(u))?u:''; }
 function fmt(iso){var d=new Date(iso);return d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
 function oggiLabel(){return new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}
 function applicabile(s){return !s.mesi||s.mesi.indexOf(meseOggi)>=0}
@@ -528,7 +530,7 @@ async function resolveProblem(r){
 function openImage(url){
   var ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:2000;padding:14px';
-  ov.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:100%;border-radius:8px"><div style="position:absolute;top:16px;right:20px;color:#fff;font-size:30px">×</div>';
+  ov.innerHTML='<img src="'+esc(safeUrl(url))+'" style="max-width:100%;max-height:100%;border-radius:8px"><div style="position:absolute;top:16px;right:20px;color:#fff;font-size:30px">×</div>';
   ov.onclick=function(){ov.remove()};
   document.body.appendChild(ov);
 }
@@ -936,7 +938,7 @@ function renderDossier(){
       var mine=(r.autore_id && r.autore_id===userId);
       var fotos=fotoListOf(r);
       var fotoHtml=fotos.length
-        ? fotos.map(function(u){return '<img class="photo-thumb dz-img" data-img="'+esc(u)+'" src="'+esc(u)+'" style="cursor:pointer">'}).join('')
+        ? fotos.map(function(u){return '<img class="photo-thumb dz-img" data-img="'+esc(safeUrl(u))+'" src="'+esc(safeUrl(u))+'" style="cursor:pointer">'}).join('')
         : '<div class="photo-thumb" style="display:flex;align-items:center;justify-content:center;color:var(--hint);background:var(--todobg)">—</div>';
       html+='<div style="border-top:.5px solid var(--line);padding:8px 0">'+
         '<div class="row" style="align-items:flex-start">'+
@@ -1305,7 +1307,7 @@ function avCard(a){
       '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(a.titolo)+'</div>'+
       '<div style="font-size:14px;color:var(--hint)">'+esc(cat.ic)+' '+esc(cat.label)+'</div></div></div>'+
     (a.descrizione?'<div style="font-size:15px;color:var(--muted);margin-top:8px">'+esc(a.descrizione)+'</div>':'');
-  if(fotos.length){ h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+fotos.map(function(u){return '<img class="av-foto" src="'+esc(u)+'" data-u="'+esc(u)+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer">';}).join('')+'</div>'; }
+  if(fotos.length){ h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+fotos.map(function(u){return '<img class="av-foto" src="'+esc(safeUrl(u))+'" data-u="'+esc(safeUrl(u))+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer">';}).join('')+'</div>'; }
   h+='<div style="font-size:13px;color:var(--hint);margin-top:8px">'+meta+'</div>';
   if(a.stato==='risolto' && a.chiuso_da_nome){   // tracciabilità chiusura (visibile a tutti, utile al superadmin)
     h+='<div style="font-size:13px;color:var(--ok);margin-top:3px">✓ risolto da <b>'+esc(a.chiuso_da_nome)+'</b>'+(a.chiuso_il?' il '+new Date(a.chiuso_il).toLocaleDateString('it-IT'):'')+(a.chiuso_da&&a.chiuso_da!==a.autore_id?' · chiusura da amministrazione':'')+'</div>';
@@ -1497,7 +1499,7 @@ function magazzinoHtml(){
   magazzino.slice(0,15).forEach(function(m){
     var f=fotoListOf(m);
     h+='<div class="card" style="padding:10px 12px"><div class="row">'+
-      (f.length?'<img class="mag-foto" data-u="'+esc(f[0])+'" src="'+esc(f[0])+'" style="width:48px;height:48px;object-fit:cover;border-radius:8px;cursor:pointer">':'')+
+      (f.length?'<img class="mag-foto" data-u="'+esc(safeUrl(f[0]))+'" src="'+esc(safeUrl(f[0]))+'" style="width:48px;height:48px;object-fit:cover;border-radius:8px;cursor:pointer">':'')+
       '<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">'+esc(m.prodotto)+(m.quantita?' <span style="font-weight:400;color:var(--hint)">· '+esc(m.quantita)+'</span>':'')+'</div>'+
       (m.descrizione?'<div style="font-size:13px;color:var(--muted)">'+esc(m.descrizione)+'</div>':'')+
       '<div style="font-size:12px;color:var(--hint)">'+esc(m.autore_nome)+' · '+new Date(m.created_at).toLocaleDateString('it-IT')+'</div></div></div></div>';
@@ -1670,7 +1672,7 @@ function renderPiscina(){
       metric('pH',last.ph,'&nbsp;')+'<div style="width:.5px;background:var(--line)"></div>'+
       metric('Temp.',(last.temperatura!=null?last.temperatura+'°':null),'acqua')+'</div>'+
       '<div style="border-top:.5px solid var(--line);padding:9px 12px;font-size:13px;color:var(--hint)">'+esc(last.autore_nome)+' · '+new Date(last.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-    var lf=fotoListOf(last); if(lf.length) html+=' · <span class="aa-foto" data-u="'+esc(lf[0])+'" style="color:var(--ok);cursor:pointer">📷 prova</span>';
+    var lf=fotoListOf(last); if(lf.length) html+=' · <span class="aa-foto" data-u="'+esc(safeUrl(lf[0]))+'" style="color:var(--ok);cursor:pointer">📷 prova</span>';
     html+='</div></div>';
   } else { html+='<div class="empty">Nessuna analisi registrata ancora.</div>'; }
   if(isPoolStaff()||adminView()){   // personale piscina (o admin in vista admin): presenze + compiti + analisi
@@ -2137,7 +2139,7 @@ function paccoCard(p,mgr){
     '<span style="font-size:13px;color:'+(conf?'var(--hint)':'var(--ocra)')+';font-weight:600">'+(conf?'ritirato':'in giacenza')+'</span></div>'+
     (p.note?'<div style="font-size:14px;margin-top:3px">'+esc(p.note)+'</div>':'')+
     '<div style="font-size:13px;color:var(--hint);margin-top:3px">arrivato '+new Date(p.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+(p.creato_da?' · '+esc(p.creato_da):'')+(conf&&p.ritirato_da?' · ritirato da '+esc(p.ritirato_da):'')+'</div>';
-  if(p.foto_url) h+='<img class="photo-thumb pk-foto" data-u="'+esc(p.foto_url)+'" src="'+esc(p.foto_url)+'" style="margin-top:8px;cursor:pointer">';
+  if(p.foto_url) h+='<img class="photo-thumb pk-foto" data-u="'+esc(safeUrl(p.foto_url))+'" src="'+esc(safeUrl(p.foto_url))+'" style="margin-top:8px;cursor:pointer">';
   if(!conf) h+='<div style="display:flex;gap:7px;margin-top:10px"><button class="pk-ritira" data-id="'+esc(p.id)+'" style="border-color:var(--ok);color:var(--ok);font-size:14px;padding:7px 12px">Segna ritirato</button>'+(mgr?'<button class="pk-del" data-id="'+esc(p.id)+'" style="border-color:var(--bad);color:var(--bad);font-size:14px;padding:7px 12px">Elimina</button>':'')+'</div>';
   return h+'</div>';
 }
@@ -2291,7 +2293,7 @@ function renderAnnunci(){
       '</div>'+
       (open?('<div style="margin-top:10px">'+
         (a.testo?'<div style="font-size:15px;line-height:1.5;white-space:pre-wrap">'+esc(a.testo)+'</div>':'')+
-        (a.foto_url?'<img class="an-foto" data-u="'+esc(a.foto_url)+'" src="'+esc(a.foto_url)+'" style="margin-top:8px;cursor:pointer;max-width:100%;border-radius:10px">':'')+
+        (a.foto_url?'<img class="an-foto" data-u="'+esc(safeUrl(a.foto_url))+'" src="'+esc(safeUrl(a.foto_url))+'" style="margin-top:8px;cursor:pointer;max-width:100%;border-radius:10px">':'')+
         (adminView()?'<div style="margin-top:10px"><button class="an-del" data-id="'+esc(a.id)+'" style="border-color:var(--bad);color:var(--bad);font-size:14px;padding:7px 12px">Elimina</button></div>':'')+
         '</div>'):'')+
       '</div>';
