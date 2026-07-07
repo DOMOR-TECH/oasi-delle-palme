@@ -107,7 +107,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v78';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v79';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -2343,15 +2343,15 @@ async function eliminaAnnuncio(id){
 var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,admin:renderAdmin};
 var VIEW_LABEL={zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',admin:'Admin'};
 var HUBS=[
-  {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier','avvisi']},
+  {id:'comunita',label:'Comunità',ic:'☑',views:['annunci','voti','sala']},
   {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true},
   {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei']},
-  {id:'comunita',label:'Comunità',ic:'☑',views:['annunci','voti','sala']},
+  {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier','avvisi']},
   {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi']},
   {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true}
 ];
 function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y,5,13) && n<=new Date(y,8,13,23,59,59); }
-var curV='zona';
+var curV='annunci';   // landing sul primo hub (Comunità → Bacheca)
 function hubOf(v){return HUBS.find(function(h){return h.views.indexOf(v)>=0})||HUBS[0];}
 function isPoolStaff(){ return !!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0; }   // personale piscina: vive solo nel modulo Piscina
 // "vista amministratore": l'admin è residente di default; i poteri/le viste admin compaiono SOLO quando ha attivato la modalità.
