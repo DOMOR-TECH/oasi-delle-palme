@@ -107,7 +107,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v76';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v77';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[];   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -2252,6 +2252,7 @@ function updatePacchiBadge(){
 /* ---------- BACHECA — annunci/comunicazioni dell'amministrazione ai condòmini ----------
    L'amministrazione pubblica (titolo+testo+foto+"importante"); tutti leggono (palese). */
 var DEMO_ANNUNCI=[
+  {id:'an0',titolo:'Benvenuto nell\'Oasi delle Palme',testo:'Questa app serve a prenderci cura del condominio insieme: chi c\'è da sempre e chi è arrivato ieri, ognuno con la sua voce. Più siamo a guardare e a proporre, più le cose funzionano.\n\nLE AREE\n• Controllo · Piscina · Tennis · Comunità · Pacchi',importante:true,fissato:true,autore_nome:'Amministrazione',created_at:new Date(Date.now()-10*86400000).toISOString()},
   {id:'an1',titolo:'Assemblea condominiale',testo:'Convocata per giovedì alle 18:30 nella sala. L\'ordine del giorno è disponibile in portineria.',importante:true,autore_nome:'Amministrazione',created_at:new Date(Date.now()-86400000).toISOString()},
   {id:'an2',titolo:'Disinfestazione martedì',testo:'Martedì mattina intervento di disinfestazione nelle aree comuni. Si consiglia di tenere chiuse le finestre al piano terra.',importante:false,autore_nome:'Amministrazione',created_at:new Date(Date.now()-3*86400000).toISOString()}
 ];
@@ -2264,11 +2265,11 @@ function renderAnnunci(){
   var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Bacheca</p>'+
     '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Comunicazioni e annunci dall\'amministrazione per tutti i condòmini.</div>';
   if(adminView()) html+='<button class="btn-primary" id="an-new" style="margin-bottom:12px">＋ Nuovo annuncio</button>';
-  var sorted=annunci.slice().sort(function(a,b){ return (b.importante?1:0)-(a.importante?1:0) || (a.created_at<b.created_at?1:-1); });
+  var sorted=annunci.slice().sort(function(a,b){ return (b.fissato?1:0)-(a.fissato?1:0) || (b.importante?1:0)-(a.importante?1:0) || (a.created_at<b.created_at?1:-1); });
   if(!sorted.length){ html+='<div class="empty">Nessun annuncio al momento.</div>'; }
   else sorted.forEach(function(a){
-    html+='<div class="card"'+(a.importante?' style="border-color:#c9962f"':'')+'>'+
-      (a.importante?'<div style="font-size:12px;font-weight:700;color:#c9962f;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px">📌 Importante</div>':'')+
+    html+='<div class="card"'+((a.fissato||a.importante)?' style="border-color:#c9962f"':'')+'>'+
+      (a.fissato?'<div style="font-size:12px;font-weight:700;color:#c9962f;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px">📌 In evidenza</div>':(a.importante?'<div style="font-size:12px;font-weight:700;color:#c9962f;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px">⭐ Importante</div>':''))+
       '<div style="font-weight:700;font-size:18px">'+esc(a.titolo)+'</div>'+
       (a.testo?'<div style="font-size:15px;line-height:1.5;margin-top:6px;white-space:pre-wrap">'+esc(a.testo)+'</div>':'')+
       (a.foto_url?'<img class="an-foto" data-u="'+esc(a.foto_url)+'" src="'+esc(a.foto_url)+'" style="margin-top:8px;cursor:pointer;max-width:100%;border-radius:10px">':'')+
@@ -2289,7 +2290,8 @@ function nuovoAnnuncio(){
     '<div style="font-size:18px;font-weight:600;margin-bottom:12px">Nuovo annuncio</div>'+
     '<label>Titolo</label><input id="an-tit" type="text" placeholder="es. Assemblea condominiale" style="margin:4px 0 10px;width:100%">'+
     '<label>Testo</label><textarea id="an-txt" rows="6" placeholder="Scrivi la comunicazione…" style="margin:4px 0 10px;width:100%;font-size:15px;line-height:1.4;min-width:0"></textarea>'+
-    '<label style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:15px"><input id="an-imp" type="checkbox"> Segna come importante (resta in cima)</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:15px"><input id="an-imp" type="checkbox"> Importante (evidenziato)</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:15px"><input id="an-fis" type="checkbox"> Fissa in cima (resta sempre il primo)</label>'+
     '<label style="display:block">Foto (facoltativa)</label><input id="an-foto-in" type="file" accept="image/*" style="display:none"><div id="an-prev" style="margin:6px 0"></div>'+
     '<div id="an-warn" style="color:var(--bad);font-size:14px;margin:4px 0;display:none"></div>'+
     '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="an-x">Annulla</button><button class="btn-primary" id="an-ok">Pubblica</button></div></div>';
@@ -2302,7 +2304,7 @@ function nuovoAnnuncio(){
   $('an-ok').onclick=async function(){
     var tit=($('an-tit').value||'').trim();
     if(!tit){ $('an-warn').textContent='Il titolo è obbligatorio.'; $('an-warn').style.display='block'; return; }
-    var rec={titolo:tit,testo:($('an-txt').value||'').trim()||null,importante:$('an-imp').checked,autore_nome:(userNome||'Amministrazione'),autore_id:userId};
+    var rec={titolo:tit,testo:($('an-txt').value||'').trim()||null,importante:$('an-imp').checked,fissato:$('an-fis').checked,autore_nome:(userNome||'Amministrazione'),autore_id:userId};
     if(DEMO){ annunci.unshift(Object.assign({id:'an'+Date.now(),created_at:new Date().toISOString(),foto_url:blob?URL.createObjectURL(blob):null},rec)); m.remove(); renderAnnunci(); return; }
     var btn=$('an-ok'); btn.disabled=true; btn.textContent='Pubblico…';
     try{
