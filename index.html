@@ -1640,8 +1640,8 @@ var DEMO_PRESENZE=[
 ];
 async function loadPresenze(){   // presenze di oggi (lettura pubblica)
   if(DEMO){ presenze=DEMO_PRESENZE; return; }
-  const { data } = await sb.from('presenze').select('*').eq('giorno',todayStr());
-  presenze = data||[];
+  const { data, error } = await sb.from('presenze').select('*').eq('giorno',todayStr());
+  if(!error) presenze = data||[];   // su errore rete tieni il dato stale: meglio del vuoto (che mostrerebbe falsa "Vasca chiusa")
 }
 function myPresence(){ return presenze.find(function(p){return p.autore_id===userId;}); }
 function nStaffInVasca(){ return presenze.filter(function(p){return p.is_staff;}).length; }
@@ -2527,6 +2527,7 @@ function showView(v){
   } else { sn.style.display='none'; sn.innerHTML=''; }
   Object.keys(views).forEach(function(k){ var el=$('view-'+k); if(el) el.classList.toggle('hide',k!==v); });
   views[v]();
+  if(v==='piscina' && !DEMO){ loadPresenze().then(function(){ if(curV==='piscina') renderPiscina(); }).catch(function(){}); }   // presenze fresche all'apertura: mostra subito 0/90 quando il bagnino si dichiara in vasca (niente display stantio → il check-in non sembra "bloccato")
 }
 function renderAll(){ if(isPoolStaff() && hubOf(curV).id!=='piscina') curV='piscina'; showView(curV); }
 
