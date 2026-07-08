@@ -59,6 +59,25 @@
   .photo-thumb{width:46px;height:46px;border-radius:var(--r);object-fit:cover;border:.5px solid var(--line)}
   .empty{color:var(--hint);font-size:16px;text-align:center;padding:18px}
   .spin{color:var(--hint);font-size:16px;text-align:center;padding:24px}
+  /* === Componenti «Laguna» === */
+  .vhead{padding:2px 4px 10px}
+  .vhead h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.12}
+  .vhead .s{font-size:17px;color:var(--muted);margin-top:3px;line-height:1.35}
+  .mlabel{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:14px 4px 8px}
+  .glasscard{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:16px;margin-bottom:10px;box-shadow:0 8px 26px -16px rgba(20,40,34,.35)}
+  .statpanel{background:var(--areabg,var(--okbg));border:1px solid var(--line);border-radius:var(--r2);padding:16px;margin-bottom:10px}
+  .statbig{font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+  .statbig u{font-style:normal;text-decoration:none;font-size:16px;font-weight:600;color:var(--muted);margin-left:4px}
+  .prog{height:9px;border-radius:5px;background:rgba(20,40,34,.10);overflow:hidden;margin-top:9px}
+  .prog>i{display:block;height:100%;border-radius:5px;background:var(--area,var(--ok))}
+  .codecard{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:18px 16px;margin-bottom:10px;box-shadow:0 8px 26px -16px rgba(20,40,34,.35);display:flex;flex-direction:column;gap:10px}
+  .codebox{align-self:flex-start;background:var(--areabg,var(--okbg));border:1px dashed var(--area,var(--ok));border-radius:14px;padding:10px 18px}
+  .codebox .k{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .codebox .v{font-size:32px;font-weight:800;letter-spacing:.05em;font-variant-numeric:tabular-nums;color:var(--txt)}
+  .wchips{display:flex;flex-wrap:wrap;gap:8px}
+  .wchip{min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:0 15px;border-radius:13px;background:var(--surface);border:1px solid var(--line);font-size:15px;font-weight:600;color:var(--muted)}
+  .wchip.on{background:var(--area,var(--ok));border-color:var(--area,var(--ok));color:#fff;font-weight:700}
+  .itile{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;background:var(--areabg,var(--okbg))}
   /* fonte cliccabile → apre il contratto */
   .src-link{background:none;border:none;padding:0;margin-top:6px;color:var(--info);font-size:14px;text-decoration:underline;text-underline-offset:2px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
   /* pagina a tutta schermo (presentazione + contratto) */
@@ -113,7 +132,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v83';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v84';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -695,7 +714,7 @@ function threadHTML(r){
 }
 function renderZona(){
   var v=$('view-zona');
-  var selectHTML='<label>Dove sei ora</label><select id="z-area"><option value="" disabled'+(!curArea?' selected':'')+'>Dove ti trovi ora?</option>'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+esc(a)+'</option>'}).join('')+'</select>';
+  var selectHTML=vHead('🌿','Controllo','Capitolato del verde — controlla e segnala')+'<label>Dove sei ora</label><select id="z-area"><option value="" disabled'+(!curArea?' selected':'')+'>Dove ti trovi ora?</option>'+AREE.map(function(a){return '<option'+(a===curArea?' selected':'')+'>'+esc(a)+'</option>'}).join('')+'</select>';
   if(!curArea){   // nessun luogo scelto → prima si seleziona "dove ti trovi"
     v.innerHTML=(approvato()?'':'<div class="pres-note" style="margin:0 0 11px"><b>Il tuo accesso è in attesa di conferma</b> dall\'amministratore del gruppo. Intanto puoi guardare tutto; potrai inviare segnalazioni appena sei confermato.</div>')+selectHTML+
       '<div class="card" style="text-align:center;margin-top:14px"><div style="font-size:42px">📍</div><div style="font-size:17px;font-weight:600;margin-top:4px">Dove ti trovi ora?</div><div class="sub" style="margin-top:4px">Scegli la zona qui sopra per vedere cosa controllare e poter segnalare.</div></div>';
@@ -1332,8 +1351,7 @@ function renderAvvisi(){
   var v=$('view-avvisi');
   var aperti=avvisi.filter(function(a){return a.stato!=='risolto'});
   var chiusi=avvisi.filter(function(a){return a.stato==='risolto'});
-  var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:2px 2px 4px">Avvisi fuori-capitolato</p>'+
-    '<div class="sub" style="margin:0 2px 12px">Imprevisti non coperti da nessun contratto fornitore (centralina, citofoni, ascensore…). Chi apre un avviso ne segue la chiusura; l\'amministrazione può chiudere qualsiasi avviso.</div>';
+  var html=vHead('⚠️','Avvisi','Imprevisti non coperti da nessun contratto fornitore (centralina, citofoni, ascensore…). Chi apre un avviso ne segue la chiusura; l\'amministrazione può chiudere qualsiasi avviso.');
   if(canSegnalare()) html+='<button class="btn-primary" id="av-new" style="margin-bottom:14px">＋ Nuovo avviso</button>';
   else html+='<div class="pres-note" style="margin:0 0 12px">Per aprire un avviso devi essere un condòmino confermato. Intanto puoi vedere e commentare quelli esistenti.</div>';
   html+='<div class="metrics"><div class="metric"><label>Aperti</label><div class="n" style="color:var(--bad)">'+aperti.length+'</div></div>'+
@@ -1667,10 +1685,11 @@ async function loadAnalisi(){   // registro analisi acqua (lettura pubblica)
   analisiAcqua = data||[];
 }
 function puoRegistrareAnalisi(){ return adminView() || (!!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0); }
+function vHead(emoji,title,subHTML){ return '<div class="vhead"><h2>'+emoji+' '+esc(title)+'</h2>'+(subHTML?'<div class="s">'+subHTML+'</div>':'')+'</div>'; }  // subHTML NON escapato → passare SOLO stringhe statiche fidate, MAI dati utente/DB
 function renderPiscina(){
   var v=$('view-piscina'), last=analisiAcqua[0];
-  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 4px">Piscina</p>'+
-    '<div style="font-size:13px;color:var(--hint);margin:6px 2px 6px">Qualità dell\'acqua</div>';
+  var html=vHead('💧','Piscina','Presenze e qualità dell\'acqua')+
+    '<div class="mlabel">Qualità dell\'acqua</div>';
   if(last){
     function metric(lbl,val,unit){ return '<div style="flex:1;padding:10px 4px;text-align:center"><div style="font-size:12px;color:var(--hint)">'+lbl+'</div><div style="font-size:20px;font-weight:600">'+(val!=null&&val!==''?val:'—')+'</div><div style="font-size:11px;color:var(--hint)">'+unit+'</div></div>'; }
     html+='<div class="card" style="padding:0"><div style="display:flex">'+
@@ -1772,9 +1791,8 @@ function tennisMioSlot(giornoStr){ return prenotazioniTennis.find(function(p){re
 function tennisOccupato(giornoStr,ora){ return prenotazioniTennis.find(function(p){return p.giorno===giornoStr && p.ora_inizio===ora;}); }
 function renderTennis(){
   var v=$('view-tennis'), g=tennisDayStr(curGiornoTennis);
-  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Prenota il campo da tennis</p>'+
-    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Slot da 60 minuti · max 1 al giorno per condòmino · per oggi o domani (Regolamento Art. 32)</div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:12px">'+[0,1].map(function(o){return '<button class="tn-day" data-o="'+o+'" style="flex:1;padding:10px;border-radius:10px;font-size:14px;'+(o===curGiornoTennis?'background:#185FA5;color:#fff;border:none':'background:var(--surface);color:var(--muted);border:1px solid var(--line)')+'">'+tennisDayLabel(o)+'</button>';}).join('')+'</div>';
+  var html=vHead('🎾','Prenota il campo','Slot da 60 minuti · max 1 al giorno per condòmino · per oggi o domani (Regolamento Art. 32)')+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+[0,1].map(function(o){return '<button class="tn-day" data-o="'+o+'" style="flex:1;padding:10px;border-radius:var(--r);font-size:14px;font-weight:600;'+(o===curGiornoTennis?'background:var(--area,var(--ok));color:#fff;border:none':'background:var(--surface);color:var(--muted);border:1px solid var(--line)')+'">'+tennisDayLabel(o)+'</button>';}).join('')+'</div>';
   var mine=tennisMioSlot(g);
   if(mine){ html+='<div class="pres-note" style="margin:0 0 10px">La tua prenotazione '+(curGiornoTennis===0?'di oggi':'di domani')+': <b>'+pad2(mine.ora_inizio)+':00–'+pad2(mine.ora_inizio+1)+':00</b>. Una sola al giorno.</div>'; }
   else if(!(approvato()&&userUnita)){ html+='<div class="pres-note" style="margin:0 0 10px">Per prenotare devi essere un condòmino confermato.</div>'; }
@@ -1855,8 +1873,7 @@ function classificaDi(tid){
 }
 function renderTornei(){
   var v=$('view-tornei');
-  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Tornei di tennis</p>'+
-    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Girone all\'italiana: tutti giocano con tutti, vince chi fa più vittorie. I tornei lasciano almeno metà delle ore ai non partecipanti (Regolamento Art. 32).</div>';
+  var html=vHead('🏆','Tornei di tennis','Girone all\'italiana: tutti giocano con tutti, vince chi fa più vittorie. I tornei lasciano almeno metà delle ore ai non partecipanti (Regolamento Art. 32).');
   if(adminView()) html+='<button class="btn-primary" id="to-new" style="margin-bottom:12px">＋ Nuovo torneo</button>';
   if(!tornei.length){ html+='<div class="empty">Nessun torneo al momento.'+(adminView()?' Creane uno col pulsante qui sopra.':' Quando ne verrà organizzato uno, comparirà qui.')+'</div>'; v.innerHTML=html; var nb0=$('to-new'); if(nb0)nb0.onclick=creaTorneo; return; }
   var STLBL={aperto:'iscrizioni aperte',chiuso:'iscrizioni chiuse',in_corso:'in corso',concluso:'concluso'};
@@ -2041,8 +2058,7 @@ async function loadSala(){
 function dSala(g){ return new Date(g+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'long'}); }
 function renderSala(){
   var v=$('view-sala');
-  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Prenota uno spazio per la festa</p>'+
-    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Prenota uno spazio del complesso (sala, collina) per una festa o un evento privato. Ogni spazio ha le sue <b>regole d\'uso</b>, che accetti al momento della richiesta. Chi prenota lascia lo spazio in ordine, come l\'ha trovato.</div>';
+  var html=vHead('🎉','Prenota uno spazio','Prenota uno spazio del complesso (sala, collina) per una festa o un evento privato. Ogni spazio ha le sue <b>regole d\'uso</b>, che accetti al momento della richiesta. Chi prenota lascia lo spazio in ordine, come l\'ha trovato.');
   if(approvato()&&userUnita) html+='<button class="btn-primary" id="sala-new" style="margin-bottom:12px">＋ Richiedi la sala</button>';
   else html+='<div class="pres-note" style="margin:0 0 10px">Per prenotare devi essere un condòmino confermato.</div>';
   if(!prenotazioniSala.length){ html+='<div class="empty">Nessuna prenotazione in programma.</div>'; }
@@ -2158,8 +2174,7 @@ function renderPacchi(){
   var v=$('view-pacchi'), mgr=pacchiManager(), html='';
   if(mgr){
     var giac=pacchiGiacenza(), ritirati=pacchi.filter(function(p){return p.stato==='ritirato';});
-    html+='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Pacchi in custodia</p>'+
-      '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Registra un pacco arrivato: destinatario + foto dell\'etichetta. Il condòmino viene avvisato di passare a ritirarlo.</div>'+
+    html+=vHead('📦','Pacchi in custodia','Registra un pacco arrivato: destinatario + foto dell\'etichetta. Il condòmino viene avvisato di passare a ritirarlo.')+
       '<button class="btn-primary" id="pk-new" style="margin-bottom:12px">＋ Registra pacco</button>'+
       '<div class="cap-grp">In giacenza ('+giac.length+')</div>';
     if(!giac.length) html+='<div class="empty">Nessun pacco in giacenza.</div>'; else giac.forEach(function(p){ html+=paccoCard(p,true); });
@@ -2286,8 +2301,7 @@ async function loadAnnunci(){
 }
 function renderAnnunci(){
   var v=$('view-annunci');
-  var html='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">Bacheca</p>'+
-    '<div style="font-size:13px;color:var(--hint);margin:0 2px 10px">Comunicazioni e annunci dall\'amministrazione. Tocca un messaggio per leggerlo.</div>';
+  var html=vHead('📣','Bacheca','Comunicazioni e annunci dell\'amministrazione. Tocca un messaggio per leggerlo.');
   if(adminView()) html+='<button class="btn-primary" id="an-new" style="margin-bottom:12px">＋ Nuovo annuncio</button>';
   var sorted=annunci.slice().sort(function(a,b){ return (b.fissato?1:0)-(a.fissato?1:0) || (b.importante?1:0)-(a.importante?1:0) || (a.created_at<b.created_at?1:-1); });
   if(!sorted.length){ html+='<div class="empty">Nessun annuncio al momento.</div>'; }
@@ -2356,12 +2370,12 @@ async function eliminaAnnuncio(id){
 var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,admin:renderAdmin};
 var VIEW_LABEL={zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',admin:'Admin'};
 var HUBS=[
-  {id:'comunita',label:'Comunità',ic:'☑',views:['annunci','voti','sala'],col:'#9E4526',bg:'#F3E5DF'},
-  {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true,col:'#08678F',bg:'#E1EFF5'},
+  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala'],col:'#9E4526',bg:'#F3E5DF'},
+  {id:'piscina',label:'Piscina',ic:'💧',views:['piscina'],seasonal:true,col:'#08678F',bg:'#E1EFF5'},
   {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'#8A6410',bg:'#F5EEDA'},
-  {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier','avvisi'],col:'#2F6E2C',bg:'#E6EFE4'},
+  {id:'controllo',label:'Controllo',ic:'🌿',views:['zona','bacheca','dossier','avvisi'],col:'#2F6E2C',bg:'#E6EFE4'},
   {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi'],col:'#5F5346',bg:'#EEEBE6'},
-  {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true,col:'#0A6F60',bg:'#DCEBE6'}
+  {id:'admin',label:'Admin',ic:'🛠️',views:['admin'],adminOnly:true,col:'#0A6F60',bg:'#DCEBE6'}
 ];
 function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y,5,13) && n<=new Date(y,8,13,23,59,59); }
 var curV='annunci';   // landing sul primo hub (Comunità → Bacheca)
@@ -2400,6 +2414,7 @@ function showView(v){
   curV=v; var hub=hubOf(v);
   $('nav').querySelectorAll('button').forEach(function(b){b.classList.toggle('active', b.dataset.hub===hub.id);});
   var sn=$('subnav'); sn.style.setProperty('--area',hub.col||''); sn.style.setProperty('--areabg',hub.bg||'');
+  var wp=document.querySelector('.wrap'); if(wp){ wp.style.setProperty('--area',hub.col||''); wp.style.setProperty('--areabg',hub.bg||''); }   // il contenuto delle viste eredita il colore dell'area corrente
   if(hub.views.length>1){
     sn.style.display='flex';
     sn.innerHTML=hub.views.map(function(x){return '<button class="subchip'+(x===v?' active':'')+'" data-v="'+x+'">'+VIEW_LABEL[x]+'</button>';}).join('');
