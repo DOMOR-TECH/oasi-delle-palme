@@ -1645,7 +1645,7 @@ async function loadPresenze(){   // presenze di oggi (lettura pubblica)
 }
 function myPresence(){ return presenze.find(function(p){return p.autore_id===userId;}); }
 function nStaffInVasca(){ return presenze.filter(function(p){return p.is_staff;}).length; }
-function capienza(){ return 90*nStaffInVasca(); }   // 90 posti per ogni bagnino in vasca; 0 bagnini = vasca chiusa (0/0)
+function capienza(){ return 90*Math.max(1,nStaffInVasca()); }   // min 90: la vasca resta agibile anche se il bagnino non si segna in-app (segnale inaffidabile); il conteggio bagnini resta info
 function totPresenti(){ var c=0; presenze.forEach(function(p){ if(!p.is_staff) c+=1+(p.ospiti||0); }); return c; }   // condòmini + ospiti
 async function togglePresenza(){
   if(!DEMO) await loadPresenze();   // guardia bagnino + capienza sempre su dati freschi (gate F1: evita lockout/ingresso a vasca chiusa su stato stantio)
@@ -1654,7 +1654,6 @@ async function togglePresenza(){
     if(DEMO){ presenze=presenze.filter(function(p){return p.autore_id!==userId;}); renderPiscina(); return; }
     var d=await sb.from('presenze').delete().eq('autore_id',userId).eq('giorno',todayStr()); if(d.error){alert('Errore: '+d.error.message);return;}
   } else if(!mine){
-    if(nStaffInVasca()===0){ alert('Nessun bagnino in vasca: la piscina è chiusa. Si può entrare solo quando il bagnino è in servizio.'); return; }
     if(totPresenti()>=capienza()){ alert('Piscina al completo ('+capienza()+' posti). I condòmini hanno la precedenza: riprova quando si libera un posto.'); return; }
     var rec={autore_id:userId,autore_nome:(userNome||'—'),unita:(userUnita?userUnita.unita:null),ospiti:0,is_staff:false,giorno:todayStr()};
     if(DEMO){ presenze.push(rec); renderPiscina(); return; }
@@ -1685,15 +1684,13 @@ async function toggleStaff(){
 function accessiHtml(){
   if(!userUnita) return '';   // solo condòmini (hanno unità) fanno check-in
   var mine=myPresence(), present=!!(mine&&!mine.is_staff), osp=present?(mine.ospiti||0):0;
-  var nTot=totPresenti(), cap=capienza(), chiusa=(cap===0);   // 0 bagnini in vasca = piscina chiusa
+  var nTot=totPresenti(), cap=capienza();
   var h='<div class="mlabel" style="margin-top:14px">Accesso in piscina</div>';
   h+='<div class="card" style="padding:16px"><div style="display:flex;align-items:baseline;gap:6px"><span class="statbig">'+nTot+'</span><span style="font-size:16px;color:var(--muted);white-space:nowrap">/ '+cap+' presenti ora</span></div>'+
     '<div class="prog"><i style="width:'+(cap>0?Math.max(0,Math.min(100,Math.round(nTot/cap*100))):0)+'%"></i></div></div>';
-  if(chiusa) h+='<div class="pres-note" style="margin:0 0 10px"><b>Vasca chiusa.</b> Nessun bagnino in servizio: si può entrare solo quando il bagnino è in vasca.</div>';
-  else if(nTot>=cap) h+='<div class="pres-note" style="margin:0 0 10px"><b>Piscina al completo.</b> I condòmini hanno la precedenza: chi ha ospiti è pregato di farli uscire.</div>';
+  if(nTot>=cap) h+='<div class="pres-note" style="margin:0 0 10px"><b>Piscina al completo.</b> I condòmini hanno la precedenza: chi ha ospiti è pregato di farli uscire.</div>';
   else if(nTot>80) h+='<div class="pres-note" style="margin:0 0 10px">Oltre 80 presenti: è stato richiesto un secondo bagnino.</div>';
-  if(!present && chiusa) h+='<button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;background:var(--todobg);color:var(--muted);border:none">Vasca chiusa — tocca per riprovare</button>';
-  else h+='<button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;'+(present?'background:var(--ok);color:var(--okc);border:none':'background:transparent;color:var(--ok);border:1.5px solid var(--okbr)')+'">'+(present?'✓ Sono in piscina — esci':'Sono in piscina')+'</button>';
+  h+='<button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;'+(present?'background:var(--ok);color:var(--okc);border:none':'background:transparent;color:var(--ok);border:1.5px solid var(--okbr)')+'">'+(present?'✓ Sono in piscina — esci':'Sono in piscina')+'</button>';
   if(present){
     h+='<div style="display:flex;gap:10px;margin-top:10px">';
     [1,2].forEach(function(n){ var on=osp>=n; h+='<button class="acc-osp" data-n="'+n+'" style="flex:1;min-height:44px;padding:11px;border-radius:13px;font-size:15px;font-weight:600;'+(on?'background:var(--info);color:var(--infoc);border:none':'background:transparent;color:var(--info);border:1.5px solid var(--infobr)')+'">'+(on?'✓ ':'+ ')+'Ospite '+n+'</button>'; });
