@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0A6F60">
+<meta name="theme-color" content="#0B7A69">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,12 +13,16 @@
 <title>Oasi delle Palme</title>
 <style>
   :root{
-    /* === Palette «Laguna» (VC451 · Oasi delle Palme) — restyle visivo === */
-    --bg:#F6F5F1; --surface:#FFFFFF; --line:#E6E4DC; --line2:#C7C4B8;
+    /* === Design system «Laguna» (VC451 · Oasi delle Palme) — tokens/colors.css === */
+    --bg:#F6F5F1; --surface:#FFFFFF; --line:#E6E4DC; --line2:#C7C4B8; --traccia:#ECEAE2;
     --txt:#1B2421; --muted:#5C6663; --hint:#8B948F;
-    --ok:#0A6F60; --okbg:#DCEBE6; --bad:#A03127; --badbg:#F7E7E4; --todo:#59625E; --todobg:#ECEEEC;
+    --ok:#0B7A69; --okbg:#E9F3F0; --okdark:#075E51;   /* brand verde-acqua (ok = brand + azione) */
+    --bad:#A03127; --badbg:#F7E7E4; --todo:#59625E; --todobg:#ECEEEC;
     --ocra:#7A5E12; --ocrabg:#F4ECD6;
     --info:#0A6E9C; --infobg:#E2F0F7; --r:13px; --r2:20px;
+    /* stati Controllo — SOLO nelle capsule bordate con glifo (mai come tinta d'area) */
+    --st-fatto:#237A46; --st-fatto-ink:#1C6139; --st-problema:#B3362C; --st-problema-ink:#A03127;
+    --st-finestra:#6E7773; --st-finestra-ink:#59625E; --st-scaduta:#96741B; --st-scaduta-ink:#7A5E12;
     --glass:rgba(255,255,255,.72); --glassblur:blur(20px) saturate(1.6);
   }
   *{box-sizing:border-box}
@@ -29,13 +33,14 @@
   .logo{width:38px;height:38px;border-radius:var(--r);background:var(--okbg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
   h1{font-size:21px;font-weight:600;margin:0}
   .sub{font-size:15px;color:var(--muted);margin:0}
-  .card{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:12px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(20,40,34,.035)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);padding:12px 14px;margin-bottom:9px}
   label{font-size:15px;color:var(--muted)}
   select,input,textarea,button{font:inherit}
   select,input[type=text],input[type=email],textarea{width:100%;padding:13px 13px;border:.5px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--txt);margin-top:5px;font-size:17px}
   button{cursor:pointer;border:.5px solid var(--line2);background:var(--surface);color:var(--txt);border-radius:var(--r);padding:13px 16px;font-size:17px}
   button:active{transform:scale(.98)}
-  .btn-primary{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:700;width:100%;box-shadow:0 6px 16px -7px rgba(11,122,105,.55)}
+  .btn-primary{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:700;width:100%;border-radius:14px;min-height:44px}
+  .btn-primary:active{background:var(--okdark)}
   .row{display:flex;align-items:center;gap:10px}
   .pill{font-size:14px;padding:3px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:4px;font-weight:700}
   .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:11px}
@@ -45,7 +50,7 @@
   .tile{padding:9px 10px;border-radius:var(--r);border:.5px solid;text-align:left;display:flex;flex-direction:column;gap:3px}
   .src{font-size:14px;color:var(--hint)}
   nav{position:fixed;left:0;right:0;bottom:0;background:var(--glass);backdrop-filter:var(--glassblur);-webkit-backdrop-filter:var(--glassblur);border-top:.5px solid var(--line);display:flex;max-width:440px;margin:0 auto}
-  nav button{flex:1;border:none;background:none;border-radius:0;padding:10px 4px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav button{flex:1;min-width:0;border:none;background:none;border-radius:0;padding:10px 2px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;gap:3px}
   nav button.active{color:var(--area,var(--ok))}
   nav button{position:relative}
   nav button.active::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:3px;border-radius:0 0 3px 3px;background:var(--area,var(--ok))}
@@ -59,25 +64,30 @@
   .photo-thumb{width:46px;height:46px;border-radius:var(--r);object-fit:cover;border:.5px solid var(--line)}
   .empty{color:var(--hint);font-size:16px;text-align:center;padding:18px}
   .spin{color:var(--hint);font-size:16px;text-align:center;padding:24px}
-  /* === Componenti «Laguna» === */
+  /* === Componenti design system «Laguna» (design-vc451) === */
   .vhead{padding:2px 4px 10px}
-  .vhead h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.12}
+  .vhead h2{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.12}
   .vhead .s{font-size:17px;color:var(--muted);margin-top:3px;line-height:1.35}
   .mlabel{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:14px 4px 8px}
-  .glasscard{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:16px;margin-bottom:10px;box-shadow:0 8px 26px -16px rgba(20,40,34,.35)}
-  .statpanel{background:var(--areabg,var(--okbg));border:1px solid var(--line);border-radius:var(--r2);padding:16px;margin-bottom:10px}
-  .statbig{font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+  .statbig{font-size:32px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
   .statbig u{font-style:normal;text-decoration:none;font-size:16px;font-weight:600;color:var(--muted);margin-left:4px}
-  .prog{height:9px;border-radius:5px;background:rgba(20,40,34,.10);overflow:hidden;margin-top:9px}
-  .prog>i{display:block;height:100%;border-radius:5px;background:var(--area,var(--ok))}
-  .codecard{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:18px 16px;margin-bottom:10px;box-shadow:0 8px 26px -16px rgba(20,40,34,.35);display:flex;flex-direction:column;gap:10px}
-  .codebox{align-self:flex-start;background:var(--areabg,var(--okbg));border:1px dashed var(--area,var(--ok));border-radius:14px;padding:10px 18px}
-  .codebox .k{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-  .codebox .v{font-size:32px;font-weight:800;letter-spacing:.05em;font-variant-numeric:tabular-nums;color:var(--txt)}
-  .wchips{display:flex;flex-wrap:wrap;gap:8px}
-  .wchip{min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:0 15px;border-radius:13px;background:var(--surface);border:1px solid var(--line);font-size:15px;font-weight:600;color:var(--muted)}
-  .wchip.on{background:var(--area,var(--ok));border-color:var(--area,var(--ok));color:#fff;font-weight:700}
-  .itile{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;background:var(--areabg,var(--okbg))}
+  .prog{height:8px;border-radius:4px;background:var(--traccia);overflow:hidden;margin-top:9px}
+  .prog>i{display:block;height:100%;border-radius:4px;background:var(--area,var(--ok))}
+  /* capsule dei 4 stati del Controllo: pill con bordo + glifo (✓ ✕ ○ !) — forma dedicata agli STATI */
+  .stcap{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:999px;white-space:nowrap;font-size:13px;font-weight:700}
+  .stcap-fatto{background:rgba(35,122,70,.12);border:1px solid rgba(35,122,70,.45);color:var(--st-fatto-ink)}
+  .stcap-problema{background:rgba(179,54,44,.10);border:1px solid rgba(179,54,44,.45);color:var(--st-problema-ink)}
+  .stcap-finestra{background:rgba(110,119,115,.12);border:1px solid rgba(110,119,115,.45);color:var(--st-finestra-ink)}
+  .stcap-scaduta{background:rgba(150,116,27,.13);border:1px solid rgba(150,116,27,.5);color:var(--st-scaduta-ink)}
+  /* quadrotto icona d'area: 44×44, raggio 14, tinta d'area 12-20% (via --tint inline) */
+  .itile{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;background:var(--tint,var(--okbg))}
+  /* tile modulo per la Home */
+  .mtile{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;text-align:left;font-family:inherit;color:var(--txt)}
+  .mtile.hor{grid-column:1/-1;flex-direction:row;align-items:center;gap:12px}
+  .mtile .t{font-size:17px;font-weight:700}
+  .mtile .st{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:1px}
+  .mtile .mbadge{position:absolute;top:10px;right:10px;min-width:20px;height:20px;border-radius:10px;background:#BC5430;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+  .mtile.hor .mbadge{position:static;flex:none}
   /* fonte cliccabile → apre il contratto */
   .src-link{background:none;border:none;padding:0;margin-top:6px;color:var(--info);font-size:14px;text-decoration:underline;text-underline-offset:2px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
   /* pagina a tutta schermo (presentazione + contratto) */
@@ -89,7 +99,7 @@
   .cap-item{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:13px 14px;margin-bottom:9px;scroll-margin-top:64px}
   .cap-item.hl{border-color:var(--ok);box-shadow:0 0 0 2px var(--okbg);animation:hlpulse 1.6s ease-out}
   @keyframes hlpulse{0%{box-shadow:0 0 0 3px var(--ok)}100%{box-shadow:0 0 0 2px var(--okbg)}}
-  .cap-grp{font-size:14px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--hint);margin:18px 2px 8px}
+  .cap-grp{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:18px 4px 8px}
   .lead{font-size:17px;line-height:1.55;color:var(--txt);margin:0 0 12px}
   .pres-step{display:flex;gap:11px;align-items:flex-start;margin:0 0 12px}
   .pres-n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--okbg);color:var(--ok);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px}
@@ -109,6 +119,7 @@
     </div>
   </header>
   <div id="subnav" style="display:none"></div>
+  <div id="view-home" class="hide"></div>
   <div id="view-zona"><div class="spin">Carico…</div></div>
   <div id="view-bacheca" class="hide"></div>
   <div id="view-dossier" class="hide"></div>
@@ -132,7 +143,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v84';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v85';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -700,7 +711,7 @@ function srvById(id){return CAPITOLATO_VERDE.find(function(x){return x.id===id})
 function fornitoreOf(s){return (s&&s.fornitore)||'House & Garden';}
 function fornTag(s){ if(areaType(curArea)!=='piscina') return '';   // il tag serve solo dove convivono 2 fornitori (piscina)
   var f=fornitoreOf(s), w=f==='WaterForYou';
-  return '<div style="margin-top:3px"><span style="font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:'+(w?'#E6F1FB':'var(--todobg)')+';color:'+(w?'#185FA5':'var(--muted)')+'">'+esc(f)+'</span></div>'; }
+  return '<div style="margin-top:3px"><span style="font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:'+(w?'var(--infobg)':'var(--todobg)')+';color:'+(w?'var(--info)':'var(--muted)')+'">'+esc(f)+'</span></div>'; }
 // tipo di luogo di un'area + se un servizio compare in quell'area (mappatura SERVIZIO_DOVE)
 function areaType(a){ return a==='Collina'?'collina':a==='Zona piscina'?'piscina':a==='Campo tennis'?'tennis':a==='Strade interne'?'strade':a==='Tutto il complesso'?'comune':'palazzina'; }
 function serviceInArea(s,a){ var d=(window.SERVIZIO_DOVE&&window.SERVIZIO_DOVE[s.id])||[]; return d.indexOf(areaType(a))>=0; }
@@ -761,11 +772,12 @@ function renderZona(){
     html+='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:8px 2px 8px">Cosa controllare in '+esc(curArea)+' · '+oggiLabel()+'</p>';
     if(!attuali.length) html+='<div class="empty">Per ora niente da controllare in questa zona.</div>';
     attuali.forEach(function(s){
-      var w=windowOf(s), st=pillStato(curArea,s.id), c=st==='ok'?'ok':'todo', ic=st==='ok'?'✓':'?';
+      var w=windowOf(s), st=pillStato(curArea,s.id);
       var mio=myReportP(curArea,s.id), scadTxt= st==='ok'?'verificato in questa finestra':w.label;
-      html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+c+'bg);color:var(--'+c+')">'+ic+'</span>'+
-        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+fornTag(s)+
-        '<div style="font-size:15px;color:var(--hint)">'+esc(s.freq)+' · <b>'+esc(scadTxt)+'</b>'+(mio?' · <b style="color:var(--ok)">tua: fatto</b>':'')+'</div></div>'+segBtn(s.id,mio)+'</div>'+
+      html+='<div class="card"><div class="row">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+fornTag(s)+'</div>'+segBtn(s.id,mio)+'</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px">'+(st==='ok'?stCap('fatto','Fatto'):stCap('finestra','Finestra aperta'))+
+        '<span style="font-size:15px;color:var(--muted)">'+esc(s.freq)+' · <b>'+esc(scadTxt)+'</b>'+(mio?' · <b style="color:var(--ok)">tua: fatto</b>':'')+'</span></div>'+
         '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
     });
   } else if(curStato==='problematici'){
@@ -774,9 +786,10 @@ function renderZona(){
     problematici.forEach(function(s){
       var probs=reports.filter(function(r){return r.area===curArea&&r.servizio===s.id&&isOpen(r)});
       var mio=myReportP(curArea,s.id);
-      html+='<div class="card"><div class="row"><span class="pill" style="background:var(--badbg);color:var(--bad)">!</span>'+
-        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+fornTag(s)+
-        '<div style="font-size:15px;color:var(--bad)"><b>'+probs.length+(probs.length>1?' problemi aperti':' problema aperto')+'</b></div></div>'+segBtn(s.id,mio)+'</div>'+
+      html+='<div class="card"><div class="row">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s.nome)+'</div>'+fornTag(s)+'</div>'+segBtn(s.id,mio)+'</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px">'+stCap('problema','Problema')+
+        '<span style="font-size:15px;color:var(--bad)"><b>'+probs.length+(probs.length>1?' problemi aperti':' problema aperto')+'</b></span></div>'+
         (probs[0]&&probs[0].nota?'<div style="font-size:15px;color:var(--muted);margin-top:6px">«'+esc(probs[0].nota)+'»</div>':'')+
         '<button class="src-link" data-cap="'+s.id+'">📄 '+esc(s.fonte)+'</button></div>';
     });
@@ -794,10 +807,9 @@ function renderZona(){
     });
     chiusiReports.forEach(function(r){
       var s=srvById(r.servizio); var fatto=r.stato==='ok';
-      var col=fatto?'ok':'todo';
-      html+='<div class="card"><div class="row"><span class="pill" style="background:var(--'+col+'bg);color:var(--'+col+')">'+(fatto?'✓':'•')+'</span>'+
-        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s?s.nome:r.servizio)+'</div>'+
-        '<div style="font-size:14px;color:var(--hint)">'+(fatto?'fatto':'problema risolto')+' · '+esc(r.autore_nome)+' · '+new Date(r.created_at).toLocaleDateString('it-IT')+' <span style="color:var(--ok)">· completato</span></div></div></div>'+
+      html+='<div class="card"><div class="row">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600">'+esc(s?s.nome:r.servizio)+'</div></div>'+stCap('fatto',fatto?'Fatto':'Risolto')+'</div>'+
+        '<div style="font-size:14px;color:var(--hint);margin-top:4px">'+(fatto?'fatto':'problema risolto')+' · '+esc(r.autore_nome)+' · '+new Date(r.created_at).toLocaleDateString('it-IT')+' <span style="color:var(--ok)">· completato</span></div>'+
         (!fatto && r.chiuso_da_nome?'<div style="font-size:13px;color:var(--ok);margin-top:2px">✓ chiuso da <b>'+esc(r.chiuso_da_nome)+'</b>'+(r.chiuso_il?' il '+new Date(r.chiuso_il).toLocaleDateString('it-IT'):'')+(r.chiuso_da&&r.chiuso_da!==r.autore_id?' · chiusura da amministrazione':'')+'</div>':'')+
         (r.nota?'<div style="font-size:15px;color:var(--muted);margin-top:6px">«'+esc(r.nota)+'»</div>':'')+
         threadHTML(r)+'</div>';
@@ -1245,7 +1257,7 @@ async function renderVoti(){
       html+='<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:15px;gap:8px">'+
         '<span>'+(unitVote&&unitVote.opzione===o?'<b>'+esc(o)+' ✓ ('+(mine?'il tuo voto':'voto dell\'unità')+')</b>':esc(o))+'</span>'+
         '<span style="color:var(--hint);white-space:nowrap">'+ov.length+' u · '+mm.toFixed(1).replace('.',',')+' mm</span></div>'+
-        '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--ok)"></div></div>'+
+        '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--area,var(--ok))"></div></div>'+
         (ov.length?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+ov.map(function(x){return esc(x.autore_nome)}).join(', ')+'</div>':'')+'</div>';
     });
     if(adminView()){ html+='<div style="display:flex;gap:7px;margin-top:12px">'+
@@ -1621,14 +1633,15 @@ function accessiHtml(){
   if(!userUnita) return '';   // solo condòmini (hanno unità) fanno check-in
   var mine=myPresence(), present=!!(mine&&!mine.is_staff), osp=present?(mine.ospiti||0):0;
   var nTot=totPresenti(), cap=capienza();
-  var h='<div class="cap-grp" style="margin-top:14px">Accesso in piscina</div>';
-  h+='<div style="background:#6fb0e6;border-radius:14px;padding:20px 12px;text-align:center;color:#fff;margin-bottom:10px"><div style="font-size:30px;font-weight:700">'+nTot+' / '+cap+'</div><div style="font-size:13px;opacity:.92">presenti in area piscina</div></div>';
+  var h='<div class="mlabel" style="margin-top:14px">Accesso in piscina</div>';
+  h+='<div class="card" style="padding:16px"><div style="display:flex;align-items:baseline;gap:6px"><span class="statbig">'+nTot+'</span><span style="font-size:16px;color:var(--muted);white-space:nowrap">/ '+cap+' presenti ora</span></div>'+
+    '<div class="prog"><i style="width:'+Math.max(0,Math.min(100,Math.round(nTot/cap*100)))+'%;background:#0A6E9C"></i></div></div>';
   if(nTot>=cap) h+='<div class="pres-note" style="margin:0 0 10px"><b>Piscina al completo.</b> I condòmini hanno la precedenza: chi ha ospiti è pregato di farli uscire.</div>';
   else if(nTot>80) h+='<div class="pres-note" style="margin:0 0 10px">Oltre 80 presenti: è stato richiesto un secondo bagnino.</div>';
-  h+='<button id="acc-me" style="width:100%;padding:13px;border-radius:10px;font-size:16px;font-weight:600;'+(present?'background:#3B6D11;color:#fff;border:none':'background:var(--surface);color:#3B6D11;border:1px solid #3B6D11')+'">'+(present?'✓ Sono in piscina — esci':'Sono in piscina')+'</button>';
+  h+='<button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;'+(present?'background:var(--ok);color:#fff;border:none':'background:transparent;color:var(--ok);border:1.5px solid rgba(11,122,105,.45)')+'">'+(present?'✓ Sono in piscina — esci':'Sono in piscina')+'</button>';
   if(present){
     h+='<div style="display:flex;gap:10px;margin-top:10px">';
-    [1,2].forEach(function(n){ var on=osp>=n; h+='<button class="acc-osp" data-n="'+n+'" style="flex:1;padding:11px;border-radius:10px;font-size:14px;'+(on?'background:#185FA5;color:#fff;border:none':'background:var(--surface);color:#185FA5;border:1px solid #378ADD')+'">'+(on?'✓ ':'+ ')+'Ospite '+n+'</button>'; });
+    [1,2].forEach(function(n){ var on=osp>=n; h+='<button class="acc-osp" data-n="'+n+'" style="flex:1;min-height:44px;padding:11px;border-radius:13px;font-size:15px;font-weight:600;'+(on?'background:#0A6E9C;color:#fff;border:none':'background:transparent;color:#0A6E9C;border:1.5px solid rgba(10,110,156,.45)')+'">'+(on?'✓ ':'+ ')+'Ospite '+n+'</button>'; });
     h+='</div><div class="sub" style="margin-top:6px">Max 2 ospiti a condòmino. I residenti hanno la precedenza.</div>';
   }
   return h;
@@ -1638,7 +1651,7 @@ function staffPresenzeHtml(){
   var nTot=totPresenti(), cap=capienza(), nStaff=nStaffInVasca();
   var h='<div class="cap-grp" style="margin-top:14px">Presenze in area piscina</div>';
   h+='<div class="card"><div class="row"><div style="flex:1"><div style="font-size:24px;font-weight:700">'+nTot+' / '+cap+'</div><div style="font-size:13px;color:var(--hint)">presenti · '+nStaff+' bagnin'+(nStaff===1?'o':'i')+' in vasca</div></div>'+
-    '<button id="acc-staff" style="border-color:'+(inVasca?'var(--line)':'#3B6D11')+';color:'+(inVasca?'var(--muted)':'#3B6D11')+'">'+(inVasca?'Esco dalla vasca':'Sono in vasca')+'</button></div>';
+    '<button id="acc-staff" style="border-color:'+(inVasca?'var(--line)':'var(--ok)')+';color:'+(inVasca?'var(--muted)':'var(--ok)')+'">'+(inVasca?'Esco dalla vasca':'Sono in vasca')+'</button></div>';
   if(nTot>80 && nStaff<2) h+='<div style="color:var(--ocra);font-size:14px;margin-top:8px">⚠ Oltre 80 presenti: chiama un secondo bagnino (capienza → '+(90*(nStaff+1))+').</div>';
   h+='</div>';
   var conds=presenze.filter(function(p){return !p.is_staff;});
@@ -1686,6 +1699,9 @@ async function loadAnalisi(){   // registro analisi acqua (lettura pubblica)
 }
 function puoRegistrareAnalisi(){ return adminView() || (!!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0); }
 function vHead(emoji,title,subHTML){ return '<div class="vhead"><h2>'+emoji+' '+esc(title)+'</h2>'+(subHTML?'<div class="s">'+subHTML+'</div>':'')+'</div>'; }  // subHTML NON escapato → passare SOLO stringhe statiche fidate, MAI dati utente/DB
+/* capsula stato Controllo (design system): glifo fisso + etichetta. label statico fidato. */
+var ST_GLIFO={fatto:'✓',problema:'✕',finestra:'○',scaduta:'!'};
+function stCap(tipo,label){ return '<span class="stcap stcap-'+tipo+'">'+ST_GLIFO[tipo]+' '+(label||'')+'</span>'; }
 function renderPiscina(){
   var v=$('view-piscina'), last=analisiAcqua[0];
   var html=vHead('💧','Piscina','Presenze e qualità dell\'acqua')+
@@ -2100,8 +2116,8 @@ function richiediSala(){
     '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="sala-x">Annulla</button><button class="btn-primary" id="sala-ok">Invia richiesta</button></div></div>';
   document.querySelector('.wrap').appendChild(m);
   var spazio='', fascia='';
-  m.querySelectorAll('.sala-sp').forEach(function(b){ b.onclick=function(){ spazio=b.dataset.s; m.querySelectorAll('.sala-sp').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='#185FA5';b.style.color='#fff';b.style.borderColor='#185FA5'; $('sala-regole').innerHTML='<b>Regole d\'uso — '+esc(SPAZI_LABEL[spazio])+':</b> '+esc(SPAZI_REGOLE[spazio]); }; });
-  m.querySelectorAll('.sala-f').forEach(function(b){ b.onclick=function(){ fascia=b.dataset.f; m.querySelectorAll('.sala-f').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='#185FA5';b.style.color='#fff';b.style.borderColor='#185FA5'; }; });
+  m.querySelectorAll('.sala-sp').forEach(function(b){ b.onclick=function(){ spazio=b.dataset.s; m.querySelectorAll('.sala-sp').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='var(--ok)';b.style.color='#fff';b.style.borderColor='var(--ok)'; $('sala-regole').innerHTML='<b>Regole d\'uso — '+esc(SPAZI_LABEL[spazio])+':</b> '+esc(SPAZI_REGOLE[spazio]); }; });
+  m.querySelectorAll('.sala-f').forEach(function(b){ b.onclick=function(){ fascia=b.dataset.f; m.querySelectorAll('.sala-f').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='var(--ok)';b.style.color='#fff';b.style.borderColor='var(--ok)'; }; });
   function warn(t){ $('sala-warn').textContent=t; $('sala-warn').style.display='block'; }
   $('sala-x').onclick=function(){m.remove();};
   $('sala-ok').onclick=async function(){
@@ -2181,8 +2197,8 @@ function renderPacchi(){
     if(ritirati.length){ html+='<div class="cap-grp">Ritirati di recente</div>'; ritirati.slice(0,10).forEach(function(p){ html+=paccoCard(p,true); }); }
   } else {
     var miei=pacchiMiei(), mieiGiac=miei.filter(function(p){return p.stato==='in_giacenza';});
-    html+='<p style="font-size:16px;font-weight:600;margin:2px 2px 2px">I tuoi pacchi</p>';
-    if(mieiGiac.length) html+='<div class="pres-note" style="margin:0 0 10px"><b>Hai '+mieiGiac.length+' pacc'+(mieiGiac.length>1?'hi':'o')+' da ritirare</b> in custodia dal portiere.</div>';
+    html+=vHead('📦','I tuoi pacchi','Quando arriva un pacco per te, il custode lo registra e lo vedi qui.');
+    if(mieiGiac.length) html+='<div class="card" style="padding:16px;display:flex;align-items:center;gap:14px"><span class="itile" style="--tint:rgba(110,97,82,.13)">📦</span><div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:6px"><span class="statbig">'+mieiGiac.length+'</span><span style="font-size:16px;color:var(--muted)">'+(mieiGiac.length>1?'pacchi ti aspettano':'pacco ti aspetta')+'</span></div><div style="font-size:14px;color:var(--muted);margin-top:3px">In custodia dal portiere · segna il ritiro quando lo prendi</div></div></div>';
     else html+='<div class="empty">Nessun pacco in custodia per te.</div>';
     miei.forEach(function(p){ html+=paccoCard(p,false); });
   }
@@ -2367,18 +2383,51 @@ async function eliminaAnnuncio(id){
   var d=await sb.from('annunci').delete().eq('id',id); if(d.error){ alert('Errore: '+d.error.message); return; }
   await loadAnnunci(); renderAnnunci();
 }
-var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,admin:renderAdmin};
-var VIEW_LABEL={zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',admin:'Admin'};
+/* ---------- VIEW: HOME (hub "I tuoi spazi" — schermata 01 del template Laguna) ---------- */
+function modTile(hubId,subtitle,badge,horizontal,goView){
+  var h=HUBS.find(function(x){return x.id===hubId}); if(!h) return '';
+  return '<button class="mtile'+(horizontal?' hor':'')+'" data-go="'+goView+'">'+
+    '<span class="itile" style="--tint:'+h.tint+'">'+h.ic+'</span>'+
+    '<span style="flex:'+(horizontal?'1':'none')+';min-width:0;display:block"><span class="t" style="display:block">'+esc(h.label)+'</span><span class="st" style="display:block">'+esc(String(subtitle))+'</span></span>'+
+    (badge?'<span class="mbadge">'+badge+'</span>':'')+'</button>';
+}
+function renderHome(){
+  var v=$('view-home');
+  var nAnn=annNonLetti();
+  var subCom=nAnn>0?(nAnn+(nAnn>1?' annunci da leggere':' annuncio da leggere')):'Bacheca · Voti · Feste';
+  var mieiPac=pacchiMiei().filter(function(p){return p.stato==='in_giacenza';}).length;
+  var subPac=pacchiManager()?(pacchiGiacenza().length+' in giacenza'):(mieiPac?(mieiPac+' in custodia per te'):'Nessun pacco in attesa');
+  var slotOggi=userUnita?tennisMioSlot(tennisDayStr(0)):null;
+  var subTen=slotOggi?('Oggi '+slotOggi.ora_inizio+':00 confermato'):'Prenota un campo';
+  var html='<div class="mlabel" style="margin-top:2px">I tuoi spazi</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+    modTile('comunita',subCom,nAnn,true,'annunci');
+  if(inStagione()||isPoolStaff()) html+=modTile('piscina',totPresenti()+'/'+capienza()+' in vasca ora',0,false,'piscina');
+  html+=modTile('tennis',subTen,0,false,'tennis')+
+    modTile('controllo','Controlla e segnala',0,false,'zona')+
+    modTile('pacchi',subPac,pacchiManager()?pacchiGiacenza().length:mieiPac,false,'pacchi')+'</div>';
+  html+='<div class="mlabel">Oggi</div>';
+  var oggi=[];
+  if(slotOggi) oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(242,194,29,.2)">🎾</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">Campo da tennis</div><div style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">Oggi '+slotOggi.ora_inizio+':00–'+(slotOggi.ora_inizio+1)+':00</div></div><span class="pill" style="background:var(--okbg);color:var(--ok)">✓ confermato</span></div>');
+  var salaOggi=(prenotazioniSala||[]).filter(function(p){return p.giorno===tennisDayStr(0)&&p.autore_id===userId;});
+  salaOggi.forEach(function(p){ oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(188,84,48,.13)">🎉</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(SPAZI_LABEL[p.spazio]||'Festa')+'</div><div style="font-size:14px;color:var(--muted)">Oggi · '+esc(p.fascia||'')+'</div></div><span class="pill" style="background:'+(p.stato==='confermata'?'var(--okbg);color:var(--ok)':'var(--ocrabg);color:var(--ocra)')+'">'+(p.stato==='confermata'?'✓ confermata':'in attesa')+'</span></div>'); });
+  html+=oggi.length?oggi.join(''):'<div class="card" style="color:var(--muted);font-size:15px">Niente in programma per oggi. Le tue prenotazioni compariranno qui.</div>';
+  v.innerHTML=html;
+  v.querySelectorAll('.mtile').forEach(function(b){ b.onclick=function(){ showView(b.dataset.go); window.scrollTo(0,0); }; });
+}
+var views={home:renderHome,zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,admin:renderAdmin};
+var VIEW_LABEL={home:'Home',zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',admin:'Admin'};
+/* col = inchiostro d'area (testo, AA su bianco) · tint = tinta quadrotto 12-20% (design system) */
 var HUBS=[
-  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala'],col:'#9E4526',bg:'#F3E5DF'},
-  {id:'piscina',label:'Piscina',ic:'💧',views:['piscina'],seasonal:true,col:'#08678F',bg:'#E1EFF5'},
-  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'#8A6410',bg:'#F5EEDA'},
-  {id:'controllo',label:'Controllo',ic:'🌿',views:['zona','bacheca','dossier','avvisi'],col:'#2F6E2C',bg:'#E6EFE4'},
-  {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi'],col:'#5F5346',bg:'#EEEBE6'},
-  {id:'admin',label:'Admin',ic:'🛠️',views:['admin'],adminOnly:true,col:'#0A6F60',bg:'#DCEBE6'}
+  {id:'home',label:'Home',ic:'🏠',views:['home'],col:'#0B7A69',bg:'#E9F3F0',tint:'rgba(11,122,105,.12)'},
+  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala'],col:'#9E4526',bg:'#F3E5DF',tint:'rgba(188,84,48,.13)'},
+  {id:'piscina',label:'Piscina',ic:'💧',views:['piscina'],seasonal:true,col:'#08678F',bg:'#E1EFF5',tint:'rgba(14,126,176,.12)'},
+  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'#8A6410',bg:'#F5EEDA',tint:'rgba(242,194,29,.2)'},
+  {id:'controllo',label:'Controllo',ic:'🌿',views:['zona','bacheca','dossier','avvisi'],col:'#2F6E2C',bg:'#E6EFE4',tint:'rgba(62,125,58,.13)'},
+  {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi'],col:'#5F5346',bg:'#EEEBE6',tint:'rgba(110,97,82,.13)'},
+  {id:'admin',label:'Admin',ic:'🛠️',views:['admin'],adminOnly:true,col:'#0B7A69',bg:'#E9F3F0',tint:'rgba(11,122,105,.12)'}
 ];
 function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y,5,13) && n<=new Date(y,8,13,23,59,59); }
-var curV='annunci';   // landing sul primo hub (Comunità → Bacheca)
+var curV='home';   // landing sulla Home (hub "I tuoi spazi")
 function hubOf(v){return HUBS.find(function(h){return h.views.indexOf(v)>=0})||HUBS[0];}
 function isPoolStaff(){ return !!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0; }   // personale piscina: vive solo nel modulo Piscina
 // "vista amministratore": l'admin è residente di default; i poteri/le viste admin compaiono SOLO quando ha attivato la modalità.
@@ -2390,7 +2439,7 @@ function toggleAdminView(){
   $('hsub').textContent = adminView() ? ((DEMO?'PROVA · ':'')+'🛠️ vista amministratore') : (DEMO?'MODALITÀ PROVA (senza login)':'Siamo tutti custodi');
   buildNav(); showBadge();
   if(adminView()){ curV='admin'; showView('admin'); }        // entrando in vista admin atterri sulla gestione
-  else { if(curV==='admin') curV='zona'; showView(curV); }    // uscendo torni al Controllo
+  else { if(curV==='admin') curV='home'; showView(curV); }    // uscendo torni alla Home
   updateAdminBadge();
 }
 function buildNav(){
@@ -2432,7 +2481,7 @@ init();
 <style>
 #installbar{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(18px);z-index:1500;opacity:0;pointer-events:none;transition:.25s;max-width:94%}
 #installbar.on{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
-#installwrap{display:flex;align-items:center;gap:4px;background:#0A6F60;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+#installwrap{display:flex;align-items:center;gap:4px;background:#0B7A69;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
 #installbtn{background:none;color:#fff;border:none;border-radius:999px;padding:14px 18px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap}
 #installx{background:none;border:none;color:rgba(255,255,255,.85);font-size:20px;line-height:1;padding:0 16px 0 0;cursor:pointer}
 .iosguide{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px}
@@ -2442,9 +2491,9 @@ init();
 .iosguide ol{margin:6px 0 4px;padding-left:22px}
 .iosguide li{font-size:17px;line-height:1.75;margin-bottom:8px}
 .ig-ic{display:inline-flex;vertical-align:middle;background:#e6f1fb;border-radius:7px;padding:3px;margin:0 2px}
-.ig-x{margin-top:14px;width:100%;background:#0A6F60;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
-.ig-copy{width:100%;background:#185fa5;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
-.ig-copy.ok{background:#0A6F60}
+.ig-x{margin-top:14px;width:100%;background:#0B7A69;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
+.ig-copy{width:100%;background:#0A6E9C;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
+.ig-copy.ok{background:#0B7A69}
 </style>
 <script>
 /* Installa sulla Home — Android: prompt nativo · iOS: guida (Apple non consente install automatica) */
@@ -2472,8 +2521,8 @@ init();
   function show(){var b=build();setTimeout(function(){b.classList.add('on');},30);}
   function iosGuide(generic){
     var ov=document.createElement('div');ov.className='iosguide';
-    var share='<span class="ig-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#185fa5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 11v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>';
-    var plus='<span class="ig-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#185fa5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg></span>';
+    var share='<span class="ig-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#0A6E9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 11v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>';
+    var plus='<span class="ig-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#0A6E9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg></span>';
     ov.innerHTML='<div class="ig-card"><div class="ig-h">Aggiungi alla schermata Home</div>'+
       (generic?'<p>Apri questa pagina su <b>Safari</b> dal tuo iPhone, poi segui questi passi:</p>':'')+
       '<ol><li>Tocca il pulsante <b>Condividi</b> '+share+' in basso</li>'+
