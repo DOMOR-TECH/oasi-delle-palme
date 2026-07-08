@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1d9e75">
+<meta name="theme-color" content="#0A6F60">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,42 +13,46 @@
 <title>Oasi delle Palme</title>
 <style>
   :root{
-    --bg:#f6f5f1; --surface:#ffffff; --line:rgba(0,0,0,.12); --line2:rgba(0,0,0,.22);
-    --txt:#1c1c1a; --muted:#5f5e5a; --hint:#8a8980;
-    --ok:#0f6e56; --okbg:#e1f5ee; --bad:#a32d2d; --badbg:#fceaea; --todo:#85705a; --todobg:#f1efe8;
-    --ocra:#9a6b1f; --ocrabg:#f6ecd4;
-    --info:#185fa5; --infobg:#e6f1fb; --r:10px; --r2:14px;
+    /* === Palette «Laguna» (VC451 · Oasi delle Palme) — restyle visivo === */
+    --bg:#F6F5F1; --surface:#FFFFFF; --line:#E6E4DC; --line2:#C7C4B8;
+    --txt:#1B2421; --muted:#5C6663; --hint:#8B948F;
+    --ok:#0A6F60; --okbg:#DCEBE6; --bad:#A03127; --badbg:#F7E7E4; --todo:#59625E; --todobg:#ECEEEC;
+    --ocra:#7A5E12; --ocrabg:#F4ECD6;
+    --info:#0A6E9C; --infobg:#E2F0F7; --r:13px; --r2:20px;
+    --glass:rgba(255,255,255,.72); --glassblur:blur(20px) saturate(1.6);
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased;font-size:17px;line-height:1.5}
   .wrap{max-width:440px;margin:0 auto;padding:14px 14px 90px}
-  header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  header{margin:-14px -14px 12px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 14px;background:linear-gradient(150deg,#8FDDE8 0%,#4FB6D6 50%,#3D9E6B 100%);border-radius:0 0 24px 24px;box-shadow:0 12px 26px -14px rgba(8,32,26,.42)}
+  .head-glass{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.85);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:8px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
   .logo{width:38px;height:38px;border-radius:var(--r);background:var(--okbg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
   h1{font-size:21px;font-weight:600;margin:0}
   .sub{font-size:15px;color:var(--muted);margin:0}
-  .card{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:12px 14px;margin-bottom:9px}
+  .card{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:12px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(20,40,34,.035)}
   label{font-size:15px;color:var(--muted)}
   select,input,textarea,button{font:inherit}
   select,input[type=text],input[type=email],textarea{width:100%;padding:13px 13px;border:.5px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--txt);margin-top:5px;font-size:17px}
   button{cursor:pointer;border:.5px solid var(--line2);background:var(--surface);color:var(--txt);border-radius:var(--r);padding:13px 16px;font-size:17px}
   button:active{transform:scale(.98)}
-  .btn-primary{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:600;width:100%}
+  .btn-primary{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:700;width:100%;box-shadow:0 6px 16px -7px rgba(11,122,105,.55)}
   .row{display:flex;align-items:center;gap:10px}
-  .pill{font-size:14px;padding:2px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:4px}
+  .pill{font-size:14px;padding:3px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:4px;font-weight:700}
   .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:11px}
   .metric{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r);padding:9px 11px}
   .metric .n{font-size:27px;font-weight:600;margin:2px 0 0}
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
   .tile{padding:9px 10px;border-radius:var(--r);border:.5px solid;text-align:left;display:flex;flex-direction:column;gap:3px}
   .src{font-size:14px;color:var(--hint)}
-  nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:.5px solid var(--line);display:flex;max-width:440px;margin:0 auto}
+  nav{position:fixed;left:0;right:0;bottom:0;background:var(--glass);backdrop-filter:var(--glassblur);-webkit-backdrop-filter:var(--glassblur);border-top:.5px solid var(--line);display:flex;max-width:440px;margin:0 auto}
   nav button{flex:1;border:none;background:none;border-radius:0;padding:10px 4px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;gap:3px}
-  nav button.active{color:var(--ok)}
+  nav button.active{color:var(--area,var(--ok))}
   nav button{position:relative}
+  nav button.active::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:3px;border-radius:0 0 3px 3px;background:var(--area,var(--ok))}
   nav .ic{font-size:24px}
   #subnav{display:flex;gap:8px;padding:10px 12px 2px;overflow-x:auto}
   #subnav .subchip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 15px;font-size:14px;font-weight:500}
-  #subnav .subchip.active{background:var(--okbg);border-color:var(--ok);color:var(--ok)}
+  #subnav .subchip.active{background:var(--areabg,var(--okbg));border-color:var(--area,var(--ok));color:var(--area,var(--ok))}
   .navbadge{position:absolute;top:4px;right:calc(50% - 26px);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--bad);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
   .hide{display:none}
   .seg{flex:none;padding:10px 16px;font-size:16px}
@@ -76,12 +80,14 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">◍</div>
-    <div style="flex:1">
-      <h1>Oasi delle Palme</h1>
-      <p class="sub" id="hsub">Siamo tutti custodi</p>
+    <div class="head-glass">
+      <div class="logo">◍</div>
+      <div style="flex:1">
+        <h1>Oasi delle Palme</h1>
+        <p class="sub" id="hsub">Siamo tutti custodi</p>
+      </div>
+      <div id="user-badge" class="hide" style="display:flex;align-items:center;gap:7px;flex:none"></div>
     </div>
-    <div id="user-badge" class="hide" style="display:flex;align-items:center;gap:7px;flex:none"></div>
   </header>
   <div id="subnav" style="display:none"></div>
   <div id="view-zona"><div class="spin">Carico…</div></div>
@@ -107,7 +113,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v79';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v83';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -297,7 +303,7 @@ function showBadge(){
   var ini=(userNome||'?').trim().split(/\s+/).map(function(w){return w[0]}).slice(0,2).join('').toUpperCase();
   var sub = userUnita ? ('Pal. '+userUnita.palazzina+' · int '+userUnita.interno) : (userRuolo || 'unità non associata');
   ub.innerHTML='<div style="text-align:right;line-height:1.2"><div style="font-size:15px;font-weight:500">'+esc((userNome||'').split(' ')[0])+(approvato()?'':' ·')+'</div>'+
-    '<div style="font-size:14px;color:var(--hint)">'+sub+(approvato()?'':' · in attesa')+'</div></div>'+
+    '<div style="font-size:14px;color:var(--muted)">'+sub+(approvato()?'':' · in attesa')+'</div></div>'+
     '<div style="width:34px;height:34px;border-radius:50%;background:var(--'+(approvato()?'okbg':'infobg')+');color:var(--'+(approvato()?'ok':'info')+');display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">'+esc(ini)+'</div>';
   ub.classList.remove('hide');
   ub.style.cursor='pointer'; ub.onclick=userMenu;
@@ -2350,12 +2356,12 @@ async function eliminaAnnuncio(id){
 var views={zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,admin:renderAdmin};
 var VIEW_LABEL={zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',admin:'Admin'};
 var HUBS=[
-  {id:'comunita',label:'Comunità',ic:'☑',views:['annunci','voti','sala']},
-  {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true},
-  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei']},
-  {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier','avvisi']},
-  {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi']},
-  {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true}
+  {id:'comunita',label:'Comunità',ic:'☑',views:['annunci','voti','sala'],col:'#9E4526',bg:'#F3E5DF'},
+  {id:'piscina',label:'Piscina',ic:'≈',views:['piscina'],seasonal:true,col:'#08678F',bg:'#E1EFF5'},
+  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'#8A6410',bg:'#F5EEDA'},
+  {id:'controllo',label:'Controllo',ic:'▤',views:['zona','bacheca','dossier','avvisi'],col:'#2F6E2C',bg:'#E6EFE4'},
+  {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi'],col:'#5F5346',bg:'#EEEBE6'},
+  {id:'admin',label:'Admin',ic:'★',views:['admin'],adminOnly:true,col:'#0A6F60',bg:'#DCEBE6'}
 ];
 function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y,5,13) && n<=new Date(y,8,13,23,59,59); }
 var curV='annunci';   // landing sul primo hub (Comunità → Bacheca)
@@ -2380,6 +2386,7 @@ function buildNav(){
     if(h.seasonal && !inStagione() && !isPoolStaff()) return;   // condòmini: Piscina solo in stagione; personale piscina: sempre (gestisce anche l'inverno)
     if(isPoolStaff() && h.id!=='piscina') return;                // PRIVILEGI: bagnino/gestore vedono SOLO l'hub Piscina
     var b=document.createElement('button'); b.dataset.hub=h.id;
+    if(h.col){ b.style.setProperty('--area',h.col); b.style.setProperty('--areabg',h.bg||''); }
     if(h.id==='admin') b.id='nav-admin';
     b.innerHTML='<span class="ic">'+h.ic+'</span>'+h.label;
     b.onclick=function(){ showView(h.views.indexOf(curV)>=0?curV:h.views[0]); };
@@ -2392,7 +2399,7 @@ function showView(v){
   if(v==='admin' && !adminView()) v='zona';   // la vista admin è raggiungibile solo in modalità amministratore
   curV=v; var hub=hubOf(v);
   $('nav').querySelectorAll('button').forEach(function(b){b.classList.toggle('active', b.dataset.hub===hub.id);});
-  var sn=$('subnav');
+  var sn=$('subnav'); sn.style.setProperty('--area',hub.col||''); sn.style.setProperty('--areabg',hub.bg||'');
   if(hub.views.length>1){
     sn.style.display='flex';
     sn.innerHTML=hub.views.map(function(x){return '<button class="subchip'+(x===v?' active':'')+'" data-v="'+x+'">'+VIEW_LABEL[x]+'</button>';}).join('');
@@ -2410,7 +2417,7 @@ init();
 <style>
 #installbar{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(18px);z-index:1500;opacity:0;pointer-events:none;transition:.25s;max-width:94%}
 #installbar.on{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
-#installwrap{display:flex;align-items:center;gap:4px;background:#1d9e75;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+#installwrap{display:flex;align-items:center;gap:4px;background:#0A6F60;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
 #installbtn{background:none;color:#fff;border:none;border-radius:999px;padding:14px 18px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap}
 #installx{background:none;border:none;color:rgba(255,255,255,.85);font-size:20px;line-height:1;padding:0 16px 0 0;cursor:pointer}
 .iosguide{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px}
@@ -2420,9 +2427,9 @@ init();
 .iosguide ol{margin:6px 0 4px;padding-left:22px}
 .iosguide li{font-size:17px;line-height:1.75;margin-bottom:8px}
 .ig-ic{display:inline-flex;vertical-align:middle;background:#e6f1fb;border-radius:7px;padding:3px;margin:0 2px}
-.ig-x{margin-top:14px;width:100%;background:#1d9e75;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
+.ig-x{margin-top:14px;width:100%;background:#0A6F60;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
 .ig-copy{width:100%;background:#185fa5;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
-.ig-copy.ok{background:#1d9e75}
+.ig-copy.ok{background:#0A6F60}
 </style>
 <script>
 /* Installa sulla Home — Android: prompt nativo · iOS: guida (Apple non consente install automatica) */
