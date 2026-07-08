@@ -137,7 +137,7 @@ var TAKEN_SET=null;
 async function loadTaken(){
   if(TAKEN_SET) return TAKEN_SET;
   if(DEMO){ TAKEN_SET=new Set(); return TAKEN_SET; }
-  try{ var r=await sb.from('proprietari').select('unita,stato'); TAKEN_SET=new Set((r.data||[]).filter(function(x){return x.stato&&x.stato!=='libero'}).map(function(x){return x.unita})); }
+  try{ var r=await sb.from('anagrafica').select('unita,stato'); TAKEN_SET=new Set((r.data||[]).filter(function(x){return x.stato&&x.stato!=='libero'}).map(function(x){return x.unita})); }
   catch(e){ TAKEN_SET=new Set(); }
   return TAKEN_SET;
 }
@@ -269,13 +269,13 @@ async function init(){
 // il PRIMO è il "primario" (proprietari.autore_id); gli altri si uniscono come coproprietari.
 // La firma è sempre il NOME DELL'UNITÀ. Ritorna {row, stato, isCo, blocked, motivo}.
 async function claimUnita(unita){
-  var res=await sb.from('proprietari').select('*').eq('unita',unita).maybeSingle();
+  var res=await sb.from('anagrafica').select('*').eq('unita',unita).maybeSingle();
   var row=res.data;
   if(!row) return { blocked:true, motivo:'Unità '+unita+' non trovata nell\'elenco proprietari.', row:{unita:unita} };
   if(!row.autore_id){
     var up=await sb.from('proprietari').update({autore_id:userId,email:userEmail,stato:'in_attesa'}).eq('unita',unita).is('autore_id',null).select().maybeSingle();
     if(up.data) return { blocked:false, row:up.data, stato:up.data.stato };
-    var re=await sb.from('proprietari').select('*').eq('unita',unita).maybeSingle(); row=re.data||row;   // qualcuno ha appena preso il primario
+    var re=await sb.from('anagrafica').select('*').eq('unita',unita).maybeSingle(); row=re.data||row;   // qualcuno ha appena preso il primario
   }
   if(row.autore_id===userId) return { blocked:false, row:row, stato:row.stato };   // sono il primario
   // unità già col primario di un altro → mi unisco come COMPROPRIETARIO (in attesa di approvazione)
@@ -2128,7 +2128,7 @@ async function loadPacchi(){
 async function loadAnagraficaPacchi(){
   if(anagraficaPacchi.length) return;
   if(DEMO){ anagraficaPacchi=[{unita:'A/03',nome:'Rossi Marco'},{unita:'C/05',nome:'Bianchi Ada'},{unita:'I/08',nome:'Lantieri'},{unita:'I/09',nome:'Meli Carmela'}]; return; }
-  var r=await sb.from('proprietari').select('unita,nome,autore_id').order('unita'); anagraficaPacchi=r.data||[];
+  var r=await sb.from('anagrafica').select('unita,nome,autore_id').order('unita'); anagraficaPacchi=r.data||[];
 }
 function pacchiGiacenza(){ return pacchi.filter(function(p){return p.stato==='in_giacenza';}); }
 function pacchiMiei(){ return pacchi.filter(function(p){ return userUnita && p.unita===userUnita.unita; }); }
