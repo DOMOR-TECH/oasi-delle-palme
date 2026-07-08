@@ -88,6 +88,10 @@
   .mtile .st{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:1px}
   .mtile .mbadge{position:absolute;top:10px;right:10px;min-width:20px;height:20px;border-radius:10px;background:#BC5430;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
   .mtile.hor .mbadge{position:static;flex:none}
+  /* segmented control (design system): binario testo-7%, segmento attivo bianco con ombra */
+  .segw{display:flex;background:rgba(27,36,33,.07);border-radius:13px;padding:3px;margin:13px 0 4px}
+  .segw button{flex:1;min-height:44px;padding:8px 4px;border:none;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;font-weight:600}
+  .segw button.on{background:var(--surface);box-shadow:0 1px 4px rgba(20,30,26,.14);color:var(--txt);font-weight:700}
   /* fonte cliccabile → apre il contratto */
   .src-link{background:none;border:none;padding:0;margin-top:6px;color:var(--info);font-size:14px;text-decoration:underline;text-underline-offset:2px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
   /* pagina a tutta schermo (presentazione + contratto) */
@@ -143,7 +147,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v85';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v88';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -758,13 +762,13 @@ function renderZona(){
   var counts={attuali:attuali.length, problematici:problematici.length, chiusi:chiusiReports.length+ocraGroups.length+(ocraDaily?1:0)};
 
   function chip(key,label){ var on=curStato===key;
-    return '<button class="zchip" data-st="'+key+'" style="flex:1;padding:9px 4px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'#fff':'var(--muted)')+';font-size:14px;font-weight:600">'+label+' · '+counts[key]+'</button>'; }
+    return '<button class="zchip'+(on?' on':'')+'" data-st="'+key+'">'+label+' · '+counts[key]+'</button>'; }
 
   var html=(approvato()?'':'<div class="pres-note" style="margin:0 0 11px"><b>Il tuo accesso è in attesa di conferma</b> dall\'amministratore del gruppo. Intanto puoi guardare tutto; potrai inviare segnalazioni appena sei confermato.</div>')+
     selectHTML+
     '<div class="metrics" style="margin-top:11px"><div class="metric"><label>Qui, aperti</label><div class="n" style="color:var(--bad)">'+apri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">problemi</span></div></div>'+
     '<div class="metric"><label>Tutto il complesso</label><div class="n">'+totApri+' <span style="font-size:15px;font-weight:400;color:var(--hint)">aperti</span></div></div></div>'+
-    '<div style="display:flex;gap:7px;margin:13px 0 4px">'+chip('attuali','Attuali')+chip('problematici','Problematici')+chip('chiusi','Chiusi')+'</div>';
+    '<div class="segw">'+chip('attuali','Attuali')+chip('problematici','Problematici')+chip('chiusi','Chiusi')+'</div>';
 
   function segBtn(sid,mio){ return canSegnalare()?'<button class="seg" data-s="'+sid+'">'+(mio?'✎ Modifica':'Segnala')+'</button>':'<button class="seg" disabled style="opacity:.45">Segnala</button>'; }
 
@@ -909,7 +913,7 @@ function renderBacheca(){
   var totProb=Object.keys(probByArea).reduce(function(t,k){return t+probByArea[k]},0);
   var totOcra=AREE.reduce(function(t,a){return t+ocraByArea[a]},0);
   var okAree=AREE.filter(function(a){return !probByArea[a]&&!ocraByArea[a]}).length;
-  var html='<div class="metrics"><div class="metric"><label>Aree controllate</label><div class="n">'+okAree+' <span style="font-size:15px;font-weight:400;color:var(--hint)">/'+AREE.length+'</span></div></div>'+
+  var html=vHead('🗺️','Mappa del verde','Lo stato di ogni zona a colpo d\'occhio. Tocca una zona per controllarla.')+'<div class="metrics"><div class="metric"><label>Aree controllate</label><div class="n">'+okAree+' <span style="font-size:15px;font-weight:400;color:var(--hint)">/'+AREE.length+'</span></div></div>'+
     '<div class="metric"><label>Problemi aperti</label><div class="n" style="color:var(--bad)">'+totProb+'</div></div></div>'+
     (totOcra?'<div style="margin:9px 0 2px;font-size:14px;background:var(--ocrabg);color:var(--ocra);padding:7px 10px;border-radius:8px">⬤ <b>'+totOcra+'</b> finestre scadute senza controllo — valgono come fatte, ma nessuno le ha confermate</div>':'')+
     '<p style="font-size:16px;font-weight:600;color:var(--muted);margin:10px 2px 8px">Mappa del complesso · '+oggiLabel()+'</p><div class="grid">';
@@ -932,8 +936,8 @@ function renderDossier(){
   var v=$('view-dossier');
   var probs=reports.filter(isOpen);
   var bySrv={};probs.forEach(function(r){(bySrv[r.servizio]=bySrv[r.servizio]||[]).push(r)});
-  var html='<div class="card"><div class="row"><span style="font-size:28px">▤</span><div><div style="font-weight:600;font-size:18px">Dossier — esecuzione capitolato verde</div><div class="sub">generato il '+new Date().toLocaleDateString('it-IT')+' · si aggiorna da solo</div></div></div>'+
-    '<div class="metrics" style="margin-top:12px"><div class="metric"><label>segnalazioni</label><div class="n">'+reports.length+'</div></div><div class="metric"><label>inadempienze aperte</label><div class="n" style="color:var(--bad)">'+Object.keys(bySrv).length+'</div></div></div></div>';
+  var html=vHead('📄','Dossier','Esecuzione del capitolato del verde · generato il '+new Date().toLocaleDateString('it-IT')+' · si aggiorna da solo')+'<div class="card">'+
+    '<div class="metrics" style="margin-top:2px"><div class="metric"><label>segnalazioni</label><div class="n">'+reports.length+'</div></div><div class="metric"><label>inadempienze aperte</label><div class="n" style="color:var(--bad)">'+Object.keys(bySrv).length+'</div></div></div></div>';
   // PENALI Art.5: problemi APERTI su servizi settimanali+ (i giornalieri non generano penale)
   var penali=[]; probs.forEach(function(r){ var p=penaleOf(r); if(p) penali.push({r:r,p:p}); });
   if(penali.length){
@@ -1101,7 +1105,7 @@ async function renderAdmin(){
   }
   function achip(key,label){ var on=curAdminTab===key; return '<button class="achip" data-t="'+key+'" style="flex:1;padding:9px 2px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'#fff':'var(--muted)')+';font-size:12.5px;font-weight:600">'+label+'</button>'; }
   if((curAdminTab==='speciali' && !isSuper) || curAdminTab==='condomini') curAdminTab='attesa';
-  var html='<div style="display:flex;gap:5px;margin-bottom:12px">'+achip('attesa','In attesa')+achip('approvati','Approvati')+(isSuper?achip('speciali','Speciali'):'')+achip('logs','Logs')+'</div>';
+  var html=vHead('🛠️','Amministrazione','Richieste di accesso, condòmini e gestione dell\'app.')+'<div style="display:flex;gap:5px;margin-bottom:12px">'+achip('attesa','In attesa')+achip('approvati','Approvati')+(isSuper?achip('speciali','Speciali'):'')+achip('logs','Logs')+'</div>';
   if(curAdminTab==='attesa'){
   html+='<div class="cap-grp">Da approvare ('+attesa.length+')</div>'+(attesa.length?attesa.map(card).join(''):'<div class="empty">Nessuna richiesta in attesa. 👍 Sei in pari.</div>');
   } else if(curAdminTab==='approvati'){
@@ -1215,7 +1219,7 @@ async function renderVoti(){
   var attivi=sondaggi.filter(function(s){return s.approvato!==false});
   var proposte=sondaggi.filter(function(s){return s.approvato===false && (adminView() || s.proposto_da===userId)});   // in vista condòmino l'admin vede solo le proprie proposte
   function opzOf(s){return Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto'])}
-  var html='<p style="font-size:16px;font-weight:600;color:var(--muted);margin:4px 2px 10px">Sondaggi della comunità</p>';
+  var html=vHead('🗳️','Voti','Sondaggi della comunità — un voto per unità.');
   if(approvato() && (adminView() || userUnita)){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">＋ '+(adminView()?'Nuovo sondaggio':'Proponi un sondaggio')+'</button>'; }
   else { html+='<div class="sub" style="margin-bottom:12px">Quando sarai un condòmino confermato potrai votare e proporre sondaggi.</div>'; }
   // PROPOSTE (in attesa di avallo dell'admin)
@@ -2402,6 +2406,7 @@ function renderHome(){
   var mieiPac=pacchiMiei().filter(function(p){return p.stato==='in_giacenza';}).length;
   var subPac=pacchiManager()?(pacchiGiacenza().length+' in giacenza'):(mieiPac?(mieiPac+' in custodia per te'):'Nessun pacco in attesa');
   var slotOggi=userUnita?tennisMioSlot(tennisDayStr(0)):null;
+  if(slotOggi && (slotOggi.ora_inizio+1)<=new Date().getHours()) slotOggi=null;   // slot già concluso: non è più "di oggi"
   var subTen=slotOggi?('Oggi '+pad2(slotOggi.ora_inizio)+':00 confermato'):'Prenota un campo';
   var html='<div class="mlabel" style="margin-top:2px">I tuoi spazi</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
     modTile('comunita',subCom,nAnn,true,'annunci');
@@ -2413,7 +2418,7 @@ function renderHome(){
   var oggi=[];
   if(slotOggi) oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(242,194,29,.2)">🎾</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">Campo da tennis</div><div style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">Oggi '+pad2(slotOggi.ora_inizio)+':00–'+pad2(slotOggi.ora_inizio+1)+':00</div></div><span class="pill" style="background:var(--okbg);color:var(--ok)">✓ confermato</span></div>');
   var salaOggi=(prenotazioniSala||[]).filter(function(p){return p.giorno===tennisDayStr(0)&&p.autore_id===userId;});
-  salaOggi.forEach(function(p){ oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(188,84,48,.13)">🎉</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(SPAZI_LABEL[p.spazio]||'Festa')+'</div><div style="font-size:14px;color:var(--muted)">Oggi · '+esc(p.fascia||'')+'</div></div><span class="pill" style="background:'+(p.stato==='confermata'?'var(--okbg);color:var(--ok)':'var(--ocrabg);color:var(--ocra)')+'">'+(p.stato==='confermata'?'✓ confermata':'in attesa')+'</span></div>'); });
+  salaOggi.forEach(function(p){ oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(188,84,48,.13)">🎉</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(SPAZI_LABEL[p.spazio]||'Festa')+'</div><div style="font-size:14px;color:var(--muted)">Oggi · '+esc(FASCE_SALA[p.fascia]||p.fascia||'')+'</div></div><span class="pill" style="background:'+(p.stato==='confermata'?'var(--okbg);color:var(--ok)':'var(--ocrabg);color:var(--ocra)')+'">'+(p.stato==='confermata'?'✓ confermata':'in attesa')+'</span></div>'); });
   html+=oggi.length?oggi.join(''):'<div class="card" style="color:var(--muted);font-size:15px">Niente in programma per oggi. Le tue prenotazioni compariranno qui.</div>';
   v.innerHTML=html;
   v.querySelectorAll('.mtile').forEach(function(b){ b.onclick=function(){ showView(b.dataset.go); window.scrollTo(0,0); }; });
