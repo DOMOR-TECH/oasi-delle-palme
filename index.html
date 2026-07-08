@@ -68,7 +68,7 @@
   .vhead{padding:2px 4px 10px}
   .vhead h2{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.12}
   .vhead .s{font-size:17px;color:var(--muted);margin-top:3px;line-height:1.35}
-  .mlabel{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:14px 4px 8px}
+  .mlabel{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 4px 8px}
   .statbig{font-size:32px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
   .statbig u{font-style:normal;text-decoration:none;font-size:16px;font-weight:600;color:var(--muted);margin-left:4px}
   .prog{height:8px;border-radius:4px;background:var(--traccia);overflow:hidden;margin-top:9px}
@@ -99,7 +99,7 @@
   .cap-item{background:var(--surface);border:.5px solid var(--line);border-radius:var(--r2);padding:13px 14px;margin-bottom:9px;scroll-margin-top:64px}
   .cap-item.hl{border-color:var(--ok);box-shadow:0 0 0 2px var(--okbg);animation:hlpulse 1.6s ease-out}
   @keyframes hlpulse{0%{box-shadow:0 0 0 3px var(--ok)}100%{box-shadow:0 0 0 2px var(--okbg)}}
-  .cap-grp{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:18px 4px 8px}
+  .cap-grp{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 4px 8px}
   .lead{font-size:17px;line-height:1.55;color:var(--txt);margin:0 0 12px}
   .pres-step{display:flex;gap:11px;align-items:flex-start;margin:0 0 12px}
   .pres-n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--okbg);color:var(--ok);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px}
@@ -1702,7 +1702,7 @@ async function loadAnalisi(){   // registro analisi acqua (lettura pubblica)
   analisiAcqua = data||[];
 }
 function puoRegistrareAnalisi(){ return adminView() || (!!userRuolo && ['bagnino','gestore'].indexOf(userRuolo.trim().toLowerCase())>=0); }
-function vHead(emoji,title,subHTML){ return '<div class="vhead"><h2>'+emoji+' '+esc(title)+'</h2>'+(subHTML?'<div class="s">'+subHTML+'</div>':'')+'</div>'; }  // subHTML NON escapato → passare SOLO stringhe statiche fidate, MAI dati utente/DB
+function vHead(emoji,title,sub,rawHtml){ return '<div class="vhead"><h2>'+emoji+' '+esc(title)+'</h2>'+(sub?'<div class="s">'+(rawHtml?sub:esc(sub))+'</div>':'')+'</div>'; }  // sub escapato di DEFAULT; passare rawHtml=true SOLO per markup statico fidato (mai dati utente/DB)
 /* capsula stato Controllo (design system): glifo fisso + etichetta. label statico fidato. */
 var ST_GLIFO={fatto:'✓',problema:'✕',finestra:'○',scaduta:'!'};
 function stCap(tipo,label){ return '<span class="stcap stcap-'+tipo+'">'+ST_GLIFO[tipo]+' '+(label||'')+'</span>'; }
@@ -2078,7 +2078,7 @@ async function loadSala(){
 function dSala(g){ return new Date(g+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'long'}); }
 function renderSala(){
   var v=$('view-sala');
-  var html=vHead('🎉','Prenota uno spazio','Prenota uno spazio del complesso (sala, collina) per una festa o un evento privato. Ogni spazio ha le sue <b>regole d\'uso</b>, che accetti al momento della richiesta. Chi prenota lascia lo spazio in ordine, come l\'ha trovato.');
+  var html=vHead('🎉','Prenota uno spazio','Prenota uno spazio del complesso (sala, collina) per una festa o un evento privato. Ogni spazio ha le sue <b>regole d\'uso</b>, che accetti al momento della richiesta. Chi prenota lascia lo spazio in ordine, come l\'ha trovato.',true);
   if(approvato()&&userUnita) html+='<button class="btn-primary" id="sala-new" style="margin-bottom:12px">＋ Richiedi la sala</button>';
   else html+='<div class="pres-note" style="margin:0 0 10px">Per prenotare devi essere un condòmino confermato.</div>';
   if(!prenotazioniSala.length){ html+='<div class="empty">Nessuna prenotazione in programma.</div>'; }
@@ -2402,16 +2402,16 @@ function renderHome(){
   var mieiPac=pacchiMiei().filter(function(p){return p.stato==='in_giacenza';}).length;
   var subPac=pacchiManager()?(pacchiGiacenza().length+' in giacenza'):(mieiPac?(mieiPac+' in custodia per te'):'Nessun pacco in attesa');
   var slotOggi=userUnita?tennisMioSlot(tennisDayStr(0)):null;
-  var subTen=slotOggi?('Oggi '+slotOggi.ora_inizio+':00 confermato'):'Prenota un campo';
+  var subTen=slotOggi?('Oggi '+pad2(slotOggi.ora_inizio)+':00 confermato'):'Prenota un campo';
   var html='<div class="mlabel" style="margin-top:2px">I tuoi spazi</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
     modTile('comunita',subCom,nAnn,true,'annunci');
-  if(inStagione()||isPoolStaff()) html+=modTile('piscina',totPresenti()+'/'+capienza()+' in vasca ora',0,false,'piscina');
+  if(inStagione()||isPoolStaff()) html+=modTile('piscina',(capienza()===0?'Vasca chiusa':totPresenti()+'/'+capienza()+' in vasca ora'),0,false,'piscina');
   html+=modTile('tennis',subTen,0,false,'tennis')+
     modTile('controllo','Controlla e segnala',0,false,'zona')+
     modTile('pacchi',subPac,pacchiManager()?pacchiGiacenza().length:mieiPac,false,'pacchi')+'</div>';
   html+='<div class="mlabel">Oggi</div>';
   var oggi=[];
-  if(slotOggi) oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(242,194,29,.2)">🎾</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">Campo da tennis</div><div style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">Oggi '+slotOggi.ora_inizio+':00–'+(slotOggi.ora_inizio+1)+':00</div></div><span class="pill" style="background:var(--okbg);color:var(--ok)">✓ confermato</span></div>');
+  if(slotOggi) oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(242,194,29,.2)">🎾</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">Campo da tennis</div><div style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">Oggi '+pad2(slotOggi.ora_inizio)+':00–'+pad2(slotOggi.ora_inizio+1)+':00</div></div><span class="pill" style="background:var(--okbg);color:var(--ok)">✓ confermato</span></div>');
   var salaOggi=(prenotazioniSala||[]).filter(function(p){return p.giorno===tennisDayStr(0)&&p.autore_id===userId;});
   salaOggi.forEach(function(p){ oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(188,84,48,.13)">🎉</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(SPAZI_LABEL[p.spazio]||'Festa')+'</div><div style="font-size:14px;color:var(--muted)">Oggi · '+esc(p.fascia||'')+'</div></div><span class="pill" style="background:'+(p.stato==='confermata'?'var(--okbg);color:var(--ok)':'var(--ocrabg);color:var(--ocra)')+'">'+(p.stato==='confermata'?'✓ confermata':'in attesa')+'</span></div>'); });
   html+=oggi.length?oggi.join(''):'<div class="card" style="color:var(--muted);font-size:15px">Niente in programma per oggi. Le tue prenotazioni compariranno qui.</div>';
