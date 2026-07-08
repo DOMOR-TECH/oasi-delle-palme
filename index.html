@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0B7A69">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#0B7A69">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0D1513">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -24,22 +25,60 @@
     --st-fatto:#237A46; --st-fatto-ink:#1C6139; --st-problema:#B3362C; --st-problema-ink:#A03127;
     --st-finestra:#6E7773; --st-finestra-ink:#59625E; --st-scaduta:#96741B; --st-scaduta-ink:#7A5E12;
     --glass:rgba(255,255,255,.72); --glassblur:blur(20px) saturate(1.6);
+    --okc:#FFFFFF; --infoc:#FFFFFF;               /* testo su brand/info pieni */
+    --okbr:rgba(11,122,105,.45);                  /* bordo ghost brand */
+    --grad:linear-gradient(150deg,#8FDDE8 0%,#4FB6D6 50%,#3D9E6B 100%);
+    --hglass:rgba(255,255,255,.85); --hglassb:rgba(255,255,255,.7); --hglasshi:rgba(255,255,255,.9);
+    --badgebg:#BC5430; --badgefg:#FFFFFF;
+    --segtrack:rgba(27,36,33,.07);
+    /* inchiostri e tinte d'AREA (tokens/colors.css chiaro) */
+    --ink-comunita:#9E4526; --abg-comunita:#F3E5DF; --tint-comunita:rgba(188,84,48,.13);
+    --ink-piscina:#08678F;  --abg-piscina:#E1EFF5;  --tint-piscina:rgba(14,126,176,.12);
+    --ink-tennis:#8A6410;   --abg-tennis:#F5EEDA;   --tint-tennis:rgba(242,194,29,.2);
+    --ink-verde:#2F6E2C;    --abg-verde:#E6EFE4;    --tint-verde:rgba(62,125,58,.13);
+    --ink-pacchi:#5F5346;   --abg-pacchi:#EEEBE6;   --tint-pacchi:rgba(110,97,82,.13);
+    --infobr:rgba(10,110,156,.45);
+    color-scheme:light;
+  }
+  /* ── tema scuro «notte-oasi» (tokens/colors.css dark) — segue il tema del telefono ── */
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0D1513; --surface:#17211E; --line:#26322D; --line2:#3A4741; --traccia:#243029;
+      --txt:#EDEFEA; --muted:#9CA8A3; --hint:#8B978F;
+      --ok:#3BC2AC; --okbg:rgba(59,194,172,.14); --okdark:#5ECDB9; --okc:#06231D; --okbr:rgba(59,194,172,.45);
+      --bad:#E87368; --badbg:rgba(232,115,104,.13); --todo:#AEB9B3; --todobg:rgba(147,160,154,.14);
+      --ocra:#DDB856; --ocrabg:rgba(210,169,60,.14);
+      --info:#56C4E8; --infobg:rgba(86,196,232,.14); --infoc:#062330;
+      --st-fatto-ink:#8FDCA9; --st-problema-ink:#F09186; --st-finestra-ink:#AEB9B3; --st-scaduta-ink:#DDB856;
+      --glass:rgba(23,33,30,.72);
+      --grad:linear-gradient(150deg,#0E2C38 0%,#134250 50%,#0E3A2A 100%);
+      --hglass:rgba(16,26,23,.72); --hglassb:rgba(255,255,255,.16); --hglasshi:rgba(255,255,255,.18);
+      --badgebg:#E8906B; --badgefg:#2A130A;
+      --segtrack:rgba(255,255,255,.08);
+      --ink-comunita:#F0A986; --abg-comunita:rgba(232,144,107,.16); --tint-comunita:rgba(232,144,107,.16);
+      --ink-piscina:#56C4E8;  --abg-piscina:rgba(86,196,232,.15);   --tint-piscina:rgba(86,196,232,.15);
+      --ink-tennis:#F5CB3D;   --abg-tennis:rgba(245,203,61,.15);    --tint-tennis:rgba(245,203,61,.15);
+      --ink-verde:#7CC178;    --abg-verde:rgba(124,193,120,.15);    --tint-verde:rgba(124,193,120,.15);
+      --ink-pacchi:#B3A797;   --abg-pacchi:rgba(179,167,151,.15);   --tint-pacchi:rgba(179,167,151,.15);
+      --infobr:rgba(86,196,232,.45);
+      color-scheme:dark;
+    }
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased;font-size:17px;line-height:1.5}
   .wrap{max-width:440px;margin:0 auto;padding:14px 14px 90px}
-  header{margin:-14px -14px 12px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 14px;background:linear-gradient(150deg,#8FDDE8 0%,#4FB6D6 50%,#3D9E6B 100%);border-radius:0 0 24px 24px;box-shadow:0 12px 26px -14px rgba(8,32,26,.42)}
-  .head-glass{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.85);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:8px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+  header{margin:-14px -14px 12px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 14px;background:var(--grad);border-radius:0 0 24px 24px;box-shadow:0 12px 26px -14px rgba(8,32,26,.42)}
+  .head-glass{display:flex;align-items:center;gap:10px;background:var(--hglass);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);border:1px solid var(--hglassb);border-radius:16px;padding:8px 10px;box-shadow:inset 0 1px 0 var(--hglasshi)}
   .logo{width:38px;height:38px;border-radius:var(--r);background:var(--okbg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
   h1{font-size:21px;font-weight:600;margin:0}
   .sub{font-size:15px;color:var(--muted);margin:0}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);padding:12px 14px;margin-bottom:9px}
   label{font-size:15px;color:var(--muted)}
   select,input,textarea,button{font:inherit}
-  select,input[type=text],input[type=email],textarea{width:100%;padding:13px 13px;border:.5px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--txt);margin-top:5px;font-size:17px}
+  select,input[type=text],input[type=email],input[type=date],textarea{width:100%;padding:13px 13px;border:.5px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--txt);margin-top:5px;font-size:17px}
   button{cursor:pointer;border:.5px solid var(--line2);background:var(--surface);color:var(--txt);border-radius:var(--r);padding:13px 16px;font-size:17px}
   button:active{transform:scale(.98)}
-  .btn-primary{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:700;width:100%;border-radius:14px;min-height:44px}
+  .btn-primary{background:var(--ok);color:var(--okc);border-color:var(--ok);font-weight:700;width:100%;border-radius:14px;min-height:44px}
   .btn-primary:active{background:var(--okdark)}
   .row{display:flex;align-items:center;gap:10px}
   .pill{font-size:14px;padding:3px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:4px;font-weight:700}
@@ -58,7 +97,7 @@
   #subnav{display:flex;gap:8px;padding:10px 12px 2px;overflow-x:auto}
   #subnav .subchip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:6px 15px;font-size:14px;font-weight:500}
   #subnav .subchip.active{background:var(--areabg,var(--okbg));border-color:var(--area,var(--ok));color:var(--area,var(--ok))}
-  .navbadge{position:absolute;top:4px;right:calc(50% - 26px);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--bad);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+  .navbadge{position:absolute;top:4px;right:calc(50% - 26px);min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--badgebg);color:var(--badgefg);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
   .hide{display:none}
   .seg{flex:none;padding:10px 16px;font-size:16px}
   .photo-thumb{width:46px;height:46px;border-radius:var(--r);object-fit:cover;border:.5px solid var(--line)}
@@ -86,10 +125,10 @@
   .mtile.hor{grid-column:1/-1;flex-direction:row;align-items:center;gap:12px}
   .mtile .t{font-size:17px;font-weight:700}
   .mtile .st{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:1px}
-  .mtile .mbadge{position:absolute;top:10px;right:10px;min-width:20px;height:20px;border-radius:10px;background:#BC5430;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+  .mtile .mbadge{position:absolute;top:10px;right:10px;min-width:20px;height:20px;border-radius:10px;background:var(--badgebg);color:var(--badgefg);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
   .mtile.hor .mbadge{position:static;flex:none}
   /* segmented control (design system): binario testo-7%, segmento attivo bianco con ombra */
-  .segw{display:flex;background:rgba(27,36,33,.07);border-radius:13px;padding:3px;margin:13px 0 4px}
+  .segw{display:flex;background:var(--segtrack);border-radius:13px;padding:3px;margin:13px 0 4px}
   .segw button{flex:1;min-height:44px;padding:8px 4px;border:none;border-radius:10px;background:transparent;color:var(--muted);font-size:14px;font-weight:600}
   .segw button.on{background:var(--surface);box-shadow:0 1px 4px rgba(20,30,26,.14);color:var(--txt);font-weight:700}
   /* fonte cliccabile → apre il contratto */
@@ -108,6 +147,14 @@
   .pres-step{display:flex;gap:11px;align-items:flex-start;margin:0 0 12px}
   .pres-n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--okbg);color:var(--ok);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px}
   .pres-note{background:var(--infobg);border-radius:var(--r2);padding:13px 14px;font-size:16px;line-height:1.5;color:var(--txt);margin:14px 0}
+  /* override dark di CLASSE — devono stare DOPO le definizioni base (cascata a pari specificità) */
+  @media (prefers-color-scheme: dark){
+    .stcap-fatto{background:rgba(111,207,143,.14);border-color:rgba(111,207,143,.4)}
+    .stcap-problema{background:rgba(232,115,104,.13);border-color:rgba(232,115,104,.4)}
+    .stcap-finestra{background:rgba(147,160,154,.14);border-color:rgba(147,160,154,.4)}
+    .stcap-scaduta{background:rgba(210,169,60,.14);border-color:rgba(210,169,60,.42)}
+    .segw button.on{background:#223029;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  }
 </style>
 </head>
 <body>
@@ -147,7 +194,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v88';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v89';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -1103,7 +1150,7 @@ async function renderAdmin(){
       '<div style="font-size:15px;color:var(--hint)">Pal. '+esc(r.palazzina)+' · int '+esc(r.interno)+' · '+esc(r.email||'—')+'</div></div></div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">'+actions+'</div></div>';
   }
-  function achip(key,label){ var on=curAdminTab===key; return '<button class="achip" data-t="'+key+'" style="flex:1;padding:9px 2px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'#fff':'var(--muted)')+';font-size:12.5px;font-weight:600">'+label+'</button>'; }
+  function achip(key,label){ var on=curAdminTab===key; return '<button class="achip" data-t="'+key+'" style="flex:1;padding:9px 2px;border-radius:9px;border:1px solid '+(on?'var(--txt)':'var(--line)')+';background:'+(on?'var(--txt)':'var(--surface)')+';color:'+(on?'var(--surface)':'var(--muted)')+';font-size:12.5px;font-weight:600">'+label+'</button>'; }
   if((curAdminTab==='speciali' && !isSuper) || curAdminTab==='condomini') curAdminTab='attesa';
   var html=vHead('🛠️','Amministrazione','Richieste di accesso, condòmini e gestione dell\'app.')+'<div style="display:flex;gap:5px;margin-bottom:12px">'+achip('attesa','In attesa')+achip('approvati','Approvati')+(isSuper?achip('speciali','Speciali'):'')+achip('logs','Logs')+'</div>';
   if(curAdminTab==='attesa'){
@@ -1646,10 +1693,10 @@ function accessiHtml(){
   else if(nTot>=cap) h+='<div class="pres-note" style="margin:0 0 10px"><b>Piscina al completo.</b> I condòmini hanno la precedenza: chi ha ospiti è pregato di farli uscire.</div>';
   else if(nTot>80) h+='<div class="pres-note" style="margin:0 0 10px">Oltre 80 presenti: è stato richiesto un secondo bagnino.</div>';
   if(!present && chiusa) h+='<button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;background:var(--todobg);color:var(--muted);border:none">Vasca chiusa — tocca per riprovare</button>';
-  else h+='<button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;'+(present?'background:var(--ok);color:#fff;border:none':'background:transparent;color:var(--ok);border:1.5px solid rgba(11,122,105,.45)')+'">'+(present?'✓ Sono in piscina — esci':'Sono in piscina')+'</button>';
+  else h+='<button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;'+(present?'background:var(--ok);color:var(--okc);border:none':'background:transparent;color:var(--ok);border:1.5px solid var(--okbr)')+'">'+(present?'✓ Sono in piscina — esci':'Sono in piscina')+'</button>';
   if(present){
     h+='<div style="display:flex;gap:10px;margin-top:10px">';
-    [1,2].forEach(function(n){ var on=osp>=n; h+='<button class="acc-osp" data-n="'+n+'" style="flex:1;min-height:44px;padding:11px;border-radius:13px;font-size:15px;font-weight:600;'+(on?'background:#0A6E9C;color:#fff;border:none':'background:transparent;color:#0A6E9C;border:1.5px solid rgba(10,110,156,.45)')+'">'+(on?'✓ ':'+ ')+'Ospite '+n+'</button>'; });
+    [1,2].forEach(function(n){ var on=osp>=n; h+='<button class="acc-osp" data-n="'+n+'" style="flex:1;min-height:44px;padding:11px;border-radius:13px;font-size:15px;font-weight:600;'+(on?'background:var(--info);color:var(--infoc);border:none':'background:transparent;color:var(--info);border:1.5px solid var(--infobr)')+'">'+(on?'✓ ':'+ ')+'Ospite '+n+'</button>'; });
     h+='</div><div class="sub" style="margin-top:6px">Max 2 ospiti a condòmino. I residenti hanno la precedenza.</div>';
   }
   return h;
@@ -1816,7 +1863,7 @@ function tennisOccupato(giornoStr,ora){ return prenotazioniTennis.find(function(
 function renderTennis(){
   var v=$('view-tennis'), g=tennisDayStr(curGiornoTennis);
   var html=vHead('🎾','Prenota il campo','Slot da 60 minuti · max 1 al giorno per condòmino · per oggi o domani (Regolamento Art. 32)')+
-    '<div style="display:flex;gap:8px;margin-bottom:12px">'+[0,1].map(function(o){return '<button class="tn-day" data-o="'+o+'" style="flex:1;padding:10px;border-radius:var(--r);font-size:14px;font-weight:600;'+(o===curGiornoTennis?'background:var(--area,var(--ok));color:#fff;border:none':'background:var(--surface);color:var(--muted);border:1px solid var(--line)')+'">'+tennisDayLabel(o)+'</button>';}).join('')+'</div>';
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+[0,1].map(function(o){return '<button class="tn-day" data-o="'+o+'" style="flex:1;padding:10px;border-radius:var(--r);font-size:14px;font-weight:600;'+(o===curGiornoTennis?'background:var(--area,var(--ok));color:var(--okc);border:none':'background:var(--surface);color:var(--muted);border:1px solid var(--line)')+'">'+tennisDayLabel(o)+'</button>';}).join('')+'</div>';
   var mine=tennisMioSlot(g);
   if(mine){ html+='<div class="pres-note" style="margin:0 0 10px">La tua prenotazione '+(curGiornoTennis===0?'di oggi':'di domani')+': <b>'+pad2(mine.ora_inizio)+':00–'+pad2(mine.ora_inizio+1)+':00</b>. Una sola al giorno.</div>'; }
   else if(!(approvato()&&userUnita)){ html+='<div class="pres-note" style="margin:0 0 10px">Per prenotare devi essere un condòmino confermato.</div>'; }
@@ -2124,8 +2171,8 @@ function richiediSala(){
     '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="sala-x">Annulla</button><button class="btn-primary" id="sala-ok">Invia richiesta</button></div></div>';
   document.querySelector('.wrap').appendChild(m);
   var spazio='', fascia='';
-  m.querySelectorAll('.sala-sp').forEach(function(b){ b.onclick=function(){ spazio=b.dataset.s; m.querySelectorAll('.sala-sp').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='var(--ok)';b.style.color='#fff';b.style.borderColor='var(--ok)'; $('sala-regole').innerHTML='<b>Regole d\'uso — '+esc(SPAZI_LABEL[spazio])+':</b> '+esc(SPAZI_REGOLE[spazio]); }; });
-  m.querySelectorAll('.sala-f').forEach(function(b){ b.onclick=function(){ fascia=b.dataset.f; m.querySelectorAll('.sala-f').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='var(--ok)';b.style.color='#fff';b.style.borderColor='var(--ok)'; }; });
+  m.querySelectorAll('.sala-sp').forEach(function(b){ b.onclick=function(){ spazio=b.dataset.s; m.querySelectorAll('.sala-sp').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='var(--ok)';b.style.color='var(--okc)';b.style.borderColor='var(--ok)'; $('sala-regole').innerHTML='<b>Regole d\'uso — '+esc(SPAZI_LABEL[spazio])+':</b> '+esc(SPAZI_REGOLE[spazio]); }; });
+  m.querySelectorAll('.sala-f').forEach(function(b){ b.onclick=function(){ fascia=b.dataset.f; m.querySelectorAll('.sala-f').forEach(function(x){x.style.background='var(--surface)';x.style.color='';x.style.borderColor='var(--line)';}); b.style.background='var(--ok)';b.style.color='var(--okc)';b.style.borderColor='var(--ok)'; }; });
   function warn(t){ $('sala-warn').textContent=t; $('sala-warn').style.display='block'; }
   $('sala-x').onclick=function(){m.remove();};
   $('sala-ok').onclick=async function(){
@@ -2206,7 +2253,7 @@ function renderPacchi(){
   } else {
     var miei=pacchiMiei(), mieiGiac=miei.filter(function(p){return p.stato==='in_giacenza';});
     html+=vHead('📦','I tuoi pacchi','Quando arriva un pacco per te, il custode lo registra e lo vedi qui.');
-    if(mieiGiac.length) html+='<div class="card" style="padding:16px;display:flex;align-items:center;gap:14px"><span class="itile" style="--tint:rgba(110,97,82,.13)">📦</span><div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:6px"><span class="statbig">'+mieiGiac.length+'</span><span style="font-size:16px;color:var(--muted)">'+(mieiGiac.length>1?'pacchi ti aspettano':'pacco ti aspetta')+'</span></div><div style="font-size:14px;color:var(--muted);margin-top:3px">In custodia dal portiere · segna il ritiro quando lo prendi</div></div></div>';
+    if(mieiGiac.length) html+='<div class="card" style="padding:16px;display:flex;align-items:center;gap:14px"><span class="itile" style="--tint:var(--tint-pacchi)">📦</span><div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:6px"><span class="statbig">'+mieiGiac.length+'</span><span style="font-size:16px;color:var(--muted)">'+(mieiGiac.length>1?'pacchi ti aspettano':'pacco ti aspetta')+'</span></div><div style="font-size:14px;color:var(--muted);margin-top:3px">In custodia dal portiere · segna il ritiro quando lo prendi</div></div></div>';
     else html+='<div class="empty">Nessun pacco in custodia per te.</div>';
     miei.forEach(function(p){ html+=paccoCard(p,false); });
   }
@@ -2416,9 +2463,9 @@ function renderHome(){
     modTile('pacchi',subPac,pacchiManager()?pacchiGiacenza().length:mieiPac,false,'pacchi')+'</div>';
   html+='<div class="mlabel">Oggi</div>';
   var oggi=[];
-  if(slotOggi) oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(242,194,29,.2)">🎾</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">Campo da tennis</div><div style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">Oggi '+pad2(slotOggi.ora_inizio)+':00–'+pad2(slotOggi.ora_inizio+1)+':00</div></div><span class="pill" style="background:var(--okbg);color:var(--ok)">✓ confermato</span></div>');
+  if(slotOggi) oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:var(--tint-tennis)">🎾</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">Campo da tennis</div><div style="font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums">Oggi '+pad2(slotOggi.ora_inizio)+':00–'+pad2(slotOggi.ora_inizio+1)+':00</div></div><span class="pill" style="background:var(--okbg);color:var(--ok)">✓ confermato</span></div>');
   var salaOggi=(prenotazioniSala||[]).filter(function(p){return p.giorno===tennisDayStr(0)&&p.autore_id===userId;});
-  salaOggi.forEach(function(p){ oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:rgba(188,84,48,.13)">🎉</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(SPAZI_LABEL[p.spazio]||'Festa')+'</div><div style="font-size:14px;color:var(--muted)">Oggi · '+esc(FASCE_SALA[p.fascia]||p.fascia||'')+'</div></div><span class="pill" style="background:'+(p.stato==='confermata'?'var(--okbg);color:var(--ok)':'var(--ocrabg);color:var(--ocra)')+'">'+(p.stato==='confermata'?'✓ confermata':'in attesa')+'</span></div>'); });
+  salaOggi.forEach(function(p){ oggi.push('<div class="card" style="display:flex;align-items:center;gap:12px"><span class="itile" style="--tint:var(--tint-comunita)">🎉</span><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700">'+esc(SPAZI_LABEL[p.spazio]||'Festa')+'</div><div style="font-size:14px;color:var(--muted)">Oggi · '+esc(FASCE_SALA[p.fascia]||p.fascia||'')+'</div></div><span class="pill" style="background:'+(p.stato==='confermata'?'var(--okbg);color:var(--ok)':'var(--ocrabg);color:var(--ocra)')+'">'+(p.stato==='confermata'?'✓ confermata':'in attesa')+'</span></div>'); });
   html+=oggi.length?oggi.join(''):'<div class="card" style="color:var(--muted);font-size:15px">Niente in programma per oggi. Le tue prenotazioni compariranno qui.</div>';
   v.innerHTML=html;
   v.querySelectorAll('.mtile').forEach(function(b){ b.onclick=function(){ showView(b.dataset.go); window.scrollTo(0,0); }; });
@@ -2427,13 +2474,13 @@ var views={home:renderHome,zona:renderZona,bacheca:renderBacheca,dossier:renderD
 var VIEW_LABEL={home:'Home',zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',admin:'Admin'};
 /* col = inchiostro d'area (testo, AA su bianco) · tint = tinta quadrotto 12-20% (design system) */
 var HUBS=[
-  {id:'home',label:'Home',ic:'🏠',views:['home'],col:'#0B7A69',bg:'#E9F3F0',tint:'rgba(11,122,105,.12)'},
-  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala'],col:'#9E4526',bg:'#F3E5DF',tint:'rgba(188,84,48,.13)'},
-  {id:'piscina',label:'Piscina',ic:'💧',views:['piscina'],seasonal:true,col:'#08678F',bg:'#E1EFF5',tint:'rgba(14,126,176,.12)'},
-  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'#8A6410',bg:'#F5EEDA',tint:'rgba(242,194,29,.2)'},
-  {id:'controllo',label:'Controllo',ic:'🌿',views:['zona','bacheca','dossier','avvisi'],col:'#2F6E2C',bg:'#E6EFE4',tint:'rgba(62,125,58,.13)'},
-  {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi'],col:'#5F5346',bg:'#EEEBE6',tint:'rgba(110,97,82,.13)'},
-  {id:'admin',label:'Admin',ic:'🛠️',views:['admin'],adminOnly:true,col:'#0B7A69',bg:'#E9F3F0',tint:'rgba(11,122,105,.12)'}
+  {id:'home',label:'Home',ic:'🏠',views:['home'],col:'var(--ok)',bg:'var(--okbg)',tint:'var(--okbg)'},
+  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala'],col:'var(--ink-comunita)',bg:'var(--abg-comunita)',tint:'var(--tint-comunita)'},
+  {id:'piscina',label:'Piscina',ic:'💧',views:['piscina'],seasonal:true,col:'var(--ink-piscina)',bg:'var(--abg-piscina)',tint:'var(--tint-piscina)'},
+  {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'var(--ink-tennis)',bg:'var(--abg-tennis)',tint:'var(--tint-tennis)'},
+  {id:'controllo',label:'Controllo',ic:'🌿',views:['zona','bacheca','dossier','avvisi'],col:'var(--ink-verde)',bg:'var(--abg-verde)',tint:'var(--tint-verde)'},
+  {id:'pacchi',label:'Pacchi',ic:'📦',views:['pacchi'],col:'var(--ink-pacchi)',bg:'var(--abg-pacchi)',tint:'var(--tint-pacchi)'},
+  {id:'admin',label:'Admin',ic:'🛠️',views:['admin'],adminOnly:true,col:'var(--ok)',bg:'var(--okbg)',tint:'var(--okbg)'}
 ];
 function inStagione(){ var n=new Date(), y=n.getFullYear(); return n>=new Date(y,5,13) && n<=new Date(y,8,13,23,59,59); }
 var curV='home';   // landing sulla Home (hub "I tuoi spazi")
@@ -2503,6 +2550,9 @@ init();
 .ig-x{margin-top:14px;width:100%;background:#0B7A69;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
 .ig-copy{width:100%;background:#0A6E9C;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer}
 .ig-copy.ok{background:#0B7A69}
+@media (prefers-color-scheme: dark){
+  .ig-card{background:var(--surface);color:var(--txt)}
+}
 </style>
 <script>
 /* Installa sulla Home — Android: prompt nativo · iOS: guida (Apple non consente install automatica) */
