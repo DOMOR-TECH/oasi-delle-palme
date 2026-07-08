@@ -1688,7 +1688,7 @@ function accessiHtml(){
   var nTot=totPresenti(), cap=capienza(), chiusa=(cap===0);   // 0 bagnini in vasca = piscina chiusa
   var h='<div class="mlabel" style="margin-top:14px">Accesso in piscina</div>';
   h+='<div class="card" style="padding:16px"><div style="display:flex;align-items:baseline;gap:6px"><span class="statbig">'+nTot+'</span><span style="font-size:16px;color:var(--muted);white-space:nowrap">/ '+cap+' presenti ora</span></div>'+
-    '<div class="prog"><i style="width:'+(cap>0?Math.max(0,Math.min(100,Math.round(nTot/cap*100))):0)+'%;background:#0A6E9C"></i></div></div>';
+    '<div class="prog"><i style="width:'+(cap>0?Math.max(0,Math.min(100,Math.round(nTot/cap*100))):0)+'%"></i></div></div>';
   if(chiusa) h+='<div class="pres-note" style="margin:0 0 10px"><b>Vasca chiusa.</b> Nessun bagnino in servizio: si può entrare solo quando il bagnino è in vasca.</div>';
   else if(nTot>=cap) h+='<div class="pres-note" style="margin:0 0 10px"><b>Piscina al completo.</b> I condòmini hanno la precedenza: chi ha ospiti è pregato di farli uscire.</div>';
   else if(nTot>80) h+='<div class="pres-note" style="margin:0 0 10px">Oltre 80 presenti: è stato richiesto un secondo bagnino.</div>';
