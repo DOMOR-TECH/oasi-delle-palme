@@ -194,10 +194,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v93';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v94';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
-let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
+let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
 let userRuolo=null, isSuper=false, puoSegnalare=true;   // ruolo non-condòmino (custode/avvocato…), superadmin, gating segnalazioni
 function canSegnalare(){ return approvato() && puoSegnalare; }
 async function logLogin(){   // registra l'accesso (una volta per sessione browser)
@@ -1732,36 +1732,76 @@ function staffPresenzeHtml(){
   else if(inVasca) h+='<div class="sub" style="margin:6px 2px">Nessun condòmino in vasca: puoi chiudere la giornata con «Esco dalla vasca».</div>';
   return h;
 }
+// cad = cadenza in GIORNI. 1 = giornaliero (riproposto ogni giorno). >1 = compare solo a scadenza e resta finché non fatto.
 var COMPITI_BAGNINO=[
-  {id:'bag_mattonato',     nome:'Pulizia del mattonato',                      freq:'ogni giorno'},
-  {id:'bag_robot',         nome:'Pulizia vasca col robot (chiusura serale)',  freq:'ogni sera'},
-  {id:'bag_aspiratore',    nome:'Pulizia vasca con aspiratore a mano (asta)', freq:'2× a settimana'},
-  {id:'bag_controlavaggio',nome:'Controlavaggio dei filtri',                  freq:'2× a settimana'},
-  {id:'bag_arredi',        nome:'Sistemazione tavoli, sedie e sdraio',        freq:'ogni giorno'}
+  {id:'bag_mattonato',     nome:'Pulizia del mattonato',                      freq:'ogni giorno',     cad:1},
+  {id:'bag_robot',         nome:'Pulizia vasca col robot (chiusura serale)',  freq:'ogni sera',       cad:1},
+  {id:'bag_aspiratore',    nome:'Pulizia vasca con aspiratore a mano (asta)', freq:'ogni 3-4 giorni', cad:4},
+  {id:'bag_controlavaggio',nome:'Controlavaggio dei filtri',                  freq:'ogni 3-4 giorni', cad:4},
+  {id:'bag_arredi',        nome:'Sistemazione tavoli, sedie e sdraio',        freq:'ogni giorno',     cad:1}
 ];
-var DEMO_COMPITI=[{id:'dc1',compito_id:'bag_mattonato',compito_nome:'Pulizia del mattonato',autore_nome:'Marco B.',giorno:'oggi'}];
 function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
-async function loadCompiti(){   // completamenti di oggi (lettura pubblica)
-  if(DEMO){ compitiOggi=DEMO_COMPITI; return; }
-  const { data } = await sb.from('compiti_piscina').select('*').eq('giorno',todayStr());
-  compitiOggi = data||[];
+function dayOffStr(off){ var d=new Date(Date.now()+off*86400000); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+async function loadCompiti(){   // completamenti recenti (lettura pubblica): oggi + storico per il calcolo cadenze
+  if(DEMO){
+    compitiOggi=[{id:'dc1',compito_id:'bag_mattonato',compito_nome:'Pulizia del mattonato',autore_nome:'Marco B.',giorno:todayStr()}];
+    compitiStorico=[   // aspiratore fatto 2gg fa (cad4 → non dovuto), controlavaggio 6gg fa (cad4 → in ritardo)
+      {id:'ds1',compito_id:'bag_aspiratore',compito_nome:'Pulizia vasca con aspiratore a mano (asta)',autore_nome:'Marco B.',giorno:dayOffStr(-2)},
+      {id:'ds2',compito_id:'bag_controlavaggio',compito_nome:'Controlavaggio dei filtri',autore_nome:'Anna R.',giorno:dayOffStr(-6)},
+      {id:'ds3',compito_id:'bag_mattonato',compito_nome:'Pulizia del mattonato',autore_nome:'Marco B.',giorno:dayOffStr(-1)}
+    ];
+    return;
+  }
+  const { data } = await sb.from('compiti_piscina').select('*').gte('giorno',dayOffStr(-40));
+  var all=data||[];
+  compitiOggi = all.filter(function(r){return r.giorno===todayStr();});
+  compitiStorico = all.filter(function(r){return r.giorno<todayStr();});
 }
 async function toggleCompito(c){
   var ex=compitiOggi.find(function(r){return r.compito_id===c.id;});
-  if(DEMO){ if(ex) compitiOggi=compitiOggi.filter(function(r){return r.compito_id!==c.id;}); else compitiOggi.push({id:'c'+Date.now(),compito_id:c.id,compito_nome:c.nome,autore_id:userId,autore_nome:(userNome||userRuolo||'—'),giorno:'oggi'}); renderPiscina(); return; }
+  if(DEMO){ if(ex) compitiOggi=compitiOggi.filter(function(r){return r.compito_id!==c.id;}); else compitiOggi.push({id:'c'+Date.now(),compito_id:c.id,compito_nome:c.nome,autore_id:userId,autore_nome:(userNome||userRuolo||'—'),giorno:todayStr()}); renderPiscina(); return; }
   if(ex){ var d=await sb.from('compiti_piscina').delete().eq('id',ex.id); if(d.error){ alert('Errore: '+d.error.message); return; } }
-  else { var ins=await sb.from('compiti_piscina').insert({compito_id:c.id,compito_nome:c.nome,autore_id:userId,autore_nome:(userNome||userRuolo||'—'),giorno:todayStr()}); if(ins.error){ alert('Errore: '+ins.error.message); return; } }
+  else { var ins=await sb.from('compiti_piscina').upsert({compito_id:c.id,compito_nome:c.nome,autore_id:userId,autore_nome:(userNome||userRuolo||'—'),giorno:todayStr()},{onConflict:'compito_id,giorno',ignoreDuplicates:true}); if(ins.error){ alert('Errore: '+ins.error.message); return; } }   // upsert idempotente: 1 completamento/compito/giorno anche con doppio tap o due bagnini
   await loadCompiti(); renderPiscina();
+}
+function fmtDayShort(g){ var d=new Date(g+'T00:00:00'); return d.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'}); }
+function giorniTra(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+function compitoFattoOggi(id){ return compitiOggi.some(function(r){return r.compito_id===id && r.giorno===todayStr();}); }   // difensivo su giorno: se la PWA resta aperta oltre mezzanotte, non contare i ✓ di ieri
+function compitoUltimoPrima(id){ var gg=compitiStorico.filter(function(r){return r.compito_id===id;}).map(function(r){return r.giorno;}).sort(); return gg.length?gg[gg.length-1]:null; }   // ultima esecuzione < oggi
+function compitoDovutoOggi(c){
+  if(compitoFattoOggi(c.id)) return true;         // fatto oggi → resta visibile (come fatto) fino a fine giornata
+  if((c.cad||1)<=1) return true;                  // giornaliero → riproposto ogni giorno
+  var prev=compitoUltimoPrima(c.id);
+  if(!prev) return true;                          // mai registrato → dovuto
+  return giorniTra(prev,todayStr())>=c.cad;       // scaduto → dovuto, e resta finché non fatto (poi sparisce fino alla prossima scadenza)
 }
 function compitiHtml(){
   if(!puoRegistrareAnalisi()) return '';   // solo bagnino/gestore/admin
-  var done={}; compitiOggi.forEach(function(r){ done[r.compito_id]=r; });
+  var dovuti=COMPITI_BAGNINO.filter(compitoDovutoOggi);
   var h='<div class="cap-grp" style="margin-top:14px">I tuoi compiti di oggi</div>';
-  COMPITI_BAGNINO.forEach(function(c){
-    var d=!!done[c.id];
-    h+='<div class="card" style="padding:11px 12px"><div class="row"><span class="pill" style="background:var(--'+(d?'ok':'todo')+'bg);color:var(--'+(d?'ok':'todo')+')">'+(d?'✓':'○')+'</span>'+
-      '<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">'+esc(c.nome)+'</div><div style="font-size:13px;color:var(--hint)">'+esc(c.freq)+'</div></div>'+
+  if(!dovuti.length) h+='<div class="sub" style="margin:2px 2px 10px">Nessun compito in scadenza oggi.</div>';
+  dovuti.forEach(function(c){
+    var d=compitoFattoOggi(c.id);
+    var prev=(c.cad>1)?compitoUltimoPrima(c.id):null;
+    var ritardo=!d && c.cad>1 && prev && giorniTra(prev,todayStr())>c.cad;   // oltre la cadenza = in ritardo (ocra)
+    var stato=d?'ok':(ritardo?'ocra':'todo'), glifo=d?'✓':(ritardo?'!':'○');
+    var sub=c.freq + (c.cad>1 ? (d?' · fatto oggi':(prev?' · ultima volta '+fmtDayShort(prev)+(ritardo?' · in ritardo':''):' · mai registrato')) : '');
+    h+='<div class="card" style="padding:11px 12px"><div class="row"><span class="pill" style="background:var(--'+stato+'bg);color:var(--'+stato+')">'+glifo+'</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">'+esc(c.nome)+'</div><div style="font-size:13px;color:var(--hint)">'+esc(sub)+'</div></div>'+
       '<button class="cmp-tog" data-id="'+esc(c.id)+'" style="border-color:var(--'+(d?'line':'ok')+');color:var(--'+(d?'muted':'ok')+')">'+(d?'Annulla':'✓ Fatto')+'</button></div></div>';
+  });
+  h+=storicoCompitiHtml();
+  return h;
+}
+function storicoCompitiHtml(){
+  if(!compitiStorico.length) return '';
+  var byDay={}; compitiStorico.forEach(function(r){ (byDay[r.giorno]=byDay[r.giorno]||[]).push(r); });
+  var days=Object.keys(byDay).sort().reverse().slice(0,7);
+  var h='<div class="cap-grp" style="margin-top:16px">Storico compiti</div>';
+  days.forEach(function(g){
+    h+='<div class="card" style="padding:9px 12px"><div style="font-size:13px;color:var(--hint);font-weight:600;margin-bottom:3px">'+esc(fmtDayShort(g))+'</div>';
+    byDay[g].forEach(function(r){ h+='<div style="font-size:14px">✓ '+esc(r.compito_nome)+' <span style="color:var(--hint)">· '+esc(r.autore_nome||'—')+'</span></div>'; });
+    h+='</div>';
   });
   return h;
 }
@@ -2547,7 +2587,7 @@ function showView(v){
   } else { sn.style.display='none'; sn.innerHTML=''; }
   Object.keys(views).forEach(function(k){ var el=$('view-'+k); if(el) el.classList.toggle('hide',k!==v); });
   views[v]();
-  if(v==='piscina' && !DEMO){ loadPresenze().then(function(){ if(curV==='piscina') renderPiscina(); }).catch(function(){}); }   // presenze fresche all'apertura: mostra subito 0/90 quando il bagnino si dichiara in vasca (niente display stantio → il check-in non sembra "bloccato")
+  if(v==='piscina' && !DEMO){ Promise.all([loadPresenze(),loadCompiti()]).then(function(){ if(curV==='piscina') renderPiscina(); }).catch(function(){}); }   // presenze+compiti freschi all'apertura: niente display stantio (check-in vasca; e i ✓ compiti si riazzerano sul giorno giusto anche se la PWA resta aperta oltre mezzanotte)
 }
 function renderAll(){ if(isPoolStaff() && hubOf(curV).id!=='piscina') curV='piscina'; showView(curV); }
 
