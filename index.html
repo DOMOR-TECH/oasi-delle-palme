@@ -194,7 +194,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v89';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v93';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -1633,10 +1633,9 @@ function aggiungiProdotto(){
     }catch(err){ $('mag-warn').textContent='Errore: '+err.message; $('mag-warn').style.display='block'; btn.disabled=false; btn.textContent='Aggiungi'; }
   };
 }
-var DEMO_PRESENZE=[
+var DEMO_PRESENZE=[   // 2 condòmini presenti, nessun bagnino: la demo bagnino apre col toggle e poi deve farli uscire per chiudere
   {autore_id:'p1',autore_nome:'Rossi Marco',unita:'A/03',ospiti:2,is_staff:false,giorno:'oggi'},
-  {autore_id:'p2',autore_nome:'Bianchi Ada',unita:'C/05',ospiti:0,is_staff:false,giorno:'oggi'},
-  {autore_id:'db',autore_nome:'Marco B.',unita:null,ospiti:0,is_staff:true,giorno:'oggi'}
+  {autore_id:'p2',autore_nome:'Bianchi Ada',unita:'C/05',ospiti:0,is_staff:false,giorno:'oggi'}
 ];
 async function loadPresenze(){   // presenze di oggi (lettura pubblica)
   if(DEMO){ presenze=DEMO_PRESENZE; return; }
@@ -1645,7 +1644,7 @@ async function loadPresenze(){   // presenze di oggi (lettura pubblica)
 }
 function myPresence(){ return presenze.find(function(p){return p.autore_id===userId;}); }
 function nStaffInVasca(){ return presenze.filter(function(p){return p.is_staff;}).length; }
-function capienza(){ return 90*Math.max(1,nStaffInVasca()); }   // min 90: la vasca resta agibile anche se il bagnino non si segna in-app (segnale inaffidabile); il conteggio bagnini resta info
+function capienza(){ return 90*nStaffInVasca(); }   // 0 senza bagnini in vasca = VASCA CHIUSA. Il bagnino apre/chiude la giornata col toggle "Sono in vasca"/"Esco dalla vasca" (modello scelto da Corrado 2026-07-10). L'admin in vista admin può aprire allo stesso modo se il bagnino non si segna.
 function totPresenti(){ var c=0; presenze.forEach(function(p){ if(!p.is_staff) c+=1+(p.ospiti||0); }); return c; }   // condòmini + ospiti
 async function togglePresenza(){
   if(!DEMO) await loadPresenze();   // guardia bagnino + capienza sempre su dati freschi (gate F1: evita lockout/ingresso a vasca chiusa su stato stantio)
@@ -1654,6 +1653,7 @@ async function togglePresenza(){
     if(DEMO){ presenze=presenze.filter(function(p){return p.autore_id!==userId;}); renderPiscina(); return; }
     var d=await sb.from('presenze').delete().eq('autore_id',userId).eq('giorno',todayStr()); if(d.error){alert('Errore: '+d.error.message);return;}
   } else if(!mine){
+    if(capienza()===0){ alert('Vasca chiusa: non c\'è un bagnino in servizio. Potrai entrare quando la vasca viene aperta.'); return; }
     if(totPresenti()>=capienza()){ alert('Piscina al completo ('+capienza()+' posti). I condòmini hanno la precedenza: riprova quando si libera un posto.'); return; }
     var rec={autore_id:userId,autore_nome:(userNome||'—'),unita:(userUnita?userUnita.unita:null),ospiti:0,is_staff:false,giorno:todayStr()};
     if(DEMO){ presenze.push(rec); renderPiscina(); return; }
@@ -1670,8 +1670,17 @@ async function setOspiti(n){
   await loadPresenze(); renderPiscina();
 }
 async function toggleStaff(){
+  if(!DEMO) await loadPresenze();   // stato fresco: la guardia "condòmini ancora in vasca" deve valere su dati veri
   var mine=myPresence();
   if(mine && mine.is_staff){
+    // USCITA DALLA VASCA = chiusura della giornata. Se sei l'ultimo bagnino e ci sono ancora presenti, blocca: vanno fatti uscire a mano uno ad uno.
+    var conds=presenze.filter(function(p){return !p.is_staff;});
+    var altriStaff=presenze.filter(function(p){return p.is_staff && p.autore_id!==userId;}).length;
+    if(conds.length && altriStaff===0){
+      var nTot=totPresenti();
+      alert('⚠ Non puoi ancora chiudere: ci sono '+nTot+' present'+(nTot===1?'e':'i')+' in vasca ('+conds.length+' condòmin'+(conds.length===1?'o':'i')+').\n\nFalli uscire uno ad uno con «Fai uscire» accanto a ciascun nome qui sotto, poi tocca di nuovo «Esco dalla vasca» per chiudere la giornata.');
+      return;
+    }
     if(DEMO){ presenze=presenze.filter(function(p){return p.autore_id!==userId;}); renderPiscina(); return; }
     var d=await sb.from('presenze').delete().eq('autore_id',userId).eq('giorno',todayStr()); if(d.error){alert('Errore: '+d.error.message);return;}
   } else {
@@ -1681,11 +1690,23 @@ async function toggleStaff(){
   }
   await loadPresenze(); renderPiscina();
 }
+async function staffRemovePresenza(aid){   // il bagnino/gestore/admin fa uscire un presente (chiusura giornata)
+  if(!(isPoolStaff()||adminView())) return;
+  if(DEMO){ presenze=presenze.filter(function(p){return p.autore_id!==aid;}); renderPiscina(); return; }
+  var d=await sb.from('presenze').delete().eq('autore_id',aid).eq('giorno',todayStr());
+  if(d.error){ alert('Errore: '+d.error.message); return; }
+  await loadPresenze(); renderPiscina();
+}
 function accessiHtml(){
   if(!userUnita) return '';   // solo condòmini (hanno unità) fanno check-in
   var mine=myPresence(), present=!!(mine&&!mine.is_staff), osp=present?(mine.ospiti||0):0;
   var nTot=totPresenti(), cap=capienza();
   var h='<div class="mlabel" style="margin-top:14px">Accesso in piscina</div>';
+  if(cap===0){   // nessun bagnino in vasca → vasca chiusa: niente check-in
+    h+='<div class="card" style="padding:16px"><div style="font-size:18px;font-weight:700">Vasca chiusa</div><div class="sub" style="margin-top:4px">Non c\'è un bagnino in servizio. Potrai entrare quando la vasca viene aperta.</div></div>';
+    if(present) h+='<div class="pres-note" style="margin:10px 0 0">Risulti ancora in vasca da prima della chiusura.</div><button id="acc-me" style="width:100%;min-height:48px;padding:13px;border-radius:14px;font-size:17px;font-weight:700;background:var(--ok);color:var(--okc);border:none;margin-top:8px">✓ Sono in piscina — esci</button>';   // M1: non intrappolare chi era già dentro
+    return h;
+  }
   h+='<div class="card" style="padding:16px"><div style="display:flex;align-items:baseline;gap:6px"><span class="statbig">'+nTot+'</span><span style="font-size:16px;color:var(--muted);white-space:nowrap">/ '+cap+' presenti ora</span></div>'+
     '<div class="prog"><i style="width:'+(cap>0?Math.max(0,Math.min(100,Math.round(nTot/cap*100))):0)+'%"></i></div></div>';
   if(nTot>=cap) h+='<div class="pres-note" style="margin:0 0 10px"><b>Piscina al completo.</b> I condòmini hanno la precedenza: chi ha ospiti è pregato di farli uscire.</div>';
@@ -1707,7 +1728,8 @@ function staffPresenzeHtml(){
   if(nTot>80 && nStaff<2) h+='<div style="color:var(--ocra);font-size:14px;margin-top:8px">⚠ Oltre 80 presenti: chiama un secondo bagnino (capienza → '+(90*(nStaff+1))+').</div>';
   h+='</div>';
   var conds=presenze.filter(function(p){return !p.is_staff;});
-  if(conds.length){ h+='<div class="cap-grp">Chi è presente</div>'; conds.forEach(function(p){ h+='<div class="card" style="padding:9px 12px"><div style="font-size:15px">'+esc(p.autore_nome)+(p.unita?' <span style="color:var(--hint)">('+esc(p.unita)+')</span>':'')+(p.ospiti?' · <b>'+p.ospiti+' osp.</b>':'')+'</div></div>'; }); }
+  if(conds.length){ h+='<div class="cap-grp">Chi è presente</div>'; conds.forEach(function(p){ h+='<div class="card" style="padding:9px 12px"><div class="row"><div style="flex:1;min-width:0;font-size:15px">'+esc(p.autore_nome)+(p.unita?' <span style="color:var(--hint)">('+esc(p.unita)+')</span>':'')+(p.ospiti?' · <b>'+p.ospiti+' osp.</b>':'')+'</div><button class="pres-out" data-aid="'+esc(p.autore_id)+'" style="border-color:var(--line);color:var(--muted);font-size:14px;white-space:nowrap">Fai uscire</button></div></div>'; }); }
+  else if(inVasca) h+='<div class="sub" style="margin:6px 2px">Nessun condòmino in vasca: puoi chiudere la giornata con «Esco dalla vasca».</div>';
   return h;
 }
 var COMPITI_BAGNINO=[
@@ -1790,6 +1812,7 @@ function renderPiscina(){
   v.querySelectorAll('.cmp-tog').forEach(function(b){b.onclick=function(){var c=COMPITI_BAGNINO.find(function(x){return x.id===b.dataset.id;});if(c)toggleCompito(c);}});
   var am=$('acc-me'); if(am) am.onclick=togglePresenza;
   var ast=$('acc-staff'); if(ast) ast.onclick=toggleStaff;
+  v.querySelectorAll('.pres-out').forEach(function(b){b.onclick=function(){ if(confirm('Far uscire questa persona dalla vasca?')) staffRemovePresenza(b.dataset.aid); }});
   v.querySelectorAll('.acc-osp').forEach(function(b){b.onclick=function(){onOsp(+b.dataset.n);}});
   var mn=$('mag-new'); if(mn) mn.onclick=aggiungiProdotto;
   v.querySelectorAll('.mag-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
