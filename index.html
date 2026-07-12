@@ -182,6 +182,7 @@
   <div id="view-sala" class="hide"></div>
   <div id="view-pacchi" class="hide"></div>
   <div id="view-annunci" class="hide"></div>
+  <div id="view-odg" class="hide"></div>
   <div id="view-ordini" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
@@ -195,7 +196,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v103';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v104';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -1333,7 +1334,16 @@ var DEMO_SONDAGGI=[
   {id:'s1',domanda:'Sei a favore di valutare il cambio di amministratore per il 2027?',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Admin'},
   {id:'s2',domanda:'Proposta: installare rastrelliere per le biciclette?',opzioni:['Sì','No'],chiuso:false,approvato:false,proposto_da:'u9',autore_nome:'Coccia Anna'},
   {id:'sp1',domanda:'Rinnovare le piante dei pilotis della palazzina?',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Demo Tester',proposto_da:'demo',palazzina:'I',tipo:'pal_interna'},   // voto di palazzina (demo: l'utente è delegato di I)
-  {id:'sp2',domanda:'Tinteggiare l\'androne della palazzina?',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Vermigli Andrea',proposto_da:'u3',palazzina:'C',tipo:'pal_interna'}   // voto di un'ALTRA palazzina: visibile solo nella supervisione admin
+  {id:'sp2',domanda:'Tinteggiare l\'androne della palazzina?',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Vermigli Andrea',proposto_da:'u3',palazzina:'C',tipo:'pal_interna'},   // voto di un'ALTRA palazzina: visibile solo nella supervisione admin
+  // punti ODG (fan-out demo): stessi punti in più palazzine
+  {id:'so1',domanda:'Rinnovo del contratto di manutenzione del verde',descrizione:'Il contratto scade a fine 2027. Si vota se avviare subito la raccolta di preventivi comparativi.',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Consiglio dei Delegati — ODG',palazzina:'I',tipo:'odg_punto',odg_punto_id:'pt1'},
+  {id:'so2',domanda:'Rifacimento dei vialetti pedonali',descrizione:'Intervento sui vialetti ammalorati; spesa da definire con perizia indipendente.',opzioni:['Sì','No','Astenuto'],chiuso:true,chiuso_da_nome:'Demo Tester',approvato:true,autore_nome:'Consiglio dei Delegati — ODG',palazzina:'I',tipo:'odg_punto',odg_punto_id:'pt2'},
+  {id:'so3',domanda:'Rinnovo del contratto di manutenzione del verde',descrizione:'Il contratto scade a fine 2027. Si vota se avviare subito la raccolta di preventivi comparativi.',opzioni:['Sì','No','Astenuto'],chiuso:true,chiuso_da_nome:'Vermigli Andrea',approvato:true,autore_nome:'Consiglio dei Delegati — ODG',palazzina:'C',tipo:'odg_punto',odg_punto_id:'pt1'}
+];
+var DEMO_ODG=[{id:'odg1',titolo:'Consiglio dei Delegati — seduta di luglio',data_consiglio:'2026-07-20',creato_da_nome:'Amministrazione',created_at:'2026-07-11T09:00:00Z'}];
+var DEMO_ODG_PUNTI=[
+  {id:'pt1',odg_id:'odg1',ordine:1,titolo:'Rinnovo del contratto di manutenzione del verde',descrizione:'Il contratto scade a fine 2027. Si vota se avviare subito la raccolta di preventivi comparativi.'},
+  {id:'pt2',odg_id:'odg1',ordine:2,titolo:'Rifacimento dei vialetti pedonali',descrizione:'Intervento sui vialetti ammalorati; spesa da definire con perizia indipendente.'}
 ];
 var DEMO_VOTI=[
   {sondaggio_id:'s1',unita:'A/07',autore_id:'u1',autore_nome:'Romani Barbara',millesimi:6.8,opzione:'Sì'},
@@ -1343,7 +1353,13 @@ var DEMO_VOTI=[
   {sondaggio_id:'sp1',unita:'I/09',autore_id:'u-meli',autore_nome:'Meli Carmela',millesimi:260.4,opzione:'Sì'},        // voti di palazzina: pesi in mm DI PALAZZINA (/1000 interni)
   {sondaggio_id:'sp1',unita:'I/03',autore_id:'u-i03',autore_nome:'Ferraguto Luca',millesimi:170.2,opzione:'Sì'},
   {sondaggio_id:'sp1',unita:'I/05',autore_id:'u-i05',autore_nome:'Boschi Anna',millesimi:120.0,opzione:'No'},
-  {sondaggio_id:'sp2',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:210.3,opzione:'Sì'}
+  {sondaggio_id:'sp2',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:210.3,opzione:'Sì'},
+  // voti sui punti ODG (mm di palazzina): so2 Pal.I → mandato Sì 550,6 · so3 Pal.C → mandato No 540,3
+  {sondaggio_id:'so2',unita:'I/09',autore_id:'u-meli',autore_nome:'Meli Carmela',millesimi:260.4,opzione:'Sì'},
+  {sondaggio_id:'so2',unita:'I/03',autore_id:'u-i03',autore_nome:'Ferraguto Luca',millesimi:170.2,opzione:'Sì'},
+  {sondaggio_id:'so2',unita:'I/05',autore_id:'u-i05',autore_nome:'Boschi Anna',millesimi:120.0,opzione:'Sì'},
+  {sondaggio_id:'so3',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:210.3,opzione:'No'},
+  {sondaggio_id:'so3',unita:'C/05',autore_id:'u-c05',autore_nome:'Casini Paola',millesimi:330.0,opzione:'No'}
 ];
 var DEMO_MM_PAL=78.5;   // ≈ mm di palazzina dell'unità demo I/08 (6,5/82,83×1000)
 var DEMO_ORDINI=[
@@ -1377,6 +1393,14 @@ async function renderVoti(){
   var attivi=generali.filter(function(s){return s.approvato!==false});
   var proposte=generali.filter(function(s){return s.approvato===false && (adminView() || s.proposto_da===userId)});   // in vista condòmino l'admin vede solo le proprie proposte
   function opzOf(s){return Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto'])}
+  function mandatoDi(s){   // MANDATO su un punto ODG: QUALUNQUE risposta oltre 500/1000 di palazzina (anche No/Astenuto: è la posizione della palazzina)
+    var sv=voti.filter(function(x){return x.sondaggio_id===s.id}), win=null;
+    opzOf(s).forEach(function(o){
+      var mm=sv.filter(function(x){return x.opzione===o}).reduce(function(t,x){return t+(+x.millesimi||0)},0);
+      if(mm>500 && (!win||mm>win.mm)) win={o:o,mm:mm};
+    });
+    return win;
+  }
   function vinceDi(s){   // risposta AZIONABILE oltre 500/1000 di palazzina (No/Astenuto vincenti = nessuna azione)
     var sv=voti.filter(function(x){return x.sondaggio_id===s.id}), win=null;
     opzOf(s).forEach(function(o){
@@ -1394,8 +1418,10 @@ async function renderVoti(){
     var opzioni=opzOf(s);
     var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
     var isMyPal=!pal || (userUnita && s.palazzina===userUnita.palazzina);   // admin in supervisione: osserva le altre palazzine, non ci vota
+    var isOdg=s.tipo==='odg_punto';
     var canManage=isMyPal && (adminView()||(pal&&myDeleg));   // gestione solo nella PROPRIA palazzina (Corrado: "admin non tocca i voti altrui" — sui voti altrui è osservatore puro)
-    var h='<div class="card"><div style="font-weight:600;font-size:18px">'+(pal&&!isMyPal?'<span class="pill" style="margin-right:6px">Pal. '+esc(s.palazzina)+'</span>':'')+esc(s.domanda)+'</div>'+
+    var h='<div class="card"><div style="font-weight:600;font-size:18px">'+(pal&&!isMyPal?'<span class="pill" style="margin-right:6px">Pal. '+esc(s.palazzina)+'</span>':'')+(isOdg?'<span class="pill" style="margin-right:6px">📋 ODG</span>':'')+esc(s.domanda)+'</div>'+
+      (s.descrizione?'<div style="font-size:15px;color:var(--muted);line-height:1.45;white-space:pre-wrap;margin:4px 0 2px">'+esc(s.descrizione)+'</div>':'')+
       '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(pal?' di palazzina':'')+(s.chiuso?' · CHIUSO'+(s.chiuso_da_nome?' da '+esc(s.chiuso_da_nome):''):'')+'</div>';
     if(pal && !isMyPal){
       if(!s.chiuso) h+='<div class="sub" style="margin-bottom:4px">Voto della Pal. '+esc(s.palazzina)+': lo osservi da amministratore, vota solo la palazzina.</div>';
@@ -1418,7 +1444,15 @@ async function renderVoti(){
         '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--area,var(--ok))"></div></div>'+
         (ov.length?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+ov.map(function(x){return esc(x.autore_nome)}).join(', ')+'</div>':'')+'</div>';
     });
-    if(pal){
+    if(pal && isOdg){   // punto ODG: l'esito è il MANDATO del delegato (qualunque risposta oltre 500, anche No/Astenuto) — niente ordini esecutivi
+      if(s.chiuso){
+        var man=mandatoDi(s);
+        h+= man ? '<div class="sub" style="margin-top:10px">📋 <b>Mandato della palazzina: «'+esc(man.o)+'»</b> ('+man.mm.toFixed(1).replace('.',',')+'/1000 di palazzina) — il delegato lo porta al Consiglio.</div>'
+                : '<div class="sub" style="margin-top:10px">Nessuna risposta oltre 500/1000 di palazzina: su questo punto la palazzina va al Consiglio come <b>astenuta</b>.</div>';
+      } else if(canManage){
+        h+='<div class="sub" style="margin-top:10px">Chiudendo il voto fissi il mandato da portare al Consiglio.</div>';
+      }
+    } else if(pal){
       var ord=ordBySond[s.id];
       if(ord){ h+='<div class="sub" style="margin-top:10px">📨 Ordine esecutivo trasmesso — '+ordStato(ord.stato)[1]+'.</div>'; }
       else if(s.chiuso){
@@ -1453,7 +1487,7 @@ async function renderVoti(){
   }
   // ===== supervisione admin: TUTTE le palazzine, sempre (scelta Corrado 2026-07-12) =====
   if(isAdmin){
-    var palAltre=sondaggi.filter(function(s){return s.palazzina && (!userUnita || s.palazzina!==userUnita.palazzina)});
+    var palAltre=sondaggi.filter(function(s){return s.palazzina && s.tipo!=='odg_punto' && (!userUnita || s.palazzina!==userUnita.palazzina)});   // gli ODG hanno la loro vista con l'aggregato: qui solo i voti interni
     var ordAltri=ordini.filter(function(o){return !userUnita || o.palazzina!==userUnita.palazzina});
     if(palAltre.length || ordAltri.length){
       html+='<div class="cap-grp">🛠️ Supervisione — altre palazzine (admin)</div>';
@@ -1471,6 +1505,7 @@ async function renderVoti(){
     html+='<div class="cap-grp">Proposte da approvare ('+proposte.length+')</div>';
     proposte.forEach(function(s){
       html+='<div class="card"><div style="font-weight:600;font-size:17px">'+esc(s.domanda)+'</div>'+
+        (s.descrizione?'<div style="font-size:14.5px;color:var(--muted);white-space:pre-wrap;margin-top:2px">'+esc(s.descrizione)+'</div>':'')+
         '<div style="font-size:14px;color:var(--hint);margin:3px 0 8px">proposto da '+esc(s.autore_nome||'—')+' · opzioni: '+esc(opzOf(s).join(' / '))+'</div>';
       if(adminView()){ html+='<div style="display:flex;gap:7px"><button class="vt-appr" data-s="'+esc(s.id)+'" style="border-color:var(--ok);color:var(--ok)">✓ Avalla</button>'+
         '<button class="vt-del" data-s="'+esc(s.id)+'" style="border-color:var(--bad);color:var(--bad)">Elimina</button></div>'; }
@@ -1544,6 +1579,139 @@ async function renderOrdini(){
     renderOrdini();
   }});
 }
+/* ---------- ODG DEL CONSIGLIO (F2: l'amministrazione carica UNA volta → fan-out nelle palazzine → mandati → aggregato a mm generali) ---------- */
+async function renderOdg(){
+  var v=$('view-odg'); v.innerHTML='<div class="spin">Carico…</div>';
+  var lista, punti, sond, votiO, mmPal={};
+  if(DEMO){
+    lista=DEMO_ODG.slice(); punti=DEMO_ODG_PUNTI.slice();
+    sond=DEMO_SONDAGGI.filter(function(s){return s.odg_punto_id}); votiO=DEMO_VOTI;
+    mmPal={A:100.63,B:85.73,C:65.97,D:99.68,E:65.33,F:54.97,GA:58.34,GB:58.99,H:99.52,I:82.83,L:64.09,M:83.19,N:76.55};
+  } else {
+    var r1=await sb.from('odg').select('*').order('created_at',{ascending:false});
+    if(r1.error){ v.innerHTML='<div class="empty">Errore: '+esc(r1.error.message)+'<br><br>Hai eseguito <b>migrate_v45_odg.sql</b>?</div>'; return; }
+    lista=r1.data||[];
+    var r2=await sb.from('odg_punti').select('*').order('ordine',{ascending:true}); punti=r2.error?[]:(r2.data||[]);
+    var r3=await sb.from('sondaggi').select('*').not('odg_punto_id','is',null); sond=r3.error?[]:(r3.data||[]);
+    var r4=await sb.from('voti').select('*'); votiO=r4.error?[]:(r4.data||[]);
+    var r5=await sb.rpc('mm_palazzine'); if(!r5.error)(r5.data||[]).forEach(function(x){ mmPal[x.palazzina]=+x.mm_generali; });
+  }
+  var vediTutto=isAdmin||isAmministratore();   // admin vede tutto sempre; l'amministratore verbalizza gli esiti
+  function opzOfO(s){return Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto'])}
+  function mandO(s){ var sv=votiO.filter(function(x){return x.sondaggio_id===s.id}),w=null; opzOfO(s).forEach(function(o){var mm=sv.filter(function(x){return x.opzione===o}).reduce(function(t,x){return t+(+x.millesimi||0)},0); if(mm>500&&(!w||mm>w.mm))w={o:o,mm:mm};}); return w; }
+  var html=vHead('📋','ODG del Consiglio','Ogni punto si vota palazzina per palazzina: il delegato porta al Consiglio il mandato della sua.');
+  if(isAmministratore()||adminView()) html+='<button class="btn-primary" id="odg-new" style="margin-bottom:12px">＋ Carica un ODG</button>';
+  if(!lista.length) html+='<div class="empty">Nessun ODG caricato.</div>';
+  lista.forEach(function(o){
+    var pts=punti.filter(function(p){return p.odg_id===o.id});
+    html+='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(o.titolo)+'</div>'+
+      '<div style="font-size:14px;color:var(--hint);margin:3px 0 8px">'+(o.data_consiglio?'Consiglio del '+new Date(o.data_consiglio+'T12:00:00').toLocaleDateString('it-IT')+' · ':'')+pts.length+' punti · caricato da '+esc(o.creato_da_nome||'—')+'</div>';
+    pts.forEach(function(p,i){
+      var ps=sond.filter(function(s){return s.odg_punto_id===p.id});
+      html+='<div style="border-top:.5px solid var(--line);padding:10px 0 4px;margin-top:8px">'+
+        '<div style="font-weight:600;font-size:16px">'+(i+1)+'. '+esc(p.titolo)+'</div>'+
+        (p.descrizione?'<div style="font-size:14.5px;color:var(--muted);white-space:pre-wrap;margin-top:2px">'+esc(p.descrizione)+'</div>':'');
+      if(vediTutto){
+        // aggregato a millesimi GENERALI: la palazzina col mandato pesa i suoi mm generali; senza mandato/aperta = astenuta (base)
+        var buckets={}, decisi=0, righe=[];
+        Object.keys(mmPal).sort().forEach(function(pal){
+          var s=ps.find(function(x){return x.palazzina===pal});
+          if(s && s.chiuso){ var mm=mandO(s);
+            if(mm){ buckets[mm.o]=(buckets[mm.o]||0)+mmPal[pal]; decisi++; righe.push('<b>'+esc(pal)+'</b>: «'+esc(mm.o)+'»'); }
+            else righe.push('<b>'+esc(pal)+'</b>: astenuta');
+          } else if(s){ righe.push('<b>'+esc(pal)+'</b>: in votazione'); }
+          else righe.push('<b>'+esc(pal)+'</b>: —');
+        });
+        var chiusiTutti=ps.length===Object.keys(mmPal).length && ps.every(function(x){return x.chiuso});
+        var res=null; Object.keys(buckets).forEach(function(ok){ if(buckets[ok]>500 && (!res||buckets[ok]>buckets[res])) res=ok; });
+        Object.keys(buckets).sort(function(a,b){return buckets[b]-buckets[a]}).forEach(function(ok){
+          html+='<div style="margin-top:7px"><div style="display:flex;justify-content:space-between;font-size:14.5px;gap:8px"><span>'+esc(ok)+'</span><span style="color:var(--hint);white-space:nowrap">'+buckets[ok].toFixed(1).replace('.',',')+'/1000 mm generali</span></div>'+
+            '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:3px;overflow:hidden"><div style="height:100%;width:'+Math.min(100,Math.round(buckets[ok]/10))+'%;background:var(--area,var(--ok))"></div></div></div>';
+        });
+        html+= res ? '<div class="sub" style="margin-top:8px">✅ <b>Risultato definito: «'+esc(res)+'»</b> ('+buckets[res].toFixed(1).replace('.',',')+'/1000 mm generali) — decisione del Consiglio.</div>'
+             : chiusiTutti ? '<div class="sub" style="margin-top:8px">⚠️ Nessuna risposta ha raggiunto 500/1000 generali: il punto va in <b>assemblea generale</b>.</div>'
+             : '<div class="sub" style="margin-top:8px">In corso — '+decisi+'/'+Object.keys(mmPal).length+' palazzine con mandato.</div>';
+        html+='<div style="font-size:13px;color:var(--hint);margin-top:6px">'+righe.join(' · ')+'</div>';
+      } else if(userUnita){
+        var sMio=ps.find(function(x){return x.palazzina===userUnita.palazzina});
+        if(!sMio) html+='<div class="sub" style="margin-top:6px">Non ancora in votazione nella tua palazzina.</div>';
+        else if(!sMio.chiuso) html+='<div class="sub" style="margin-top:6px">🗳️ In votazione nella tua palazzina — vota in <b>Comunità → Voti</b>.</div>';
+        else { var mio=mandO(sMio);
+          html+= mio ? '<div class="sub" style="margin-top:6px">📋 Mandato della tua palazzina: <b>«'+esc(mio.o)+'»</b> ('+mio.mm.toFixed(1).replace('.',',')+'/1000 di palazzina).</div>'
+                     : '<div class="sub" style="margin-top:6px">La tua palazzina va al Consiglio come <b>astenuta</b> (nessuna risposta oltre 500).</div>'; }
+      }
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+  v.innerHTML=html;
+  var nb=$('odg-new'); if(nb) nb.onclick=creaOdg;
+}
+function creaOdg(){
+  if(!(isAmministratore()||adminView())) return;
+  if(document.getElementById('og-ok')) return;   // guard doppia modale
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600;margin-bottom:10px">Carica un ODG</div>'+
+    '<div class="sub" style="margin-bottom:10px">Si carica UNA volta: ogni punto va automaticamente in votazione in tutte le palazzine e i delegati ricevono la notifica.</div>'+
+    '<label>Titolo</label><input id="og-tit" type="text" placeholder="es. Consiglio dei Delegati — settembre" style="margin:4px 0 10px;width:100%">'+
+    '<label>Data del Consiglio (facoltativa)</label><input id="og-data" type="date" style="margin:4px 0 10px;width:100%">'+
+    '<label>Punti all\'ordine del giorno</label><div id="og-punti" style="display:grid;gap:10px;margin:6px 0 8px"></div>'+
+    '<button id="og-add" style="font-size:14px">＋ Aggiungi punto</button>'+
+    '<div id="og-warn" style="color:var(--bad);font-size:14px;margin:6px 0;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="og-x">Annulla</button><button class="btn-primary" id="og-ok">Carica e diffondi</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  function addPunto(){
+    var row=document.createElement('div');
+    row.style.cssText='border:1px solid var(--line);border-radius:10px;padding:8px';
+    row.innerHTML='<div style="display:flex;gap:6px;align-items:center"><input type="text" class="og-pt" placeholder="titolo del punto" style="margin:0;flex:1;min-width:0"><button class="og-rm" style="flex:none;font-size:15px;padding:8px 12px;color:var(--muted)" aria-label="Rimuovi punto">✕</button></div>'+
+      '<textarea class="og-pd" rows="2" placeholder="descrizione (facoltativa)" style="margin:6px 0 0;width:100%;font-size:16px;line-height:1.4;min-width:0"></textarea>';
+    row.querySelector('.og-rm').onclick=function(){ row.remove(); };
+    $('og-punti').appendChild(row);
+  }
+  addPunto();
+  $('og-add').onclick=function(){ addPunto(); var ps=m.querySelectorAll('.og-pt'); ps[ps.length-1].focus(); };
+  $('og-x').onclick=function(){ m.remove(); };
+  var createdId=null, createdPts=false;   // in caso di retry dopo un errore, non ri-creare l'ODG (fan-out già idempotente a DB)
+  $('og-ok').onclick=async function(){
+    function warn(t){ $('og-warn').textContent=t; $('og-warn').style.display='block'; }
+    var tit=($('og-tit').value||'').trim();
+    if(!tit && !createdId){ warn('Il titolo è obbligatorio.'); return; }
+    var pts=[]; m.querySelectorAll('#og-punti > div').forEach(function(row){
+      var t=(row.querySelector('.og-pt').value||'').trim(), d=(row.querySelector('.og-pd').value||'').trim();
+      if(t) pts.push({titolo:t, descrizione:d||null});
+    });
+    if(!pts.length && !createdPts){ warn('Serve almeno un punto (col suo titolo).'); return; }
+    if(!await conferma({titolo:'Diffondere l\'ODG?',testo:'«'+tit+'» — '+pts.length+' punti.\n\nOgni punto va in votazione in TUTTE le palazzine e i delegati ricevono la notifica.',azione:'Carica e diffondi'})) return;
+    if(DEMO){
+      var oid='odg'+Date.now();
+      DEMO_ODG.unshift({id:oid,titolo:tit,data_consiglio:($('og-data').value||null),creato_da_nome:userNome,created_at:new Date().toISOString()});
+      pts.forEach(function(p,i){ var pid='pt'+Date.now()+'-'+i;
+        DEMO_ODG_PUNTI.push({id:pid,odg_id:oid,ordine:i+1,titolo:p.titolo,descrizione:p.descrizione});
+        ['I','C'].forEach(function(pal){ DEMO_SONDAGGI.push({id:'so'+Date.now()+'-'+i+pal,domanda:p.titolo,descrizione:p.descrizione,opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Consiglio dei Delegati — ODG',palazzina:pal,tipo:'odg_punto',odg_punto_id:pid}); });
+      });
+      m.remove(); renderOdg(); return;
+    }
+    var btn=$('og-ok'); btn.disabled=true; btn.textContent='Carico…';
+    if(!createdId){
+      var r=await sb.from('odg').insert({titolo:tit,data_consiglio:($('og-data').value||null),creato_da_nome:userNome}).select('id').single();
+      if(r.error){ warn('Errore: '+r.error.message); btn.disabled=false; btn.textContent='Carica e diffondi'; return; }
+      createdId=r.data.id;
+    }
+    if(!createdPts){
+      var rows=pts.map(function(p,i){ return {odg_id:createdId,ordine:i+1,titolo:p.titolo,descrizione:p.descrizione}; });
+      var r2=await sb.from('odg_punti').insert(rows);
+      if(r2.error){ warn('Errore punti: '+r2.error.message); btn.disabled=false; btn.textContent='Riprova'; return; }
+      createdPts=true;
+    }
+    var r3=await sb.rpc('odg_fanout',{p_odg:createdId});
+    if(r3.error){ warn('ODG salvato ma diffusione fallita: '+r3.error.message); btn.disabled=false; btn.textContent='Riprova diffusione'; return; }
+    m.remove();
+    alert('ODG diffuso ✅\n\n'+r3.data+' votazioni aperte nelle palazzine. I delegati hanno ricevuto la notifica.');
+    renderOdg();
+  };
+}
 async function votaSondaggio(sid,opzione){
   if(DEMO){ var sd=DEMO_SONDAGGI.find(function(x){return x.id===sid}); var mmv=(sd&&sd.palazzina)?DEMO_MM_PAL:(userUnita.millesimi||0); DEMO_VOTI=DEMO_VOTI.filter(function(x){return !(x.sondaggio_id===sid&&x.autore_id===userId)}); DEMO_VOTI.push({sondaggio_id:sid,unita:userUnita.unita,autore_id:userId,autore_nome:userNome,millesimi:mmv,opzione:opzione}); renderVoti(); return; }
   if(!approvato()){ alert('Devi essere un condòmino confermato per votare.'); return; }
@@ -1562,6 +1730,7 @@ function nuovoSondaggio(palMode){
     '<div style="font-size:18px;font-weight:600;margin-bottom:12px">'+(palMode?'Nuovo voto di palazzina — Pal. '+esc(userUnita.palazzina):(adminView()?'Nuovo sondaggio':'Proponi un sondaggio'))+'</div>'+
     (palMode?'<div class="sub" style="margin-bottom:10px">Vale solo per la tua palazzina, pesato sui suoi millesimi. È subito attivo: i residenti ricevono la notifica.</div>':'')+
     '<label>Domanda</label><textarea id="sn-dom" rows="3" placeholder="es. Sei a favore di…?" style="margin:4px 0 10px;width:100%;font-size:16px;line-height:1.4;min-width:0"></textarea>'+
+    '<label>Descrizione (facoltativa)</label><textarea id="sn-desc" rows="3" placeholder="Contesto, dettagli, cosa comporta…" style="margin:4px 0 10px;width:100%;font-size:16px;line-height:1.4;min-width:0"></textarea>'+
     '<label>Risposte possibili</label><div id="sn-opts" style="display:grid;gap:6px;margin:4px 0 8px"></div>'+
     '<button id="sn-add" style="font-size:14px">＋ Aggiungi risposta</button>'+
     '<div id="sn-warn" style="color:var(--bad);font-size:14px;margin:6px 0;display:none"></div>'+
@@ -1583,7 +1752,7 @@ function nuovoSondaggio(palMode){
     if(!d){ warn('Scrivi la domanda.'); return; }
     var opzioni=[],seen={}; m.querySelectorAll('.sn-opt').forEach(function(i){ var t=(i.value||'').trim(); var k=t.toLowerCase(); if(t && !seen[k]){ seen[k]=1; opzioni.push(t); } });
     if(opzioni.length<2){ warn('Servono almeno 2 risposte diverse.'); return; }
-    var rec={domanda:d,opzioni:opzioni,autore_nome:userNome,approvato:palMode?true:adminView(),proposto_da:userId};
+    var rec={domanda:d,opzioni:opzioni,autore_nome:userNome,approvato:palMode?true:adminView(),proposto_da:userId,descrizione:(($('sn-desc')&&$('sn-desc').value)||'').trim()||null};
     if(palMode){ rec.palazzina=userUnita.palazzina; rec.tipo='pal_interna'; }
     if(DEMO){ DEMO_SONDAGGI.unshift(Object.assign({id:'s'+Date.now(),chiuso:false},rec)); m.remove(); renderVoti(); if(!palMode&&!adminView())alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
     var btn=$('sn-ok'); btn.disabled=true; btn.textContent='Invio…';
@@ -2805,12 +2974,12 @@ function renderHome(){
   v.innerHTML=html;
   v.querySelectorAll('.mtile').forEach(function(b){ b.onclick=function(){ showView(b.dataset.go); window.scrollTo(0,0); }; });
 }
-var views={home:renderHome,zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,ordini:renderOrdini,admin:renderAdmin};
-var VIEW_LABEL={home:'Home',zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',ordini:'Ordini',admin:'Admin'};
+var views={home:renderHome,zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,odg:renderOdg,ordini:renderOrdini,admin:renderAdmin};
+var VIEW_LABEL={home:'Home',zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',odg:'ODG',ordini:'Ordini',admin:'Admin'};
 /* col = inchiostro d'area (testo, AA su bianco) · tint = tinta quadrotto 12-20% (design system) */
 var HUBS=[
   {id:'home',label:'Home',ic:'🏠',views:['home'],col:'var(--ok)',bg:'var(--okbg)',tint:'var(--okbg)'},
-  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala','ordini'],col:'var(--ink-comunita)',bg:'var(--abg-comunita)',tint:'var(--tint-comunita)'},   // chip Ordini: solo amministratore/admin (filtrata in showView)
+  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','odg','sala','ordini'],col:'var(--ink-comunita)',bg:'var(--abg-comunita)',tint:'var(--tint-comunita)'},   // chip Ordini: solo amministratore/admin (filtrata in showView); ODG per tutti
   {id:'piscina',label:'Piscina',ic:'💧',views:['piscina'],seasonal:true,col:'var(--ink-piscina)',bg:'var(--abg-piscina)',tint:'var(--tint-piscina)'},
   {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'var(--ink-tennis)',bg:'var(--abg-tennis)',tint:'var(--tint-tennis)'},
   {id:'controllo',label:'Controllo',ic:'🌿',views:['zona','bacheca','dossier','avvisi'],col:'var(--ink-verde)',bg:'var(--abg-verde)',tint:'var(--tint-verde)'},
