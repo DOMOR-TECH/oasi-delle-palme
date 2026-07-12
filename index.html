@@ -195,7 +195,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v102';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v103';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -607,7 +607,7 @@ function fotoListOf(r){return (r.foto_urls&&r.foto_urls.length)?r.foto_urls:(r.f
 async function resolveProblem(r){
   if(!r || !r.id){ alert('Segnalazione senza id: operazione annullata.'); return false; }   // mai un update senza id specifico
   var altrui = r.autore_id && r.autore_id!==userId;   // admin che chiude il ticket di un altro
-  if(!confirm(altrui ? 'Chiudere questa segnalazione aperta da '+(r.autore_nome||'un altro condòmino')+'?\n(resterà tracciato che l\'hai chiusa tu)' : 'Segnare questa segnalazione come risolta?')) return false;
+  if(!await conferma(altrui ? {titolo:'Chiudere la segnalazione di un altro?',testo:'Aperta da '+(r.autore_nome||'un altro condòmino')+'. Resterà tracciato che l\'hai chiusa tu.',azione:'Chiudi'} : {titolo:'Segnalazione risolta?',testo:'La segnalazione passa tra i Chiusi.',azione:'Segna risolta'})) return false;
   var patch={ risolto:true, chiuso_da:userId, chiuso_da_nome:userNome, chiuso_il:new Date().toISOString() };
   if(DEMO){ Object.assign(r,patch); return true; }
   const { data, error } = await sb.from('segnalazioni').update(patch).eq('id', r.id).select('id');
@@ -1116,6 +1116,21 @@ async function exportPDF(){
 }
 
 /* ---------- VIEW: ADMIN (conferma condòmini) ---------- */
+/* ---------- popup di conferma con bottone-azione esplicito (regola Corrado 2026-07-12: ogni azione distruttiva/importante) ---------- */
+function conferma(opt){   // {titolo, testo, azione='Esegui', distruttiva} → Promise<boolean>
+  return new Promise(function(res){
+    if(document.getElementById('cf-ok')){ res(false); return; }   // una conferma alla volta
+    var m=document.createElement('div');
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:2300';
+    m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;border-radius:16px 16px 0 0;padding:18px 16px 24px">'+
+      '<div style="font-size:18px;font-weight:600;margin-bottom:8px">'+esc(opt.titolo||'Confermi?')+'</div>'+
+      (opt.testo?'<div style="font-size:16px;line-height:1.5;white-space:pre-wrap;color:var(--muted);margin-bottom:14px">'+esc(opt.testo)+'</div>':'')+
+      '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px"><button id="cf-x" style="font-size:16px">Annulla</button><button id="cf-ok" class="btn-primary" style="font-size:16px'+(opt.distruttiva?';background:var(--bad);border-color:var(--bad)':'')+'">'+esc(opt.azione||'Esegui')+'</button></div></div>';
+    document.body.appendChild(m);
+    m.querySelector('#cf-x').onclick=function(){ m.remove(); res(false); };
+    m.querySelector('#cf-ok').onclick=function(){ m.remove(); res(true); };
+  });
+}
 var DEMO_ADMINS=[{email:'corradolantieri@gmail.com',super:true},{email:'caratelli@email.it',super:false}];
 var DEMO_ASP=[{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',puo_segnalare:true}];
 var PALAZZINE=['A','B','C','D','E','F','GA','GB','H','I','L','M','N'];   // 13 palazzine (verificate sul DB, spec Delegati §10.1)
@@ -1207,10 +1222,13 @@ async function renderAdmin(){
   v.querySelectorAll('.adm').forEach(function(b){b.onclick=async function(){
     var nome=b.dataset.nome||'questo utente';
     if(b.dataset.a==='revoca'){
-      if(!confirm('Revocare l\'accesso di «'+nome+'»?\n\nIl suo accesso verrà CHIUSO e l\'unità tornerà libera. Le segnalazioni che ha inviato RESTANO (firmate col suo nome). Potrà ri-registrarsi.')) return;
+      if(!await conferma({titolo:'Revocare l\'accesso di «'+nome+'»?',testo:'Il suo accesso verrà chiuso e l\'unità tornerà libera. Le segnalazioni che ha inviato restano (firmate col suo nome). Potrà ri-registrarsi.',azione:'Revoca',distruttiva:true})) return;
     }
     if(b.dataset.a==='rif'){
-      if(!confirm('Rifiutare la richiesta di «'+nome+'»?\n\nNon avrà accesso. Potrai sempre approvarlo in seguito.')) return;
+      if(!await conferma({titolo:'Rifiutare la richiesta di «'+nome+'»?',testo:'Non avrà accesso. Potrai sempre approvarlo in seguito.',azione:'Rifiuta',distruttiva:true})) return;
+    }
+    if(b.dataset.a==='appr'){
+      if(!await conferma({titolo:'Approvare «'+nome+'»?',testo:'Entrerà nell\'app come condòmino della sua unità.',azione:'Approva'})) return;
     }
     b.disabled=true;
     var nuovo = b.dataset.a==='appr' ? 'approvato' : b.dataset.a==='rif' ? 'rifiutato' : 'libero';
@@ -1245,7 +1263,7 @@ async function renderAdmin(){
       alert('Subadmin aggiunto: '+em+'.\nDovrà chiudere e riaprire l\'app per avere i poteri.'); renderAdmin();
     };
     v.querySelectorAll('.rm-adm').forEach(function(b){b.onclick=async function(){
-      if(!confirm('Togliere i poteri di amministratore a «'+b.dataset.email+'»?')) return;
+      if(!await conferma({titolo:'Togliere i poteri di amministratore?',testo:b.dataset.email,azione:'Rimuovi',distruttiva:true})) return;
       if(DEMO){ DEMO_ADMINS=DEMO_ADMINS.filter(function(x){return x.email!==b.dataset.email}); renderAdmin(); return; }
       var r=await sb.from('admins').delete().eq('email',b.dataset.email); if(r.error){ alert('Errore: '+r.error.message); return; } renderAdmin();
     }});
@@ -1257,7 +1275,7 @@ async function renderAdmin(){
       alert('Accesso creato ✅\n\nDi\' a '+nome+' di andare su oasidellepalme.com e accedere con l\'email:\n'+email+'\n\nEntrerà come «'+ruolo+'».'); renderAdmin();
     };
     v.querySelectorAll('.rm-asp').forEach(function(b){b.onclick=async function(){
-      if(!confirm('Rimuovere l\'accesso speciale di «'+b.dataset.email+'»?')) return;
+      if(!await conferma({titolo:'Rimuovere l\'accesso speciale?',testo:b.dataset.email+' non potrà più entrare nell\'app.',azione:'Rimuovi',distruttiva:true})) return;
       if(DEMO){ DEMO_ASP=DEMO_ASP.filter(function(x){return x.email!==b.dataset.email}); renderAdmin(); return; }
       var r=await sb.from('accessi_speciali').delete().eq('email',b.dataset.email); if(r.error){ alert('Errore: '+r.error.message); return; } renderAdmin();
     }});
@@ -1376,7 +1394,7 @@ async function renderVoti(){
     var opzioni=opzOf(s);
     var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
     var isMyPal=!pal || (userUnita && s.palazzina===userUnita.palazzina);   // admin in supervisione: osserva le altre palazzine, non ci vota
-    var canManage=adminView()||(pal&&isMyPal&&myDeleg);   // il delegato/vice gestisce i voti della SUA palazzina
+    var canManage=isMyPal && (adminView()||(pal&&myDeleg));   // gestione solo nella PROPRIA palazzina (Corrado: "admin non tocca i voti altrui" — sui voti altrui è osservatore puro)
     var h='<div class="card"><div style="font-weight:600;font-size:18px">'+(pal&&!isMyPal?'<span class="pill" style="margin-right:6px">Pal. '+esc(s.palazzina)+'</span>':'')+esc(s.domanda)+'</div>'+
       '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(pal?' di palazzina':'')+(s.chiuso?' · CHIUSO'+(s.chiuso_da_nome?' da '+esc(s.chiuso_da_nome):''):'')+'</div>';
     if(pal && !isMyPal){
@@ -1467,12 +1485,19 @@ async function renderVoti(){
   v.querySelectorAll('.vt-vote').forEach(function(b){b.onclick=function(){votaSondaggio(b.dataset.s,b.dataset.o)}});
   var nb=$('vt-new'); if(nb) nb.onclick=function(){nuovoSondaggio(false)};
   var np=$('vt-new-pal'); if(np) np.onclick=function(){nuovoSondaggio(true)};
-  v.querySelectorAll('.vt-appr').forEach(function(b){b.onclick=function(){approveSondaggio(b.dataset.s)}});
-  v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=function(){toggleSondaggio(b.dataset.s,b.dataset.chiuso!=='1')}});
+  v.querySelectorAll('.vt-appr').forEach(function(b){b.onclick=async function(){
+    if(!await conferma({titolo:'Avallare la proposta?',testo:'Il sondaggio diventa attivo per tutti e parte la notifica.',azione:'Avalla'})) return;
+    approveSondaggio(b.dataset.s);
+  }});
+  v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=async function(){
+    var chiudi=b.dataset.chiuso!=='1';
+    if(!await conferma(chiudi?{titolo:'Chiudere il voto?',testo:'Nessuno potrà più votare finché non viene riaperto. Se è un voto di palazzina, l\'esito si congela.',azione:'Chiudi il voto'}:{titolo:'Riaprire il voto?',testo:'I condòmini potranno votare di nuovo.',azione:'Riapri'})) return;
+    toggleSondaggio(b.dataset.s,chiudi);
+  }});
   v.querySelectorAll('.vt-del').forEach(function(b){b.onclick=function(){eliminaSondaggio(b.dataset.s)}});
   v.querySelectorAll('.vt-tras').forEach(function(b){b.onclick=async function(){
     var s=sondaggi.find(function(x){return x.id===b.dataset.s}); if(!s) return;
-    if(!confirm('Trasmettere all\'amministrazione l\'ordine esecutivo?\n\n«'+s.domanda+'»\nEsito: '+b.dataset.o)) return;
+    if(!await conferma({titolo:'Trasmettere l\'ordine esecutivo?',testo:'«'+s.domanda+'»\nEsito: '+b.dataset.o+'\n\nL\'amministrazione lo riceve nella sua inbox e deve eseguirlo.',azione:'Trasmetti'})) return;
     b.disabled=true;
     if(DEMO){ var w=vinceDi(s); DEMO_ORDINI.unshift({id:'o'+Date.now(),palazzina:s.palazzina,sondaggio_id:s.id,titolo:s.domanda,opzione_vincente:b.dataset.o,esito_mm:w?Math.round(w.mm*100)/100:null,stato:'da_eseguire',trasmesso_da_nome:userNome,created_at:new Date().toISOString()}); renderVoti(); return; }
     var r=await sb.from('ordini_esecutivi').insert({palazzina:s.palazzina,sondaggio_id:s.id,titolo:s.domanda,opzione_vincente:b.dataset.o,trasmesso_da:userId,trasmesso_da_nome:userNome});
@@ -1511,7 +1536,7 @@ async function renderOrdini(){
   if(fatti.length) html+='<div class="cap-grp">Eseguiti ('+fatti.length+')</div>'+fatti.map(function(o){return ordineCard(o,false)}).join('');
   v.innerHTML=html;
   v.querySelectorAll('.ord-st').forEach(function(b){b.onclick=async function(){
-    if(b.dataset.st==='eseguito' && !confirm('Segnare questo ordine come ESEGUITO?')) return;
+    if(!await conferma(b.dataset.st==='eseguito'?{titolo:'Ordine eseguito?',testo:'La palazzina vedrà l\'ordine come completato, con la tua firma.',azione:'Segna eseguito'}:{titolo:'Prendere in carico l\'ordine?',testo:'La palazzina vedrà che l\'amministrazione ci sta lavorando.',azione:'Prendi in carico'})) return;
     b.disabled=true;
     if(DEMO){ var o=DEMO_ORDINI.find(function(x){return x.id===b.dataset.id}); if(o){o.stato=b.dataset.st;o.aggiornato_da_nome=userNome;o.aggiornato_il=new Date().toISOString();} renderOrdini(); return; }
     var r=await sb.from('ordini_esecutivi').update({stato:b.dataset.st}).eq('id',b.dataset.id);
@@ -1582,7 +1607,7 @@ async function toggleSondaggio(sid,chiudi){
   renderVoti();
 }
 async function eliminaSondaggio(sid){
-  if(!confirm('Eliminare questo sondaggio e tutti i suoi voti?')) return;
+  if(!await conferma({titolo:'Eliminare il sondaggio?',testo:'Spariranno anche tutti i voti espressi. Non si torna indietro.',azione:'Elimina',distruttiva:true})) return;
   if(DEMO){ DEMO_SONDAGGI=DEMO_SONDAGGI.filter(function(x){return x.id!==sid}); DEMO_VOTI=DEMO_VOTI.filter(function(x){return x.sondaggio_id!==sid}); renderVoti(); return; }
   var up=await sb.from('sondaggi').delete().eq('id',sid);
   if(up.error){ alert(/foreign key|ordini_esecutivi/i.test(up.error.message)?'Questo voto ha generato un ordine esecutivo: non si elimina (è il registro della decisione).':'Errore: '+up.error.message); return; }
@@ -1659,7 +1684,8 @@ function renderAvvisi(){
 async function cambiaStatoAvviso(a,nuovo){
   if(!a||!a.id){ alert('Avviso senza id: operazione annullata.'); return; }
   if(!puoChiudere(a)){ alert('Solo chi ha aperto l\'avviso (o l\'amministrazione) può aggiornarlo.'); return; }
-  if(nuovo==='risolto' && !confirm('Segnare questo avviso come RISOLTO?')) return;
+  if(nuovo==='risolto' && !await conferma({titolo:'Avviso risolto?',testo:'L\'avviso passa tra i risolti, con la tua firma.',azione:'Segna risolto'})) return;
+  if(nuovo==='preso_in_carico' && !await conferma({titolo:'Prendere in carico l\'avviso?',testo:'Gli altri vedranno che ci stai lavorando, con la tua firma.',azione:'Prendi in carico'})) return;
   var patch={stato:nuovo};
   if(nuovo==='preso_in_carico'){ if(!a.preso_at) patch.preso_at=new Date().toISOString(); patch.preso_da_nome=userNome; }
   if(nuovo==='risolto'){ patch.chiuso_il=new Date().toISOString(); patch.chiuso_da=userId; patch.chiuso_da_nome=userNome; }
@@ -1752,7 +1778,7 @@ function richiesteHtml(){
 }
 async function confermaRichiesta(r){
   if(!(isGestore()||adminView())){ alert('Solo il gestore può confermare la richiesta.'); return; }
-  if(!confirm('Confermare la richiesta "'+r.oggetto+'"? Passerà all\'amministratore.')) return;
+  if(!await conferma({titolo:'Confermare la richiesta?',testo:'«'+r.oggetto+'» passerà all\'amministratore nel dossier settimanale.',azione:'Conferma'})) return;
   var patch={stato:'confermata',confermata_da:(userNome||userRuolo||'Gestore'),confermata_il:new Date().toISOString()};
   if(DEMO){ Object.assign(r,patch); renderPiscina(); return; }
   var res=await sb.from('richieste_piscina').update(patch).eq('id',r.id).select('id'); if(res.error){ alert('Errore: '+res.error.message); return; }
@@ -2100,7 +2126,7 @@ function renderPiscina(){
   v.querySelectorAll('.cmp-tog').forEach(function(b){b.onclick=function(){var c=COMPITI_BAGNINO.find(function(x){return x.id===b.dataset.id;});if(c)toggleCompito(c);}});
   var am=$('acc-me'); if(am) am.onclick=togglePresenza;
   var ast=$('acc-staff'); if(ast) ast.onclick=toggleStaff;
-  v.querySelectorAll('.pres-out').forEach(function(b){b.onclick=function(){ if(confirm('Far uscire questa persona dalla vasca?')) staffRemovePresenza(b.dataset.aid); }});
+  v.querySelectorAll('.pres-out').forEach(function(b){b.onclick=async function(){ if(await conferma({titolo:'Far uscire questa persona?',testo:'Verrà rimossa dal conteggio della vasca.',azione:'Fai uscire'})) staffRemovePresenza(b.dataset.aid); }});
   v.querySelectorAll('.acc-osp').forEach(function(b){b.onclick=function(){onOsp(+b.dataset.n);}});
   var mn=$('mag-new'); if(mn) mn.onclick=aggiungiProdotto;
   v.querySelectorAll('.mag-foto').forEach(function(b){b.onclick=function(){openImage(b.dataset.u);}});
@@ -2205,6 +2231,7 @@ async function prenotaTennis(giornoStr,ora){
   await loadTennis(); renderTennis();
 }
 async function annullaTennis(id){
+  if(!await conferma({titolo:'Annullare la prenotazione?',testo:'L\'ora torna libera per gli altri condòmini.',azione:'Annulla prenotazione',distruttiva:true})) return;
   if(DEMO){ prenotazioniTennis=prenotazioniTennis.filter(function(p){return String(p.id)!==String(id);}); renderTennis(); return; }
   var d=await sb.from('prenotazioni_tennis').delete().eq('id',id);
   if(d.error){ alert('Errore: '+d.error.message); return; }
@@ -2381,7 +2408,7 @@ async function cambiaStatoTorneo(tid,stato){
 }
 async function eliminaTorneo(tid){
   if(!adminView()) return;
-  if(!confirm('Eliminare questo torneo e tutte le iscrizioni?')) return;
+  if(!await conferma({titolo:'Eliminare il torneo?',testo:'Spariranno anche tutte le iscrizioni e le partite.',azione:'Elimina',distruttiva:true})) return;
   if(DEMO){ tornei=tornei.filter(function(x){return x.id!==tid;}); iscrizioniTorneo=iscrizioniTorneo.filter(function(x){return x.torneo_id!==tid;}); partiteTorneo=partiteTorneo.filter(function(x){return x.torneo_id!==tid;}); renderTornei(); return; }
   var d=await sb.from('tornei').delete().eq('id',tid); if(d.error){ alert('Errore: '+d.error.message); return; }
   await loadTornei(); renderTornei();
@@ -2392,7 +2419,7 @@ async function generaCalendario(tid){
   var isc=iscrittiDi(tid);
   if(isc.length<2){ alert('Servono almeno 2 iscritti per generare il calendario.'); return; }
   if(partiteDi(tid).length){ alert('Il calendario è già stato generato.'); return; }
-  if(!confirm('Genero il calendario del girone: '+(isc.length*(isc.length-1)/2)+' partite (tutti contro tutti). Il torneo passa "in corso".')) return;
+  if(!await conferma({titolo:'Generare il calendario?',testo:'Girone all\'italiana: '+(isc.length*(isc.length-1)/2)+' partite (tutti contro tutti). Il torneo passa "in corso".',azione:'Genera calendario'})) return;
   var nuove=[];
   for(var i=0;i<isc.length;i++) for(var j=i+1;j<isc.length;j++){
     nuove.push({torneo_id:tid,a_id:isc[i].autore_id,a_nome:isc[i].autore_nome,a_unita:isc[i].unita,b_id:isc[j].autore_id,b_nome:isc[j].autore_nome,b_unita:isc[j].unita,vincitore:null,stato:'da_giocare'});
@@ -2505,7 +2532,7 @@ async function confermaSala(id){
   await loadSala(); renderSala();
 }
 async function annullaSala(id){
-  if(!confirm('Annullare questa prenotazione della sala?')) return;
+  if(!await conferma({titolo:'Annullare la prenotazione?',testo:'Lo spazio torna libero per quella data.',azione:'Annulla prenotazione',distruttiva:true})) return;
   if(DEMO){ prenotazioniSala=prenotazioniSala.filter(function(x){return String(x.id)!==String(id);}); renderSala(); return; }
   var d=await sb.from('prenotazioni_sala').delete().eq('id',id); if(d.error){ alert('Errore: '+d.error.message); return; }
   await loadSala(); renderSala();
@@ -2644,7 +2671,7 @@ async function segnaRitirato(id){
   await loadPacchi(); renderPacchi(); updatePacchiBadge();
 }
 async function eliminaPacco(id){
-  if(!confirm('Eliminare questo pacco?')) return;
+  if(!await conferma({titolo:'Eliminare il pacco?',testo:'La registrazione sparisce dall\'archivio.',azione:'Elimina',distruttiva:true})) return;
   if(DEMO){ pacchi=pacchi.filter(function(x){return String(x.id)!==String(id);}); renderPacchi(); updatePacchiBadge(); return; }
   var d=await sb.from('pacchi').delete().eq('id',id); if(d.error){ alert('Errore: '+d.error.message); return; }
   await loadPacchi(); renderPacchi(); updatePacchiBadge();
@@ -2741,7 +2768,7 @@ function nuovoAnnuncio(){
   };
 }
 async function eliminaAnnuncio(id){
-  if(!confirm('Eliminare questo annuncio?')) return;
+  if(!await conferma({titolo:'Eliminare l\'annuncio?',testo:'Sparisce dalla Bacheca per tutti.',azione:'Elimina',distruttiva:true})) return;
   if(DEMO){ annunci=annunci.filter(function(x){return String(x.id)!==String(id);}); renderAnnunci(); return; }
   var d=await sb.from('annunci').delete().eq('id',id); if(d.error){ alert('Errore: '+d.error.message); return; }
   await loadAnnunci(); renderAnnunci();
