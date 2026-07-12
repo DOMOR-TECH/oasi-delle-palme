@@ -182,6 +182,7 @@
   <div id="view-sala" class="hide"></div>
   <div id="view-pacchi" class="hide"></div>
   <div id="view-annunci" class="hide"></div>
+  <div id="view-ordini" class="hide"></div>
   <div id="view-admin" class="hide"></div>
 </div>
 
@@ -194,7 +195,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v100';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v101';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -323,7 +324,7 @@ async function updateAdminBadge(){
 
 /* ---------- AUTH / INIT ---------- */
 async function init(){
-  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; isSuper=true; puoSegnalare=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; var _dr=new URLSearchParams(location.search).get('ruolo'); if(_dr){ var _rl=_dr.toLowerCase(); if(['bagnino','gestore'].indexOf(_rl)>=0){ userRuolo=_dr; userUnita=null; isAdmin=false; isSuper=false; } else if(['custode','portiere','avvocato','guest','ospite'].indexOf(_rl)>=0){ userRuolo=_dr; userUnita=null; isAdmin=false; isSuper=false; puoSegnalare=(['avvocato','guest','ospite'].indexOf(_rl)<0); /* avvocato/guest/ospite = sola lettura; custode/portiere = possono segnalare */ } else if(_rl==='condomino'){ isAdmin=false; isSuper=false; userUnita={palazzina:'Demo',interno:'200',unita:'200',millesimi:0}; } $('hsub').textContent='PROVA · '+_dr; }
+  if(DEMO){ userId='demo'; userNome='Demo Tester'; userUnita={palazzina:'I',interno:'8',unita:'I/08',millesimi:6.5}; userStato='approvato'; isAdmin=true; isSuper=true; puoSegnalare=true; $('hsub').textContent='MODALITÀ PROVA (senza login)'; var _dr=new URLSearchParams(location.search).get('ruolo'); if(_dr){ var _rl=_dr.toLowerCase(); if(['bagnino','gestore'].indexOf(_rl)>=0){ userRuolo=_dr; userUnita=null; isAdmin=false; isSuper=false; } else if(['custode','portiere','avvocato','guest','ospite','amministratore'].indexOf(_rl)>=0){ userRuolo=_dr; userUnita=null; isAdmin=false; isSuper=false; puoSegnalare=(['avvocato','guest','ospite','amministratore'].indexOf(_rl)<0); /* avvocato/guest/ospite = sola lettura; custode/portiere = possono segnalare */ } else if(_rl==='condomino'){ isAdmin=false; isSuper=false; userUnita={palazzina:'Demo',interno:'200',unita:'200',millesimi:0}; } $('hsub').textContent='PROVA · '+_dr; }
     reports=[
       {id:'dr1',area:'Pal. E',servizio:'strade',servizio_nome:'Spazzatura e lavaggio strade interne',fonte:'Capitolato HG, pag. 5',stato:'problema',nota:'strade non spazzate da oltre una settimana',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()},
       {id:'dr2',area:'Pal. E',servizio:'tennis',servizio_nome:'Pulizia campo da tennis e manto erboso',fonte:'Capitolato HG, pag. 5',stato:'ok',nota:'',autore_id:'demo2',autore_nome:'Demo',risolto:false,periodo:'prec',foto_urls:[],created_at:new Date(Date.now()-9*86400000).toISOString()}
@@ -1118,7 +1119,7 @@ async function exportPDF(){
 var DEMO_ADMINS=[{email:'corradolantieri@gmail.com',super:true},{email:'caratelli@email.it',super:false}];
 var DEMO_ASP=[{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',puo_segnalare:true}];
 var PALAZZINE=['A','B','C','D','E','F','GA','GB','H','I','L','M','N'];   // 13 palazzine (verificate sul DB, spec Delegati §10.1)
-var DEMO_DELEGATI=[{palazzina:'I',delegato_autore_id:'p-lant',delegato_nome:'Lantieri Andrea - Marco - Alessandro',delegato_unita:'I/08',vice_autore_id:null,vice_nome:null,vice_unita:null}];
+var DEMO_DELEGATI=[{palazzina:'I',delegato_autore_id:'demo',delegato_nome:'Demo Tester',delegato_unita:'I/08',vice_autore_id:null,vice_nome:null,vice_unita:null}];   // in demo l'utente è delegato di Pal. I → testabili i flussi delegato
 var DEMO_LOGS=[{email:'corradolantieri@gmail.com',nome:'Meli Carmela',ruolo:'Pal. I int 9',at:new Date(Date.now()-3600000).toISOString()},{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',at:new Date(Date.now()-2*86400000).toISOString()}];
 var DEMO_ADMIN=[
   {unita:'C/02',palazzina:'C',interno:'2',nome:'Vermigli Andrea',email:'andrea.v@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-verm'},
@@ -1300,10 +1301,11 @@ async function assegnaDelegati(p,cands){
     function pick(id){ var c=cands.find(function(x){return x.autore_id===id}); return c?{id:id,nome:c.nome||c.unita,unita:c.unita}:{id:null,nome:null,unita:null}; }
     var D=pick(dId), V=pick(vId);
     var rec={palazzina:p,delegato_autore_id:D.id,delegato_nome:D.nome,delegato_unita:D.unita,vice_autore_id:V.id,vice_nome:V.nome,vice_unita:V.unita,updated_at:new Date().toISOString()};
-    if(DEMO){ DEMO_DELEGATI=DEMO_DELEGATI.filter(function(d){return d.palazzina!==p}); DEMO_DELEGATI.push(rec); m.remove(); renderAdmin(); return; }
+    if(DEMO){ DEMO_DELEGATI=DEMO_DELEGATI.filter(function(d){return d.palazzina!==p}); DEMO_DELEGATI.push(rec); myDeleg=null; m.remove(); renderAdmin(); return; }
     var btn=$('dl-ok'); btn.disabled=true; btn.textContent='Salvo…';
     var up=await sb.from('delegati').upsert(rec,{onConflict:'palazzina'});
     if(up.error){ warn('Errore: '+up.error.message); btn.disabled=false; btn.textContent='Salva'; return; }
+    myDeleg=null;   // il mio status delegato può essere cambiato: si ricarica al prossimo renderVoti
     m.remove(); renderAdmin();
   };
 }
@@ -1311,14 +1313,23 @@ async function assegnaDelegati(p,cands){
 /* ---------- VIEW: VOTI (sondaggi informali, pesati per millesimi, palesi) ---------- */
 var DEMO_SONDAGGI=[
   {id:'s1',domanda:'Sei a favore di valutare il cambio di amministratore per il 2027?',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Admin'},
-  {id:'s2',domanda:'Proposta: installare rastrelliere per le biciclette?',opzioni:['Sì','No'],chiuso:false,approvato:false,proposto_da:'u9',autore_nome:'Coccia Anna'}
+  {id:'s2',domanda:'Proposta: installare rastrelliere per le biciclette?',opzioni:['Sì','No'],chiuso:false,approvato:false,proposto_da:'u9',autore_nome:'Coccia Anna'},
+  {id:'sp1',domanda:'Rinnovare le piante dei pilotis della palazzina?',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Demo Tester',proposto_da:'demo',palazzina:'I',tipo:'pal_interna'}   // voto di palazzina (demo: l'utente è delegato di I)
 ];
 var DEMO_VOTI=[
   {sondaggio_id:'s1',unita:'A/07',autore_id:'u1',autore_nome:'Romani Barbara',millesimi:6.8,opzione:'Sì'},
   {sondaggio_id:'s1',unita:'F/03',autore_id:'u2',autore_nome:'Bruschi - Caratelli',millesimi:5.7,opzione:'Sì'},
   {sondaggio_id:'s1',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:4.9,opzione:'No'},
-  {sondaggio_id:'s1',unita:'I/08',autore_id:'co-altro',autore_nome:'Lantieri Andrea - Marco - Alessandro',millesimi:6.5,opzione:'No'}   // un comproprietario della MIA unità ha già votato → io vedo ma non cambio
+  {sondaggio_id:'s1',unita:'I/08',autore_id:'co-altro',autore_nome:'Lantieri Andrea - Marco - Alessandro',millesimi:6.5,opzione:'No'},   // un comproprietario della MIA unità ha già votato → io vedo ma non cambio
+  {sondaggio_id:'sp1',unita:'I/09',autore_id:'u-meli',autore_nome:'Meli Carmela',millesimi:260.4,opzione:'Sì'},        // voti di palazzina: pesi in mm DI PALAZZINA (/1000 interni)
+  {sondaggio_id:'sp1',unita:'I/03',autore_id:'u-i03',autore_nome:'Ferraguto Luca',millesimi:170.2,opzione:'Sì'},
+  {sondaggio_id:'sp1',unita:'I/05',autore_id:'u-i05',autore_nome:'Boschi Anna',millesimi:120.0,opzione:'No'}
 ];
+var DEMO_MM_PAL=78.5;   // ≈ mm di palazzina dell'unità demo I/08 (6,5/82,83×1000)
+var DEMO_ORDINI=[
+  {id:'o1',palazzina:'I',sondaggio_id:'sp0',titolo:'Sostituire la rastrelliera bici rotta ai pilotis',opzione_vincente:'Sì',esito_mm:612.4,stato:'in_corso',trasmesso_da_nome:'Demo Tester',created_at:'2026-07-10T10:00:00Z',aggiornato_da_nome:'Amministrazione',aggiornato_il:'2026-07-11T09:00:00Z'}
+];
+var myDeleg=null;   // sono delegato/vice della MIA palazzina? (null = da caricare al primo renderVoti)
 async function renderVoti(){
   var v=$('view-voti'); v.innerHTML='<div class="spin">Carico…</div>';
   var sondaggi, voti;
@@ -1329,10 +1340,94 @@ async function renderVoti(){
     sondaggi=rs.data||[];
     var rv=await sb.from('voti').select('*'); voti=rv.error?[]:(rv.data||[]);
   }
-  var attivi=sondaggi.filter(function(s){return s.approvato!==false});
-  var proposte=sondaggi.filter(function(s){return s.approvato===false && (adminView() || s.proposto_da===userId)});   // in vista condòmino l'admin vede solo le proprie proposte
+  if(myDeleg===null){
+    if(!userUnita){ myDeleg=false; }
+    else if(DEMO){ var dd=DEMO_DELEGATI.find(function(d){return d.palazzina===userUnita.palazzina}); myDeleg=!!(dd&&(dd.delegato_autore_id===userId||dd.vice_autore_id===userId)); }
+    else { var rd=await sb.from('delegati').select('delegato_autore_id,vice_autore_id').eq('palazzina',userUnita.palazzina).maybeSingle(); myDeleg=!!(rd.data&&(rd.data.delegato_autore_id===userId||rd.data.vice_autore_id===userId)); }
+  }
+  var ordini=[];
+  if(userUnita){
+    if(DEMO){ ordini=DEMO_ORDINI.filter(function(o){return o.palazzina===userUnita.palazzina}); }
+    else { var ro=await sb.from('ordini_esecutivi').select('*').eq('palazzina',userUnita.palazzina).order('created_at',{ascending:false}); ordini=ro.error?[]:(ro.data||[]); }
+  }
+  var ordBySond={}; ordini.forEach(function(o){ if(o.sondaggio_id) ordBySond[o.sondaggio_id]=o; });
+  var palMine=userUnita?sondaggi.filter(function(s){return s.palazzina===userUnita.palazzina}):[];
+  var generali=sondaggi.filter(function(s){return !s.palazzina});
+  var attivi=generali.filter(function(s){return s.approvato!==false});
+  var proposte=generali.filter(function(s){return s.approvato===false && (adminView() || s.proposto_da===userId)});   // in vista condòmino l'admin vede solo le proprie proposte
   function opzOf(s){return Array.isArray(s.opzioni)? s.opzioni : (typeof s.opzioni==='string'? JSON.parse(s.opzioni):['Sì','No','Astenuto'])}
+  function vinceDi(s){   // risposta AZIONABILE oltre 500/1000 di palazzina (No/Astenuto vincenti = nessuna azione)
+    var sv=voti.filter(function(x){return x.sondaggio_id===s.id}), win=null;
+    opzOf(s).forEach(function(o){
+      if(/^(no\b|non\b|astenut|contrari)/i.test(o.trim())) return;   // risposte negative/astensione non generano ordini (\b: "Noleggiare" passa, "No grazie" no)
+      var mm=sv.filter(function(x){return x.opzione===o}).reduce(function(t,x){return t+(+x.millesimi||0)},0);
+      if(mm>500 && (!win||mm>win.mm)) win={o:o,mm:mm};
+    });
+    return win;
+  }
+  function card(s,pal){
+    var sv=voti.filter(function(x){return x.sondaggio_id===s.id});
+    var myVote=sv.find(function(x){return x.autore_id===userId});
+    var unitVote=sv.find(function(x){return userUnita && x.unita===userUnita.unita});   // il voto è dell'UNITÀ
+    var mine=!!myVote;
+    var opzioni=opzOf(s);
+    var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
+    var canManage=adminView()||(pal&&myDeleg);   // il delegato/vice gestisce i voti della SUA palazzina
+    var h='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(s.domanda)+'</div>'+
+      '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(pal?' di palazzina':'')+(s.chiuso?' · CHIUSO'+(s.chiuso_da_nome?' da '+esc(s.chiuso_da_nome):''):'')+'</div>';
+    if((!unitVote || mine) && !s.chiuso && approvato() && userUnita){
+      h+='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px">'+opzioni.map(function(o){return '<button class="vt-vote" data-s="'+esc(s.id)+'" data-o="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div>';
+    } else if(unitVote && !mine && approvato() && !s.chiuso){
+      h+='<div class="sub" style="margin-bottom:4px;color:var(--ocra)">Ha già votato un comproprietario della tua unità. Il voto è <b>dell\'unità</b>: lo vedi, ma non puoi cambiarlo.</div>';
+    } else if(!userUnita && approvato() && !s.chiuso){
+      h+='<div class="sub" style="margin-bottom:4px">Il voto è dell\'unità: i non-condòmini (custode, avvocato…) non votano.</div>';
+    } else if(!approvato() && !unitVote && !s.chiuso){
+      h+='<div class="sub" style="margin-bottom:4px">Per votare devi essere un condòmino confermato.</div>';
+    }
+    opzioni.forEach(function(o){
+      var ov=sv.filter(function(x){return x.opzione===o});
+      var mm=ov.reduce(function(t,x){return t+(+x.millesimi||0)},0);
+      var pct=totMm>0?Math.round(mm/totMm*100):0;
+      h+='<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:15px;gap:8px">'+
+        '<span>'+(unitVote&&unitVote.opzione===o?'<b>'+esc(o)+' ✓ ('+(mine?'il tuo voto':'voto dell\'unità')+')</b>':esc(o))+'</span>'+
+        '<span style="color:var(--hint);white-space:nowrap">'+ov.length+' u · '+mm.toFixed(1).replace('.',',')+' mm</span></div>'+
+        '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--area,var(--ok))"></div></div>'+
+        (ov.length?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+ov.map(function(x){return esc(x.autore_nome)}).join(', ')+'</div>':'')+'</div>';
+    });
+    if(pal){
+      var ord=ordBySond[s.id];
+      if(ord){ h+='<div class="sub" style="margin-top:10px">📨 Ordine esecutivo trasmesso — '+ordStato(ord.stato)[1]+'.</div>'; }
+      else if(s.chiuso){
+        var win=vinceDi(s);
+        if(win && canManage) h+='<button class="vt-tras" data-s="'+esc(s.id)+'" data-o="'+esc(win.o)+'" style="margin-top:10px;border-color:var(--ok);color:var(--ok)">📨 Trasmetti ordine esecutivo: «'+esc(win.o)+'»</button>';
+        else if(win) h+='<div class="sub" style="margin-top:10px">«'+esc(win.o)+'» ha superato 500/1000 di palazzina: il delegato può trasmettere l\'ordine all\'amministrazione.</div>';
+        else h+='<div class="sub" style="margin-top:10px">Nessuna risposta ha superato 500/1000 di palazzina: la proposta decade, nessuna azione.</div>';
+      } else if(canManage){
+        var winNow=vinceDi(s);
+        if(winNow) h+='<div class="sub" style="margin-top:10px">«'+esc(winNow.o)+'» è oltre 500/1000: chiudendo il voto potrai trasmettere l\'ordine.</div>';
+      }
+    }
+    if(canManage && !(pal && ordBySond[s.id])){ h+='<div style="display:flex;gap:7px;margin-top:12px">'+   // un voto già trasmesso come ordine non si riapre (M1 gate; enforced anche a DB, v44)
+      '<button class="vt-close" data-s="'+esc(s.id)+'" data-chiuso="'+(s.chiuso?'1':'0')+'" style="font-size:14px">'+(s.chiuso?'Riapri':'Chiudi')+'</button>'+
+      (adminView()?'<button class="vt-del" data-s="'+esc(s.id)+'" style="font-size:14px;border-color:var(--bad);color:var(--bad)">Elimina</button>':'')+'</div>'; }
+    return h+'</div>';
+  }
   var html=vHead('🗳️','Voti','Sondaggi della comunità — un voto per unità.');
+  // ===== voti della MIA palazzina (spazio segregato) =====
+  if(userUnita){
+    html+='<div class="cap-grp">🏠 Pal. '+esc(userUnita.palazzina)+' — voti di palazzina</div>';
+    if(myDeleg){
+      html+='<button class="btn-primary" id="vt-new-pal" style="margin-bottom:8px">＋ Apri un voto di palazzina</button>'+
+        '<div class="sub" style="margin-bottom:10px">Sei delegato o vice: questi voti valgono solo per la tua palazzina, pesati sui suoi millesimi (scala /1000 interna). Una risposta oltre 500 diventa un ordine esecutivo per l\'amministrazione.</div>';
+    }
+    if(!palMine.length && !ordini.length){ html+='<div class="empty">Nessun voto di palazzina.'+(myDeleg?'':' Li apre il delegato (o il vice).')+'</div>'; }
+    palMine.forEach(function(s){ html+=card(s,true); });
+    if(ordini.length){
+      html+='<div class="cap-grp">📨 Ordini esecutivi della palazzina</div>';
+      ordini.forEach(function(o){ html+=ordineCard(o,false); });
+    }
+    html+='<div class="cap-grp">Sondaggi del condominio</div>';
+  }
   if(approvato() && (adminView() || userUnita)){ html+='<button class="btn-primary" id="vt-new" style="margin-bottom:12px">＋ '+(adminView()?'Nuovo sondaggio':'Proponi un sondaggio')+'</button>'; }
   else { html+='<div class="sub" style="margin-bottom:12px">Quando sarai un condòmino confermato potrai votare e proporre sondaggi.</div>'; }
   // PROPOSTE (in attesa di avallo dell'admin)
@@ -1349,63 +1444,80 @@ async function renderVoti(){
     html+='<div class="cap-grp">Sondaggi attivi</div>';
   }
   if(!attivi.length){ html+='<div class="empty">Nessun sondaggio attivo.'+(approvato()?' '+(adminView()?'Creane uno':'Proponine uno')+' col pulsante qui sopra.':'')+'</div>'; }
-  attivi.forEach(function(s){
-    var sv=voti.filter(function(x){return x.sondaggio_id===s.id});
-    var myVote=sv.find(function(x){return x.autore_id===userId});
-    var unitVote=sv.find(function(x){return userUnita && x.unita===userUnita.unita});   // il voto è dell'UNITÀ
-    var mine=!!myVote;
-    var opzioni=opzOf(s);
-    var totMm=sv.reduce(function(t,x){return t+(+x.millesimi||0)},0);
-    html+='<div class="card"><div style="font-weight:600;font-size:18px">'+esc(s.domanda)+'</div>'+
-      '<div style="font-size:14px;color:var(--hint);margin:3px 0 10px">'+sv.length+' voti · '+totMm.toFixed(1).replace('.',',')+'/1000 mm'+(s.chiuso?' · CHIUSO':'')+'</div>';
-    if((!unitVote || mine) && !s.chiuso && approvato() && userUnita){
-      html+='<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px">'+opzioni.map(function(o){return '<button class="vt-vote" data-s="'+esc(s.id)+'" data-o="'+esc(o)+'">'+esc(o)+'</button>'}).join('')+'</div>';
-    } else if(unitVote && !mine && approvato() && !s.chiuso){
-      html+='<div class="sub" style="margin-bottom:4px;color:var(--ocra)">Ha già votato un comproprietario della tua unità. Il voto è <b>dell\'unità</b>: lo vedi, ma non puoi cambiarlo.</div>';
-    } else if(!userUnita && approvato() && !s.chiuso){
-      html+='<div class="sub" style="margin-bottom:4px">Il voto è dell\'unità: i non-condòmini (custode, avvocato…) non votano.</div>';
-    } else if(!approvato() && !unitVote && !s.chiuso){
-      html+='<div class="sub" style="margin-bottom:4px">Per votare devi essere un condòmino confermato.</div>';
-    }
-    opzioni.forEach(function(o){
-      var ov=sv.filter(function(x){return x.opzione===o});
-      var mm=ov.reduce(function(t,x){return t+(+x.millesimi||0)},0);
-      var pct=totMm>0?Math.round(mm/totMm*100):0;
-      html+='<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:15px;gap:8px">'+
-        '<span>'+(unitVote&&unitVote.opzione===o?'<b>'+esc(o)+' ✓ ('+(mine?'il tuo voto':'voto dell\'unità')+')</b>':esc(o))+'</span>'+
-        '<span style="color:var(--hint);white-space:nowrap">'+ov.length+' u · '+mm.toFixed(1).replace('.',',')+' mm</span></div>'+
-        '<div style="height:8px;background:var(--line);border-radius:5px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--area,var(--ok))"></div></div>'+
-        (ov.length?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+ov.map(function(x){return esc(x.autore_nome)}).join(', ')+'</div>':'')+'</div>';
-    });
-    if(adminView()){ html+='<div style="display:flex;gap:7px;margin-top:12px">'+
-      '<button class="vt-close" data-s="'+esc(s.id)+'" data-chiuso="'+(s.chiuso?'1':'0')+'" style="font-size:14px">'+(s.chiuso?'Riapri':'Chiudi')+'</button>'+
-      '<button class="vt-del" data-s="'+esc(s.id)+'" style="font-size:14px;border-color:var(--bad);color:var(--bad)">Elimina</button></div>'; }
-    html+='</div>';
-  });
+  attivi.forEach(function(s){ html+=card(s,false); });
   v.innerHTML=html;
   v.querySelectorAll('.vt-vote').forEach(function(b){b.onclick=function(){votaSondaggio(b.dataset.s,b.dataset.o)}});
-  var nb=$('vt-new'); if(nb) nb.onclick=nuovoSondaggio;
-  if(adminView()){
-    v.querySelectorAll('.vt-appr').forEach(function(b){b.onclick=function(){approveSondaggio(b.dataset.s)}});
-    v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=function(){toggleSondaggio(b.dataset.s,b.dataset.chiuso!=='1')}});
-    v.querySelectorAll('.vt-del').forEach(function(b){b.onclick=function(){eliminaSondaggio(b.dataset.s)}});
+  var nb=$('vt-new'); if(nb) nb.onclick=function(){nuovoSondaggio(false)};
+  var np=$('vt-new-pal'); if(np) np.onclick=function(){nuovoSondaggio(true)};
+  v.querySelectorAll('.vt-appr').forEach(function(b){b.onclick=function(){approveSondaggio(b.dataset.s)}});
+  v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=function(){toggleSondaggio(b.dataset.s,b.dataset.chiuso!=='1')}});
+  v.querySelectorAll('.vt-del').forEach(function(b){b.onclick=function(){eliminaSondaggio(b.dataset.s)}});
+  v.querySelectorAll('.vt-tras').forEach(function(b){b.onclick=async function(){
+    var s=sondaggi.find(function(x){return x.id===b.dataset.s}); if(!s) return;
+    if(!confirm('Trasmettere all\'amministrazione l\'ordine esecutivo?\n\n«'+s.domanda+'»\nEsito: '+b.dataset.o)) return;
+    b.disabled=true;
+    if(DEMO){ var w=vinceDi(s); DEMO_ORDINI.unshift({id:'o'+Date.now(),palazzina:s.palazzina,sondaggio_id:s.id,titolo:s.domanda,opzione_vincente:b.dataset.o,esito_mm:w?Math.round(w.mm*100)/100:null,stato:'da_eseguire',trasmesso_da_nome:userNome,created_at:new Date().toISOString()}); renderVoti(); return; }
+    var r=await sb.from('ordini_esecutivi').insert({palazzina:s.palazzina,sondaggio_id:s.id,titolo:s.domanda,opzione_vincente:b.dataset.o,trasmesso_da:userId,trasmesso_da_nome:userNome});
+    if(r.error){ alert('Errore: '+r.error.message); b.disabled=false; return; }
+    renderVoti();
+  }});
+}
+/* ---------- ORDINI ESECUTIVI (inbox amministrazione + card riusata nella sezione palazzina) ---------- */
+function ordStato(st){ return st==='eseguito'?['✅','Eseguito']:st==='in_corso'?['🔧','In corso']:['📨','Da eseguire']; }
+function ordineCard(o,manage){
+  var d=new Date(o.created_at), st=ordStato(o.stato);
+  var h='<div class="card"><div style="font-weight:600;font-size:17px">'+esc(o.titolo)+'</div>'+
+    '<div style="font-size:14px;color:var(--hint);margin:3px 0 6px">Pal. '+esc(o.palazzina)+' · esito «'+esc(o.opzione_vincente)+'»'+(o.esito_mm?' · '+(+o.esito_mm).toFixed(1).replace('.',',')+'/1000 mm di palazzina':'')+'</div>'+
+    '<div style="font-size:14px;color:var(--hint)">trasmesso da '+esc(o.trasmesso_da_nome||'—')+' il '+d.toLocaleDateString('it-IT')+'</div>'+
+    '<div style="margin-top:8px"><span class="pill">'+st[0]+' '+st[1]+'</span>'+(o.aggiornato_da_nome?' <span class="sub">agg. da '+esc(o.aggiornato_da_nome)+(o.aggiornato_il?' il '+new Date(o.aggiornato_il).toLocaleDateString('it-IT'):'')+'</span>':'')+'</div>';
+  if(manage && o.stato!=='eseguito'){
+    h+='<div style="display:flex;gap:7px;margin-top:10px">'+
+      (o.stato==='da_eseguire'?'<button class="ord-st" data-id="'+esc(o.id)+'" data-st="in_corso">🔧 Prendi in carico</button>':'')+
+      '<button class="ord-st" data-id="'+esc(o.id)+'" data-st="eseguito" style="border-color:var(--ok);color:var(--ok)">✅ Segna eseguito</button></div>';
   }
+  return h+'</div>';
+}
+async function renderOrdini(){
+  var v=$('view-ordini'); v.innerHTML='<div class="spin">Carico…</div>';
+  var rows;
+  if(DEMO){ rows=DEMO_ORDINI.slice(); }
+  else {
+    var r=await sb.from('ordini_esecutivi').select('*').order('created_at',{ascending:false});
+    if(r.error){ v.innerHTML='<div class="empty">Errore: '+esc(r.error.message)+'<br><br>Hai eseguito <b>migrate_v43</b>?</div>'; return; }
+    rows=r.data||[];
+  }
+  var manage=isAmministratore()||adminView();
+  var html=vHead('📨','Ordini esecutivi','Decisioni di palazzina (oltre 500/1000 interni) che l\'amministrazione deve eseguire.');
+  var aperti=rows.filter(function(o){return o.stato!=='eseguito'}), fatti=rows.filter(function(o){return o.stato==='eseguito'});
+  html+='<div class="cap-grp">Da eseguire / in corso ('+aperti.length+')</div>'+(aperti.length?aperti.map(function(o){return ordineCard(o,manage)}).join(''):'<div class="empty">Nessun ordine in attesa. 👍</div>');
+  if(fatti.length) html+='<div class="cap-grp">Eseguiti ('+fatti.length+')</div>'+fatti.map(function(o){return ordineCard(o,false)}).join('');
+  v.innerHTML=html;
+  v.querySelectorAll('.ord-st').forEach(function(b){b.onclick=async function(){
+    if(b.dataset.st==='eseguito' && !confirm('Segnare questo ordine come ESEGUITO?')) return;
+    b.disabled=true;
+    if(DEMO){ var o=DEMO_ORDINI.find(function(x){return x.id===b.dataset.id}); if(o){o.stato=b.dataset.st;o.aggiornato_da_nome=userNome;o.aggiornato_il=new Date().toISOString();} renderOrdini(); return; }
+    var r=await sb.from('ordini_esecutivi').update({stato:b.dataset.st}).eq('id',b.dataset.id);
+    if(r.error){ alert('Errore: '+r.error.message); b.disabled=false; return; }
+    renderOrdini();
+  }});
 }
 async function votaSondaggio(sid,opzione){
-  if(DEMO){ DEMO_VOTI=DEMO_VOTI.filter(function(x){return !(x.sondaggio_id===sid&&x.autore_id===userId)}); DEMO_VOTI.push({sondaggio_id:sid,unita:userUnita.unita,autore_id:userId,autore_nome:userNome,millesimi:userUnita.millesimi||0,opzione:opzione}); renderVoti(); return; }
+  if(DEMO){ var sd=DEMO_SONDAGGI.find(function(x){return x.id===sid}); var mmv=(sd&&sd.palazzina)?DEMO_MM_PAL:(userUnita.millesimi||0); DEMO_VOTI=DEMO_VOTI.filter(function(x){return !(x.sondaggio_id===sid&&x.autore_id===userId)}); DEMO_VOTI.push({sondaggio_id:sid,unita:userUnita.unita,autore_id:userId,autore_nome:userNome,millesimi:mmv,opzione:opzione}); renderVoti(); return; }
   if(!approvato()){ alert('Devi essere un condòmino confermato per votare.'); return; }
   if(!userUnita){ alert('Il voto è dell\'unità: i non-condòmini non votano.'); return; }
   var up=await sb.from('voti').upsert({ sondaggio_id:sid, unita:userUnita.unita, autore_id:userId, autore_nome:userNome, millesimi:(userUnita.millesimi||0), opzione:opzione },{onConflict:'sondaggio_id,unita'});
   if(up.error){ alert('Errore: '+up.error.message); return; }
   renderVoti();
 }
-function nuovoSondaggio(){
+function nuovoSondaggio(palMode){
   if(!approvato()){ alert('Devi essere un condòmino confermato.'); return; }
+  if(palMode && !(myDeleg && userUnita)){ alert('Solo il delegato (o il vice) apre i voti di palazzina.'); return; }
   // modale con risposte aggiunte UNA A UNA col tasto "+" (spec Delegati §4-bis) — default Sì/No/Astenuto
   var m=document.createElement('div');
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
   m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
-    '<div style="font-size:18px;font-weight:600;margin-bottom:12px">'+(adminView()?'Nuovo sondaggio':'Proponi un sondaggio')+'</div>'+
+    '<div style="font-size:18px;font-weight:600;margin-bottom:12px">'+(palMode?'Nuovo voto di palazzina — Pal. '+esc(userUnita.palazzina):(adminView()?'Nuovo sondaggio':'Proponi un sondaggio'))+'</div>'+
+    (palMode?'<div class="sub" style="margin-bottom:10px">Vale solo per la tua palazzina, pesato sui suoi millesimi. È subito attivo: i residenti ricevono la notifica.</div>':'')+
     '<label>Domanda</label><textarea id="sn-dom" rows="3" placeholder="es. Sei a favore di…?" style="margin:4px 0 10px;width:100%;font-size:16px;line-height:1.4;min-width:0"></textarea>'+
     '<label>Risposte possibili</label><div id="sn-opts" style="display:grid;gap:6px;margin:4px 0 8px"></div>'+
     '<button id="sn-add" style="font-size:14px">＋ Aggiungi risposta</button>'+
@@ -1428,13 +1540,14 @@ function nuovoSondaggio(){
     if(!d){ warn('Scrivi la domanda.'); return; }
     var opzioni=[],seen={}; m.querySelectorAll('.sn-opt').forEach(function(i){ var t=(i.value||'').trim(); var k=t.toLowerCase(); if(t && !seen[k]){ seen[k]=1; opzioni.push(t); } });
     if(opzioni.length<2){ warn('Servono almeno 2 risposte diverse.'); return; }
-    if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d,opzioni:opzioni,chiuso:false,approvato:adminView(),proposto_da:userId,autore_nome:userNome}); m.remove(); renderVoti(); if(!adminView())alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
+    var rec={domanda:d,opzioni:opzioni,autore_nome:userNome,approvato:palMode?true:adminView(),proposto_da:userId};
+    if(palMode){ rec.palazzina=userUnita.palazzina; rec.tipo='pal_interna'; }
+    if(DEMO){ DEMO_SONDAGGI.unshift(Object.assign({id:'s'+Date.now(),chiuso:false},rec)); m.remove(); renderVoti(); if(!palMode&&!adminView())alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
     var btn=$('sn-ok'); btn.disabled=true; btn.textContent='Invio…';
-    var rec={domanda:d,opzioni:opzioni,autore_nome:userNome,approvato:adminView(),proposto_da:userId};
     var up=await sb.from('sondaggi').insert(rec);
     if(up.error){ warn('Errore: '+up.error.message); btn.disabled=false; btn.textContent=adminView()?'Crea sondaggio':'Invia proposta'; return; }
     m.remove();
-    if(!adminView()) alert('Proposta inviata! L\'amministratore la valuterà.');
+    if(!palMode && !adminView()) alert('Proposta inviata! L\'amministratore la valuterà.');
     renderVoti();
   };
 }
@@ -1445,8 +1558,8 @@ async function approveSondaggio(sid){
   renderVoti();
 }
 async function toggleSondaggio(sid,chiudi){
-  if(DEMO){ var s=DEMO_SONDAGGI.find(function(x){return x.id===sid}); if(s)s.chiuso=chiudi; renderVoti(); return; }
-  var up=await sb.from('sondaggi').update({chiuso:chiudi}).eq('id',sid);
+  if(DEMO){ var s=DEMO_SONDAGGI.find(function(x){return x.id===sid}); if(s){s.chiuso=chiudi;s.chiuso_da_nome=chiudi?userNome:null;} renderVoti(); return; }
+  var up=await sb.from('sondaggi').update({chiuso:chiudi,chiuso_da_nome:chiudi?userNome:null}).eq('id',sid);
   if(up.error){ alert('Errore: '+up.error.message); return; }
   renderVoti();
 }
@@ -1454,7 +1567,7 @@ async function eliminaSondaggio(sid){
   if(!confirm('Eliminare questo sondaggio e tutti i suoi voti?')) return;
   if(DEMO){ DEMO_SONDAGGI=DEMO_SONDAGGI.filter(function(x){return x.id!==sid}); DEMO_VOTI=DEMO_VOTI.filter(function(x){return x.sondaggio_id!==sid}); renderVoti(); return; }
   var up=await sb.from('sondaggi').delete().eq('id',sid);
-  if(up.error){ alert('Errore: '+up.error.message); return; }
+  if(up.error){ alert(/foreign key|ordini_esecutivi/i.test(up.error.message)?'Questo voto ha generato un ordine esecutivo: non si elimina (è il registro della decisione).':'Errore: '+up.error.message); return; }
   renderVoti();
 }
 
@@ -2647,12 +2760,12 @@ function renderHome(){
   v.innerHTML=html;
   v.querySelectorAll('.mtile').forEach(function(b){ b.onclick=function(){ showView(b.dataset.go); window.scrollTo(0,0); }; });
 }
-var views={home:renderHome,zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,admin:renderAdmin};
-var VIEW_LABEL={home:'Home',zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',admin:'Admin'};
+var views={home:renderHome,zona:renderZona,bacheca:renderBacheca,dossier:renderDossier,voti:renderVoti,avvisi:renderAvvisi,piscina:renderPiscina,tennis:renderTennis,tornei:renderTornei,sala:renderSala,pacchi:renderPacchi,annunci:renderAnnunci,ordini:renderOrdini,admin:renderAdmin};
+var VIEW_LABEL={home:'Home',zona:'Controlla',bacheca:'Mappa',dossier:'Dossier',voti:'Voti',avvisi:'Avvisi',piscina:'Piscina',tennis:'Prenota',tornei:'Tornei',sala:'Feste',pacchi:'Pacchi',annunci:'Bacheca',ordini:'Ordini',admin:'Admin'};
 /* col = inchiostro d'area (testo, AA su bianco) · tint = tinta quadrotto 12-20% (design system) */
 var HUBS=[
   {id:'home',label:'Home',ic:'🏠',views:['home'],col:'var(--ok)',bg:'var(--okbg)',tint:'var(--okbg)'},
-  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala'],col:'var(--ink-comunita)',bg:'var(--abg-comunita)',tint:'var(--tint-comunita)'},
+  {id:'comunita',label:'Comunità',ic:'📣',views:['annunci','voti','sala','ordini'],col:'var(--ink-comunita)',bg:'var(--abg-comunita)',tint:'var(--tint-comunita)'},   // chip Ordini: solo amministratore/admin (filtrata in showView)
   {id:'piscina',label:'Piscina',ic:'💧',views:['piscina'],seasonal:true,col:'var(--ink-piscina)',bg:'var(--abg-piscina)',tint:'var(--tint-piscina)'},
   {id:'tennis',label:'Tennis',ic:'🎾',views:['tennis','tornei'],col:'var(--ink-tennis)',bg:'var(--abg-tennis)',tint:'var(--tint-tennis)'},
   {id:'controllo',label:'Controllo',ic:'🌿',views:['zona','bacheca','dossier','avvisi'],col:'var(--ink-verde)',bg:'var(--abg-verde)',tint:'var(--tint-verde)'},
@@ -2693,13 +2806,15 @@ function buildNav(){
 function showView(v){
   if(!views[v]) v='zona';
   if(v==='admin' && !adminView()) v='zona';   // la vista admin è raggiungibile solo in modalità amministratore
+  if(v==='ordini' && !(isAmministratore()||adminView())) v='annunci';   // inbox ordini: solo amministratore/admin (la palazzina vede i propri in Voti)
   curV=v; var hub=hubOf(v);
   $('nav').querySelectorAll('button').forEach(function(b){b.classList.toggle('active', b.dataset.hub===hub.id);});
   var sn=$('subnav'); sn.style.setProperty('--area',hub.col||''); sn.style.setProperty('--areabg',hub.bg||'');
   var wp=document.querySelector('.wrap'); if(wp){ wp.style.setProperty('--area',hub.col||''); wp.style.setProperty('--areabg',hub.bg||''); }   // il contenuto delle viste eredita il colore dell'area corrente
-  if(hub.views.length>1){
+  var vlist=hub.views.filter(function(x){return x!=='ordini' || isAmministratore() || adminView();});
+  if(vlist.length>1){
     sn.style.display='flex';
-    sn.innerHTML=hub.views.map(function(x){return '<button class="subchip'+(x===v?' active':'')+'" data-v="'+x+'">'+VIEW_LABEL[x]+'</button>';}).join('');
+    sn.innerHTML=vlist.map(function(x){return '<button class="subchip'+(x===v?' active':'')+'" data-v="'+x+'">'+VIEW_LABEL[x]+'</button>';}).join('');
     sn.querySelectorAll('.subchip').forEach(function(b){b.onclick=function(){showView(b.dataset.v);};});
   } else { sn.style.display='none'; sn.innerHTML=''; }
   Object.keys(views).forEach(function(k){ var el=$('view-'+k); if(el) el.classList.toggle('hide',k!==v); });
