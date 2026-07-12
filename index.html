@@ -194,7 +194,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v99';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v100';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -1117,6 +1117,8 @@ async function exportPDF(){
 /* ---------- VIEW: ADMIN (conferma condòmini) ---------- */
 var DEMO_ADMINS=[{email:'corradolantieri@gmail.com',super:true},{email:'caratelli@email.it',super:false}];
 var DEMO_ASP=[{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',puo_segnalare:true}];
+var PALAZZINE=['A','B','C','D','E','F','GA','GB','H','I','L','M','N'];   // 13 palazzine (verificate sul DB, spec Delegati §10.1)
+var DEMO_DELEGATI=[{palazzina:'I',delegato_autore_id:'p-lant',delegato_nome:'Lantieri Andrea - Marco - Alessandro',delegato_unita:'I/08',vice_autore_id:null,vice_nome:null,vice_unita:null}];
 var DEMO_LOGS=[{email:'corradolantieri@gmail.com',nome:'Meli Carmela',ruolo:'Pal. I int 9',at:new Date(Date.now()-3600000).toISOString()},{email:'custode@oasidellepalme.com',nome:'Mario Rossi',ruolo:'Custode',at:new Date(Date.now()-2*86400000).toISOString()}];
 var DEMO_ADMIN=[
   {unita:'C/02',palazzina:'C',interno:'2',nome:'Vermigli Andrea',email:'andrea.v@email.it',stato:'in_attesa',_tipo:'primario',autore_id:'p-verm'},
@@ -1173,9 +1175,24 @@ async function renderAdmin(){
     html+='<div style="display:grid;gap:6px;margin-top:10px">'+
       '<input id="asp-nome" placeholder="Nome e cognome" style="margin-top:0">'+
       '<input id="asp-email" type="email" placeholder="email di accesso" autocapitalize="none" autocorrect="off" style="margin-top:0">'+
-      '<input id="asp-ruolo" placeholder="Ruolo (es. Custode, Bagnino, Gestore, Avvocato, Guest)" style="margin-top:0">'+
+      '<input id="asp-ruolo" placeholder="Ruolo (es. Custode, Bagnino, Gestore, Avvocato, Guest, Amministratore)" style="margin-top:0">'+
       '<label style="display:flex;align-items:center;gap:8px;font-size:15px"><input type="checkbox" id="asp-seg" checked style="width:auto;margin:0"> Può inviare segnalazioni</label>'+
       '<button class="btn-primary" id="add-asp">Crea accesso speciale</button></div></div>';
+    // ===== 🏛️ Delegati di palazzina (modulo Delegati F0) =====
+    var delL = DEMO ? {data:DEMO_DELEGATI} : await sb.from('delegati').select('*');
+    var delMap={}; if(!delL.error) (delL.data||[]).forEach(function(d){ delMap[d.palazzina]=d; });
+    html+='<div class="cap-grp">🏛️ Delegati di palazzina</div><div class="card">'+
+      '<div class="sub" style="margin-bottom:4px">Delegato e vice sono gli <b>ambasciatori</b> della palazzina (stesse funzioni, intercambiabili). Si scelgono tra i condòmini approvati della palazzina.</div>';
+    if(delL.error){ html+='<div class="sub" style="color:var(--bad)">Errore: '+esc(delL.error.message)+'<br>Hai eseguito <b>migrate_v41_delegati_fondamenta.sql</b>?</div>'; }
+    else PALAZZINE.forEach(function(p){
+      var d=delMap[p]||{};
+      function who(nm,un){ return nm ? esc(nm)+(un?' <span style="color:var(--hint)">('+esc(un)+')</span>':'') : '—'; }
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:.5px solid var(--line)">'+
+        '<div style="min-width:0"><div style="font-size:15px;font-weight:600">Pal. '+esc(p)+'</div>'+
+        '<div class="sub">Delegato: '+who(d.delegato_nome,d.delegato_unita)+'<br>Vice: '+who(d.vice_nome,d.vice_unita)+'</div></div>'+
+        '<button class="del-edit" data-p="'+esc(p)+'" style="flex:none;font-size:13px;padding:6px 10px">✎ Assegna</button></div>';
+    });
+    html+='</div>';
   } else {   // LOGS
     var logL = DEMO ? {data:DEMO_LOGS} : await sb.from('logs').select('*').order('at',{ascending:false}).limit(200);
     if(logL.error){ html+='<div class="empty">Errore log: '+esc(logL.error.message)+'</div>'; }
@@ -1211,6 +1228,10 @@ async function renderAdmin(){
       var up=await sb.from('proprietari').update(patch).eq('unita',b.dataset.u); err=up.error;
     }
     if(err){ alert('Errore: '+err.message); b.disabled=false; return; }
+    if(nuovo==='libero' && b.dataset.aid){   // se era delegato o vice, la carica decade (best-effort: il DB comunque non gli dà più poteri, is_delegato_o_vice richiede is_approvato)
+      await sb.from('delegati').update({delegato_autore_id:null,delegato_nome:null,delegato_unita:null}).eq('delegato_autore_id',b.dataset.aid);
+      await sb.from('delegati').update({vice_autore_id:null,vice_nome:null,vice_unita:null}).eq('vice_autore_id',b.dataset.aid);
+    }
     if(userUnita && b.dataset.u===userUnita.unita && b.dataset.aid===userId){ userStato=nuovo; showBadge(); }   // se ho cambiato il MIO accesso, aggiorna il badge
     renderAdmin(); updateAdminBadge();
   }});
@@ -1239,7 +1260,52 @@ async function renderAdmin(){
       if(DEMO){ DEMO_ASP=DEMO_ASP.filter(function(x){return x.email!==b.dataset.email}); renderAdmin(); return; }
       var r=await sb.from('accessi_speciali').delete().eq('email',b.dataset.email); if(r.error){ alert('Errore: '+r.error.message); return; } renderAdmin();
     }});
+    v.querySelectorAll('.del-edit').forEach(function(b){b.onclick=function(){
+      var p=b.dataset.p;
+      var cands=appr.filter(function(r){ return r.palazzina===p && r.autore_id; });
+      assegnaDelegati(p,cands);
+    }});
   }
+}
+/* ---------- Delegati di palazzina: modale di assegnazione (F0) ---------- */
+async function assegnaDelegati(p,cands){
+  if(document.getElementById('dl-ok')) return;   // guard: doppio tap durante il fetch = seconda modale con id duplicati e bottoni morti
+  var cur={};
+  if(DEMO){ cur=DEMO_DELEGATI.find(function(d){return d.palazzina===p})||{}; }
+  else { var rc=await sb.from('delegati').select('*').eq('palazzina',p).maybeSingle(); if(rc.error){ alert('Errore: '+rc.error.message); return; } cur=rc.data||{}; }
+  if(document.getElementById('dl-ok')) return;
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  function selOf(id,curId){
+    var o='<option value="">— nessuno —</option>';
+    cands.forEach(function(c){ o+='<option value="'+esc(c.autore_id)+'"'+(c.autore_id===curId?' selected':'')+'>'+esc(c.nome||c.unita)+' ('+esc(c.unita)+')</option>'; });
+    return '<select id="'+id+'" style="width:100%;margin:4px 0 10px;font-size:16px;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--txt)">'+o+'</select>';
+  }
+  function stale(id,nm){ return id && nm && !cands.some(function(c){return c.autore_id===id}); }
+  var staleNote=(stale(cur.delegato_autore_id,cur.delegato_nome)||stale(cur.vice_autore_id,cur.vice_nome)) ?
+    '<div class="sub" style="color:var(--ocra);margin-bottom:8px">⚠️ L\'attuale titolare non è più tra i condòmini approvati: salvando, la carica passa a chi scegli qui (o a nessuno).</div>' : '';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600;margin-bottom:4px">Delegati — Pal. '+esc(p)+'</div>'+
+    '<div class="sub" style="margin-bottom:12px">'+(cands.length?'Scegli tra i condòmini approvati della palazzina.':'Nessun condòmino approvato in questa palazzina: non c\'è nessuno da nominare.')+'</div>'+staleNote+
+    '<label>Delegato</label>'+selOf('dl-del',cur.delegato_autore_id)+
+    '<label>Vice-delegato</label>'+selOf('dl-vice',cur.vice_autore_id)+
+    '<div id="dl-warn" style="color:var(--bad);font-size:14px;margin:4px 0;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="dl-x">Annulla</button><button class="btn-primary" id="dl-ok">Salva</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  $('dl-x').onclick=function(){ m.remove(); };
+  $('dl-ok').onclick=async function(){
+    function warn(t){ $('dl-warn').textContent=t; $('dl-warn').style.display='block'; }
+    var dId=$('dl-del').value, vId=$('dl-vice').value;
+    if(dId && dId===vId){ warn('Delegato e vice devono essere persone diverse.'); return; }
+    function pick(id){ var c=cands.find(function(x){return x.autore_id===id}); return c?{id:id,nome:c.nome||c.unita,unita:c.unita}:{id:null,nome:null,unita:null}; }
+    var D=pick(dId), V=pick(vId);
+    var rec={palazzina:p,delegato_autore_id:D.id,delegato_nome:D.nome,delegato_unita:D.unita,vice_autore_id:V.id,vice_nome:V.nome,vice_unita:V.unita,updated_at:new Date().toISOString()};
+    if(DEMO){ DEMO_DELEGATI=DEMO_DELEGATI.filter(function(d){return d.palazzina!==p}); DEMO_DELEGATI.push(rec); m.remove(); renderAdmin(); return; }
+    var btn=$('dl-ok'); btn.disabled=true; btn.textContent='Salvo…';
+    var up=await sb.from('delegati').upsert(rec,{onConflict:'palazzina'});
+    if(up.error){ warn('Errore: '+up.error.message); btn.disabled=false; btn.textContent='Salva'; return; }
+    m.remove(); renderAdmin();
+  };
 }
 
 /* ---------- VIEW: VOTI (sondaggi informali, pesati per millesimi, palesi) ---------- */
@@ -1333,18 +1399,44 @@ async function votaSondaggio(sid,opzione){
   if(up.error){ alert('Errore: '+up.error.message); return; }
   renderVoti();
 }
-async function nuovoSondaggio(){
+function nuovoSondaggio(){
   if(!approvato()){ alert('Devi essere un condòmino confermato.'); return; }
-  var d=prompt(adminView()?'Domanda del sondaggio:':'Proponi una domanda (l\'amministratore la valuterà):'); if(!d||!d.trim())return;
-  var opz=prompt('Opzioni separate da virgola:','Sì, No, Astenuto');
-  var opzioni=(opz&&opz.trim())?opz.split(',').map(function(s){return s.trim()}).filter(Boolean):['Sì','No','Astenuto'];
-  if(opzioni.length<2){ alert('Servono almeno 2 opzioni.'); return; }
-  if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d.trim(),opzioni:opzioni,chiuso:false,approvato:adminView(),proposto_da:userId,autore_nome:userNome}); renderVoti(); if(!adminView())alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
-  var rec={domanda:d.trim(),opzioni:opzioni,autore_nome:userNome,approvato:adminView(),proposto_da:userId};
-  var up=await sb.from('sondaggi').insert(rec);
-  if(up.error){ alert('Errore: '+up.error.message); return; }
-  if(!adminView()) alert('Proposta inviata! L\'amministratore la valuterà.');
-  renderVoti();
+  // modale con risposte aggiunte UNA A UNA col tasto "+" (spec Delegati §4-bis) — default Sì/No/Astenuto
+  var m=document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:1000';
+  m.innerHTML='<div style="background:var(--surface);width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px">'+
+    '<div style="font-size:18px;font-weight:600;margin-bottom:12px">'+(adminView()?'Nuovo sondaggio':'Proponi un sondaggio')+'</div>'+
+    '<label>Domanda</label><textarea id="sn-dom" rows="3" placeholder="es. Sei a favore di…?" style="margin:4px 0 10px;width:100%;font-size:16px;line-height:1.4;min-width:0"></textarea>'+
+    '<label>Risposte possibili</label><div id="sn-opts" style="display:grid;gap:6px;margin:4px 0 8px"></div>'+
+    '<button id="sn-add" style="font-size:14px">＋ Aggiungi risposta</button>'+
+    '<div id="sn-warn" style="color:var(--bad);font-size:14px;margin:6px 0;display:none"></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:12px"><button id="sn-x">Annulla</button><button class="btn-primary" id="sn-ok">'+(adminView()?'Crea sondaggio':'Invia proposta')+'</button></div></div>';
+  document.querySelector('.wrap').appendChild(m);
+  function addOpt(val){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;gap:6px;align-items:center';
+    row.innerHTML='<input type="text" class="sn-opt" placeholder="risposta" value="'+esc(val||'')+'" style="margin:0;flex:1;min-width:0"><button class="sn-rm" style="flex:none;font-size:15px;padding:8px 12px;color:var(--muted)" aria-label="Rimuovi risposta">✕</button>';
+    row.querySelector('.sn-rm').onclick=function(){ row.remove(); };
+    $('sn-opts').appendChild(row);
+  }
+  ['Sì','No','Astenuto'].forEach(addOpt);
+  $('sn-add').onclick=function(){ addOpt(''); var ins=m.querySelectorAll('.sn-opt'); ins[ins.length-1].focus(); };
+  $('sn-x').onclick=function(){ m.remove(); };
+  $('sn-ok').onclick=async function(){
+    function warn(t){ $('sn-warn').textContent=t; $('sn-warn').style.display='block'; }
+    var d=($('sn-dom').value||'').trim();
+    if(!d){ warn('Scrivi la domanda.'); return; }
+    var opzioni=[],seen={}; m.querySelectorAll('.sn-opt').forEach(function(i){ var t=(i.value||'').trim(); var k=t.toLowerCase(); if(t && !seen[k]){ seen[k]=1; opzioni.push(t); } });
+    if(opzioni.length<2){ warn('Servono almeno 2 risposte diverse.'); return; }
+    if(DEMO){ DEMO_SONDAGGI.unshift({id:'s'+Date.now(),domanda:d,opzioni:opzioni,chiuso:false,approvato:adminView(),proposto_da:userId,autore_nome:userNome}); m.remove(); renderVoti(); if(!adminView())alert('Proposta inviata! L\'amministratore la valuterà.'); return; }
+    var btn=$('sn-ok'); btn.disabled=true; btn.textContent='Invio…';
+    var rec={domanda:d,opzioni:opzioni,autore_nome:userNome,approvato:adminView(),proposto_da:userId};
+    var up=await sb.from('sondaggi').insert(rec);
+    if(up.error){ warn('Errore: '+up.error.message); btn.disabled=false; btn.textContent=adminView()?'Crea sondaggio':'Invia proposta'; return; }
+    m.remove();
+    if(!adminView()) alert('Proposta inviata! L\'amministratore la valuterà.');
+    renderVoti();
+  };
 }
 async function approveSondaggio(sid){
   if(DEMO){ var s=DEMO_SONDAGGI.find(function(x){return x.id===sid}); if(s)s.approvato=true; renderVoti(); return; }
@@ -1512,6 +1604,7 @@ async function loadRichieste(){   // richieste bagnino→gestore→amministrator
   richieste = data||[];
 }
 function isGestore(){ return !!userRuolo && userRuolo.trim().toLowerCase()==='gestore'; }
+function isAmministratore(){ return !!userRuolo && /amministrator/i.test(userRuolo); }   // ruolo-funzione (accessi_speciali) — usato dal modulo Delegati (F1: inbox ordini, F2: carica ODG)
 function richiesteHtml(){
   var h='<div class="cap-grp" style="margin-top:14px">Richieste · bagnino → gestore → amministratore</div>';
   h+='<button class="btn-primary" id="rq-new" style="margin:2px 0 10px">＋ Nuova richiesta</button>';
