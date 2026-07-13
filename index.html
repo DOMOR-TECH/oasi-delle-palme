@@ -196,7 +196,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v105';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v106';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -1339,7 +1339,8 @@ var DEMO_SONDAGGI=[
   {id:'so1',domanda:'Rinnovo del contratto di manutenzione del verde',descrizione:'Il contratto scade a fine 2027. Si vota se avviare subito la raccolta di preventivi comparativi.',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Consiglio dei Delegati — ODG',palazzina:'I',tipo:'odg_punto',odg_punto_id:'pt1'},
   {id:'so2',domanda:'Rifacimento dei vialetti pedonali',descrizione:'Intervento sui vialetti ammalorati; spesa da definire con perizia indipendente.',opzioni:['Sì','No','Astenuto'],chiuso:true,chiuso_da_nome:'Demo Tester',approvato:true,autore_nome:'Consiglio dei Delegati — ODG',palazzina:'I',tipo:'odg_punto',odg_punto_id:'pt2'},
   {id:'so3',domanda:'Rinnovo del contratto di manutenzione del verde',descrizione:'Il contratto scade a fine 2027. Si vota se avviare subito la raccolta di preventivi comparativi.',opzioni:['Sì','No','Astenuto'],chiuso:true,chiuso_da_nome:'Vermigli Andrea',approvato:true,autore_nome:'Consiglio dei Delegati — ODG',palazzina:'C',tipo:'odg_punto',odg_punto_id:'pt1'},
-  {id:'sd1',domanda:'Quale ditta preferiresti per il verde?',descrizione:'Sotto-consultazione sul punto 1 dell\'ODG: serve a orientare il mandato.',opzioni:['Ditta attuale','Nuova ditta con gara','Non so'],chiuso:false,approvato:true,autore_nome:'Demo Tester',proposto_da:'demo',palazzina:'I',tipo:'dibattito',odg_punto_id:'pt1'}   // 💬 dibattito di palazzina su un punto ODG
+  {id:'sd1',domanda:'Quale ditta preferiresti per il verde?',descrizione:'Sotto-consultazione sul punto 1 dell\'ODG: serve a orientare il mandato.',opzioni:['Ditta attuale','Nuova ditta con gara','Non so'],chiuso:false,approvato:true,autore_nome:'Demo Tester',proposto_da:'demo',palazzina:'I',tipo:'dibattito',odg_punto_id:'pt1'},   // 💬 dibattito di palazzina su un punto ODG
+  {id:'sa0',domanda:'Rifacimento dei vialetti pedonali',descrizione:'Il punto non ha raggiunto 500/1000 generali: voto di tutto il condominio.',opzioni:['Sì','No','Astenuto'],chiuso:false,approvato:true,autore_nome:'Assemblea generale — ODG',tipo:'assemblea',odg_punto_id:'pt2'}   // 🏛️ voto d'assemblea (l'amministratore può chiuderlo)
 ];
 var DEMO_ODG=[{id:'odg1',titolo:'Consiglio dei Delegati — seduta di luglio',data_consiglio:'2026-07-20',creato_da_nome:'Amministrazione',created_at:'2026-07-11T09:00:00Z'}];
 var DEMO_ODG_PUNTI=[
@@ -1361,7 +1362,8 @@ var DEMO_VOTI=[
   {sondaggio_id:'so2',unita:'I/05',autore_id:'u-i05',autore_nome:'Boschi Anna',millesimi:120.0,opzione:'Sì'},
   {sondaggio_id:'so3',unita:'C/02',autore_id:'u3',autore_nome:'Vermigli Andrea',millesimi:210.3,opzione:'No'},
   {sondaggio_id:'so3',unita:'C/05',autore_id:'u-c05',autore_nome:'Casini Paola',millesimi:330.0,opzione:'No'},
-  {sondaggio_id:'sd1',unita:'I/09',autore_id:'u-meli',autore_nome:'Meli Carmela',millesimi:260.4,opzione:'Nuova ditta con gara'}
+  {sondaggio_id:'sd1',unita:'I/09',autore_id:'u-meli',autore_nome:'Meli Carmela',millesimi:260.4,opzione:'Nuova ditta con gara'},
+  {sondaggio_id:'sa0',unita:'A/07',autore_id:'u1',autore_nome:'Romani Barbara',millesimi:6.8,opzione:'Sì'}   // voto d'assemblea: mm GENERALI
 ];
 var DEMO_MM_PAL=78.5;   // ≈ mm di palazzina dell'unità demo I/08 (6,5/82,83×1000)
 var DEMO_ORDINI=[
@@ -1473,6 +1475,7 @@ async function renderVoti(){
     if(canManage && !(pal && ordBySond[s.id])){ h+='<div style="display:flex;gap:7px;margin-top:12px">'+   // un voto già trasmesso come ordine non si riapre (M1 gate; enforced anche a DB, v44)
       '<button class="vt-close" data-s="'+esc(s.id)+'" data-chiuso="'+(s.chiuso?'1':'0')+'" style="font-size:14px">'+(s.chiuso?'Riapri':'Chiudi')+'</button>'+
       (adminView()?'<button class="vt-del" data-s="'+esc(s.id)+'" style="font-size:14px;border-color:var(--bad);color:var(--bad)">Elimina</button>':'')+'</div>'; }
+    else if(isAsm && isAmministratore() && !s.chiuso){ h+='<div style="display:flex;gap:7px;margin-top:12px"><button class="vt-close" data-s="'+esc(s.id)+'" data-chiuso="0" style="font-size:14px">Chiudi</button></div>'; }   // l'amministratore chiude (solo chiude) il voto d'assemblea — scelta Corrado 2026-07-13
     return h+'</div>';
   }
   var html=vHead('🗳️','Voti','Sondaggi della comunità — un voto per unità.');
@@ -1532,7 +1535,9 @@ async function renderVoti(){
   }});
   v.querySelectorAll('.vt-close').forEach(function(b){b.onclick=async function(){
     var chiudi=b.dataset.chiuso!=='1';
-    if(!await conferma(chiudi?{titolo:'Chiudere il voto?',testo:'Nessuno potrà più votare finché non viene riaperto. Se è un voto di palazzina, l\'esito si congela.',azione:'Chiudi il voto'}:{titolo:'Riaprire il voto?',testo:'I condòmini potranno votare di nuovo.',azione:'Riapri'})) return;
+    var sx=sondaggi.find(function(x){return x.id===b.dataset.s});
+    var asm=sx&&sx.tipo==='assemblea';
+    if(!await conferma(chiudi?{titolo:asm?'Chiudere il voto d\'assemblea?':'Chiudere il voto?',testo:asm?'Il voto di tutto il condominio si chiude e l\'esito resta verbalizzato con la tua firma.':'Nessuno potrà più votare finché non viene riaperto. Se è un voto di palazzina, l\'esito si congela.',azione:'Chiudi il voto'}:{titolo:'Riaprire il voto?',testo:'I condòmini potranno votare di nuovo.',azione:'Riapri'})) return;
     toggleSondaggio(b.dataset.s,chiudi);
   }});
   v.querySelectorAll('.vt-del').forEach(function(b){b.onclick=function(){eliminaSondaggio(b.dataset.s)}});
@@ -1811,6 +1816,11 @@ async function approveSondaggio(sid){
 }
 async function toggleSondaggio(sid,chiudi){
   if(DEMO){ var s=DEMO_SONDAGGI.find(function(x){return x.id===sid}); if(s){s.chiuso=chiudi;s.chiuso_da_nome=chiudi?userNome:null;} renderVoti(); return; }
+  if(chiudi && !isAdmin && isAmministratore()){   // amministratore: la chiusura dell'assemblea passa dalla rpc dedicata (nessuna policy update diretta)
+    var rr=await sb.rpc('assemblea_chiudi',{p_sondaggio:sid});
+    if(rr.error){ alert('Errore: '+rr.error.message); return; }
+    renderVoti(); return;
+  }
   var up=await sb.from('sondaggi').update({chiuso:chiudi,chiuso_da_nome:chiudi?userNome:null}).eq('id',sid);
   if(up.error){ alert('Errore: '+up.error.message); return; }
   renderVoti();
