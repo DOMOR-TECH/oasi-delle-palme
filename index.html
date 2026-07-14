@@ -196,7 +196,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v106';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v107';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -3087,11 +3087,56 @@ function showView(v){
 }
 function renderAll(){ if(isPoolStaff() && hubOf(curV).id!=='piscina') curV='piscina'; showView(curV); }
 
+/* ---------- 🎤 DETTATURA (scelta Corrado 2026-07-13: ovunque si digita, si può parlare — per gli anziani è più facile) ----------
+   Meccanismo GLOBALE: al focus su qualsiasi campo di testo compare il bottone "🎤 Detta" (sempre nello stesso posto);
+   il parlato (italiano) viene aggiunto al campo. Se il telefono non supporta il riconoscimento, il bottone non esiste
+   e resta il 🎤 della tastiera di sistema. */
+var MIC_SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var micTarget=null, micRec=null, micOn=false, micBar=null;
+function micCampoOk(t){ return !!t && (t.tagName==='TEXTAREA' || (t.tagName==='INPUT' && (t.type==='text'||t.type==='search'))); }
+function micIdle(){ micOn=false; if(micBar){ micBar.classList.remove('on'); micBar.innerHTML='🎤 Detta'; if(!micCampoOk(document.activeElement)){ micBar.style.display='none'; micTarget=null; } } }
+function micStart(){
+  if(!MIC_SR || !micTarget) return;
+  var tgt=micTarget;
+  var rec=micRec=new MIC_SR(); rec.lang='it-IT'; rec.interimResults=false; rec.maxAlternatives=1; rec.continuous=false;
+  rec.onresult=function(ev){
+    var txt=''; for(var i=ev.resultIndex;i<ev.results.length;i++){ if(ev.results[i].isFinal) txt+=ev.results[i][0].transcript; }
+    txt=txt.trim();
+    if(txt){ var v=tgt.value||''; tgt.value=(v && !/\s$/.test(v) ? v+' ' : v)+txt; tgt.dispatchEvent(new Event('input',{bubbles:true})); }
+  };
+  rec.onend=function(){ if(micRec===rec) micIdle(); };   // guard identità: l'onend di una recognition vecchia non resetta quella nuova
+  rec.onerror=function(ev){
+    if(micRec===rec) micIdle();
+    if(ev.error==='not-allowed'||ev.error==='service-not-allowed'){ alert('Per dettare serve il permesso del microfono (Impostazioni → Oasi delle Palme → Microfono).\n\nIn alternativa puoi usare il tasto 🎤 sulla tastiera del telefono.'); }
+  };
+  try{ rec.start(); micOn=true; micBar.classList.add('on'); micBar.innerHTML='🔴 Sto ascoltando… tocca per fermare'; }catch(_e){ micIdle(); }
+}
+if(MIC_SR){
+  micBar=document.createElement('button');
+  micBar.id='micbar'; micBar.type='button'; micBar.setAttribute('aria-label','Detta il testo col microfono');
+  micBar.innerHTML='🎤 Detta'; micBar.style.display='none';
+  document.body.appendChild(micBar);
+  micBar.addEventListener('pointerdown',function(e){ e.preventDefault(); });   // non ruba il focus al campo
+  micBar.addEventListener('click',function(){ if(micOn){ try{micRec&&micRec.stop();}catch(_e){} setTimeout(function(){ if(micOn) try{micRec&&micRec.abort();}catch(_e){} setTimeout(micIdle,0); },2000); } else micStart(); });   // rete di sicurezza: se stop() non produce onend, abort+idle dopo 2s
+  document.addEventListener('focusin',function(e){ if(micCampoOk(e.target)){ micTarget=e.target; micBar.style.display='flex'; } });
+  document.addEventListener('focusout',function(){ setTimeout(function(){ if(!micOn && !micCampoOk(document.activeElement)){ micBar.style.display='none'; micTarget=null; } },250); });
+  if(window.visualViewport){   // iOS: con la tastiera aperta il bottone sale SOPRA la tastiera; chiusa → posizione CSS di default
+    var micPos=function(){ var vv=window.visualViewport, gap=window.innerHeight - vv.height - vv.offsetTop;
+      micBar.style.bottom = gap>60 ? (gap+14)+'px' : ''; };
+    window.visualViewport.addEventListener('resize',micPos); window.visualViewport.addEventListener('scroll',micPos);
+  }
+}
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){})}
 init();
 </script>
 
 <style>
+#micbar{position:fixed;right:14px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:2400;display:flex;align-items:center;gap:7px;
+  background:var(--ok,#0B7A69);color:#fff;border:none;border-radius:999px;padding:14px 20px;font-size:17px;font-weight:700;
+  box-shadow:0 6px 22px rgba(0,0,0,.28);cursor:pointer;max-width:88vw}
+#micbar.on{background:#A03127;animation:micpulse 1.2s ease-in-out infinite}
+@keyframes micpulse{0%,100%{box-shadow:0 6px 22px rgba(160,49,39,.35)}50%{box-shadow:0 6px 30px rgba(160,49,39,.75)}}
+@media (prefers-reduced-motion: reduce){#micbar.on{animation:none}}
 #installbar{position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(18px);z-index:1500;opacity:0;pointer-events:none;transition:.25s;max-width:94%}
 #installbar.on{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
 #installwrap{display:flex;align-items:center;gap:4px;background:#0B7A69;border-radius:999px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
