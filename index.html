@@ -196,7 +196,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v108';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v109';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -3092,12 +3092,18 @@ function renderAll(){ if(isPoolStaff() && hubOf(curV).id!=='piscina') curV='pisc
    il parlato (italiano) viene aggiunto al campo. Se il telefono non supporta il riconoscimento, il bottone non esiste
    e resta il 🎤 della tastiera di sistema. */
 var MIC_SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-var micTarget=null, micRec=null, micOn=false, micBar=null;
+var micTarget=null, micRec=null, micOn=false, micBar=null, micSess=0;
 function micCampoOk(t){ return !!t && (t.tagName==='TEXTAREA' || (t.tagName==='INPUT' && (t.type==='text'||t.type==='search'))); }
 function micIdle(){ micOn=false; if(micBar){ micBar.classList.remove('on'); micBar.innerHTML='🎤 Detta'; if(!micCampoOk(document.activeElement)){ micBar.style.display='none'; micTarget=null; } } }
 function micStart(){
-  if(!MIC_SR || !micTarget) return;
-  var tgt=micTarget;
+  if(!MIC_SR || !micTarget || micOn) return;
+  micOn=true; micBar.classList.add('on'); micBar.innerHTML='🔴 Sto ascoltando… tocca per fermare';
+  var sess=++micSess;
+  micTry(micTarget, sess, 0);
+  setTimeout(function(){ if(micOn && micSess===sess) micStopHard(); }, 60000);   // tetto di sicurezza: mai in ascolto oltre 60s
+}
+function micTry(tgt, sess, tent){   // iOS: dopo uno stop il motore resta occupato per qualche decimo → il nuovo start() fallisce; RIPROVA finché si libera (≤5 tentativi, ~1,7s)
+  if(!micOn || micSess!==sess) return;   // fermato o sostituito nel frattempo
   var rec=micRec=new MIC_SR(); rec.lang='it-IT'; rec.interimResults=false; rec.maxAlternatives=1; rec.continuous=false;
   rec.onresult=function(ev){
     var txt=''; for(var i=ev.resultIndex;i<ev.results.length;i++){ if(ev.results[i].isFinal) txt+=ev.results[i][0].transcript; }
@@ -3106,16 +3112,21 @@ function micStart(){
   };
   rec.onend=function(){ if(micRec===rec) micIdle(); };   // guard identità: l'onend di una recognition vecchia non resetta quella nuova
   rec.onerror=function(ev){
-    if(micRec===rec) micIdle();
-    if(ev.error==='not-allowed'||ev.error==='service-not-allowed'){ alert('Per dettare serve il permesso del microfono (Impostazioni → Oasi delle Palme → Microfono).\n\nIn alternativa puoi usare il tasto 🎤 sulla tastiera del telefono.'); }
+    if(ev.error==='not-allowed'||ev.error==='service-not-allowed'){ if(micRec===rec) micIdle(); alert('Per dettare serve il permesso del microfono (Impostazioni → Oasi delle Palme → Microfono).\n\nIn alternativa puoi usare il tasto 🎤 sulla tastiera del telefono.'); return; }
+    if(micRec===rec && micOn && micSess===sess && tent<5 && (ev.error==='aborted'||ev.error==='audio-capture'||ev.error==='network')){
+      setTimeout(function(){ micTry(tgt, sess, tent+1); },350);   // motore ancora occupato: riprova
+    } else if(micRec===rec) micIdle();
   };
-  try{ rec.start(); micOn=true; micBar.classList.add('on'); micBar.innerHTML='🔴 Sto ascoltando… tocca per fermare'; }catch(_e){ micIdle(); }
-  setTimeout(function(){ if(micOn && micRec===rec) micStopHard(); }, 60000);   // tetto di sicurezza: mai in ascolto oltre 60s
+  try{ rec.start(); }
+  catch(_e){   // InvalidStateError: sessione precedente non ancora rilasciata → riprova
+    if(tent<5 && micOn && micSess===sess){ setTimeout(function(){ micTry(tgt, sess, tent+1); },350); }
+    else micIdle();
+  }
 }
 function micStopHard(){   // ferma SUBITO la UI (mai intrappolata), poi spegne il motore con stop e, se serve, abort
   var rec=micRec; micIdle();
   try{ rec && rec.stop(); }catch(_e){}
-  setTimeout(function(){ try{ rec && rec.abort(); }catch(_e){} },600);
+  setTimeout(function(){ if(micRec===rec){ try{ rec && rec.abort(); }catch(_e){} } },600);   // SOLO la sessione vecchia: mai abortire un riavvio dell'utente
 }
 if(MIC_SR){
   micBar=document.createElement('button');
