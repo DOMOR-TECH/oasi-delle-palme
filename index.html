@@ -197,7 +197,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v112';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v113';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -311,7 +311,7 @@ function pillStato(area,sid){
   if(reports.some(function(r){return r.area===area&&r.servizio===sid&&isOpen(r)}))return 'problema';
   var l=latestP(area,sid);return (l&&l.stato==='ok')?'ok':'todo';
 }
-function setApp(on){$('nav').style.display=on?'flex':'none'; if(on)buildNav(); if(!on){$('user-badge').classList.add('hide'); $('subnav').style.display='none';} var ft=$('app-footer'); if(ft){ ft.classList.toggle('hide',!on); if(on){ var fb=$('foot-cf'); if(fb) fb.onclick=comeFunziona; } }}
+function setApp(on){$('nav').style.display=on?'flex':'none'; if(on)buildNav(); if(!on){$('user-badge').classList.add('hide'); $('subnav').style.display='none';} var ft=$('app-footer'); if(ft){ ft.classList.toggle('hide',!on); if(on){ var fb=$('foot-cf'); if(fb) fb.onclick=function(){comeFunziona();}; } }}
 
 // Pallino rosso col numero di richieste IN ATTESA sul tab Admin
 async function updateAdminBadge(){
@@ -646,8 +646,9 @@ function presentazione(){
   $('pres-x').onclick=close; $('pres-go').onclick=close;
 }
 
-/* ---------- PAGINA: COME FUNZIONA (flusso decisioni / delegati) ---------- */
-function comeFunziona(){
+/* ---------- PAGINA: COME FUNZIONA (contestuale all'hub in cui sei) ---------- */
+function comeFunziona(hub){
+  hub = hub || (typeof curV!=='undefined' ? hubOf(curV).id : 'home');
   var ex=document.getElementById('page-cf'); if(ex) ex.remove();
   var p=document.createElement('div'); p.className='page'; p.id='page-cf';
   function step(kick,title,desc){ return '<div style="background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:12px;padding:11px 13px"><div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">'+kick+'</div><div style="font-size:15px;font-weight:650;margin-top:1px">'+title+'</div>'+(desc?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+desc+'</div>':'')+'</div>'; }
@@ -657,23 +658,60 @@ function comeFunziona(){
     return '<div style="display:flex;gap:10px;margin-top:6px">'+
      '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:800;color:var(--ok);text-align:center;margin:4px 0">SÌ ↓</div><div style="background:var(--okbg);border:1.5px solid var(--ok);border-radius:11px;padding:10px 12px"><div style="font-weight:700;font-size:14px;color:var(--ok)">'+okT+'</div><div style="font-size:12.5px;color:var(--hint);margin-top:2px">'+okD+'</div></div></div>'+
      '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:800;color:var('+bc+');text-align:center;margin:4px 0">NO ↓</div><div style="background:var('+bb+');border:1.5px solid var('+bc+');border-radius:11px;padding:10px 12px"><div style="font-weight:700;font-size:14px;color:var('+bc+')">'+badT+'</div><div style="font-size:12.5px;color:var(--hint);margin-top:2px">'+badD+'</div></div></div></div>'; }
+  function feat(emoji,title,desc){ return '<div class="pres-step"><div class="pres-n">'+emoji+'</div><div><b>'+title+'</b><br><span class="sub">'+desc+'</span></div></div>'; }
+  var TITLES={home:'Come funziona',comunita:'Comunità',piscina:'Piscina',tennis:'Tennis',controllo:'Controllo',pacchi:'Pacchi',admin:'Amministrazione'};
+  var body='';
+  if(hub==='comunita'){
+    body='<p class="lead">La <b>Comunità</b> è dove si parla e si decide: <b>Bacheca</b> (gli avvisi), <b>Voti</b> e <b>ODG</b> (le decisioni), <b>Feste</b> (gli spazi comuni). Qui le decisioni partono <b>dalla tua palazzina</b>: il <b>delegato</b> non decide, è l\'ambasciatore che porta ciò che la palazzina ha votato. Si vota sempre a <b>millesimi</b>, palese.</p>'+
+      '<div class="cap-grp">⬆️ Un\'idea o un problema della tua palazzina</div>'+
+      step('Delegato o vice','Apre una votazione','Es. cambiare le piante nei pilotis. Ogni palazzina ha il suo spazio riservato.')+arw+
+      step('La palazzina','Vota — a millesimi di palazzina','')+arw+
+      dec('La palazzina raggiunge il 500+1?')+
+      out2('Ordine esecutivo','Va all\'amministrazione, che deve eseguirlo.','ocra','La proposta si ferma','Sotto la maggioranza non se ne fa nulla.')+
+      '<div class="cap-grp">⬇️ L\'ordine del giorno del Consiglio</div>'+
+      step('Amministrazione','Carica l\'ODG — una volta','Ogni punto arriva in automatico nella bacheca di ogni palazzina, come votazione.')+arw+
+      step('Delegato','Porta l\'ODG nella palazzina','Apre i punti, si discute (anche con sondaggi), la palazzina vota.')+arw+
+      dec('Ogni punto: la palazzina raggiunge il 500+1?')+
+      out2('Mandato','Il delegato porta questa posizione al Consiglio.','ocra','Astenuta','Senza maggioranza la palazzina pesa come astenuta.')+arw+
+      step('Al Consiglio','Si sommano i voleri delle palazzine','A millesimi generali di tutto il condominio.')+arw+
+      dec('Un\'opzione raggiunge il 500+1 generale?')+
+      out2('Risultato deciso','È la decisione del Consiglio.','bad','Assemblea generale','Il punto va al voto di tutti i condòmini.')+
+      '<div style="margin-top:22px;padding:13px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;font-size:13.5px;color:var(--hint)"><b style="color:var(--txt)">In breve:</b> ogni palazzina è padrona a casa propria e manda il delegato al Consiglio solo con ciò che ha davvero deciso. Dove la palazzina non decide, decide l\'assemblea di tutti.</div>';
+  } else if(hub==='piscina'){
+    body='<p class="lead">Tutto quello che riguarda la <b>piscina</b>: chi è in vasca, la qualità dell\'acqua e i compiti del bagnino.</p>'+
+      feat('🏊','Accesso alla vasca','È il bagnino ad aprire la vasca. Quando è aperta fai check-in con «Sono in piscina» (fino a 2 ospiti). Alla chiusura il bagnino fa uscire tutti.')+
+      feat('💧','Qualità dell\'acqua','Due controlli al giorno: uno la mattina, uno dalle 14. Se il test della finestra non è stato registrato, i valori appaiono in <b>rosso</b>.')+
+      feat('✅','Compiti del bagnino','Il bagnino spunta i suoi compiti (mattonato, robot, filtri…): alcuni ogni giorno, altri ogni 3-4 giorni. Se scadono senza farli restano «in ritardo».');
+  } else if(hub==='tennis'){
+    body='<p class="lead">Il campo da <b>tennis</b> si prenota e si gioca da soli, come dice il Regolamento.</p>'+
+      feat('🎾','Prenota','Uno slot da 60 minuti, <b>massimo uno al giorno</b> per unità, per oggi o domani. D\'estate il campo è chiuso dalle 14 alle 16.')+
+      feat('🏆','Tornei','Ti iscrivi indicando la tua abilità (1-10). L\'amministrazione genera il calendario (girone all\'italiana) e la classifica si aggiorna a ogni risultato.');
+  } else if(hub==='controllo'){
+    body='<p class="lead">Il <b>Controllo</b> serve a verificare, insieme, che i lavori dei contratti (verde, strade, piscina) siano fatti davvero — con una prova.</p>'+
+      feat('✅','Controlla','Per ogni servizio dici «Fatto» o «Problema», con una <b>foto</b>, nel punto dove ti trovi. Ogni voce cita il contratto e la pagina.')+
+      feat('🗓️','Finestre di verifica','Ogni servizio ha la sua scadenza (giornaliera, settimanale…). Una finestra scaduta senza che nessuno abbia controllato diventa <b>ocra</b>: vale come «non confermato».')+
+      feat('🗺️','Mappa','Lo stato del complesso a colori: cosa è a posto e cosa no, a colpo d\'occhio.')+
+      feat('📄','Dossier','Raccoglie le prove (dovuto contro constatato) e calcola le <b>penali Art.5</b> del contratto (€100 + €30 al giorno di ritardo).')+
+      feat('⚠️','Avvisi','Gli imprevisti <b>fuori contratto</b> (ascensore, citofoni, idraulico…): li apre chi è abilitato, li chiude l\'autore o l\'amministrazione.');
+  } else if(hub==='pacchi'){
+    body='<p class="lead">I <b>pacchi</b> arrivati in portineria, senza più fare il postino.</p>'+
+      feat('📦','Come funziona','Il custode registra il pacco arrivato e indica il destinatario. Tu ricevi l\'<b>avviso in-app</b> (col badge 📦) e vai a ritirarlo; il ritiro viene segnato. Vedi solo i <b>tuoi</b> pacchi.');
+  } else if(hub==='admin'){
+    body='<p class="lead">La vista <b>amministrazione</b> (solo admin).</p>'+
+      feat('👥','Condòmini','Approvi/revochi le registrazioni, nomini subadmin e gestisci gli accessi speciali (custode, bagnino, gestore, delegati…).')+
+      feat('🏛️','Governance','Carichi l\'ODG del Consiglio, segui gli ordini esecutivi che arrivano dalle palazzine e supervisioni i voti di tutte le palazzine.');
+  } else {
+    body='<p class="lead">Un posto solo dove l\'<b>Oasi delle Palme</b> si cura insieme: chi c\'è da sempre e chi è arrivato ieri, ognuno con la sua voce. Ogni segnalazione, ogni voto, ogni idea porta il <b>tuo nome</b>.</p>'+
+      feat('🌿','Controllo','Verifichi che i lavori dei contratti siano fatti, con foto.')+
+      feat('💧','Piscina','Accesso alla vasca, qualità dell\'acqua, compiti (d\'estate).')+
+      feat('🎾','Tennis','Prenoti il campo e ti iscrivi ai tornei.')+
+      feat('📣','Comunità','Bacheca, Voti e ODG (le decisioni della palazzina), Feste.')+
+      feat('📦','Pacchi','I pacchi in portineria: ti avvisa quando ritirare.')+
+      '<div style="margin-top:16px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;font-size:13.5px;color:var(--hint)">Apri una sezione e tocca di nuovo «Come funziona» in fondo: trovi la spiegazione <b>di quella sezione</b>.</div>';
+  }
   p.innerHTML='<div class="page-in">'+
-    '<div class="page-top"><button class="page-x" id="cf-x">×</button><h2 class="page-h">Come funziona</h2></div>'+
-    '<p class="lead">Qui le decisioni partono <b>dalla tua palazzina</b>. Il <b>delegato</b> non decide: è l\'<b>ambasciatore</b> che porta ciò che la palazzina ha votato. Si vota sempre a <b>millesimi</b>, in modo palese.</p>'+
-    '<div class="cap-grp">⬆️ Un\'idea o un problema della tua palazzina</div>'+
-    step('Delegato o vice','Apre una votazione','Es. cambiare le piante nei pilotis. Ogni palazzina ha il suo spazio riservato.')+arw+
-    step('La palazzina','Vota — a millesimi di palazzina','')+arw+
-    dec('La palazzina raggiunge il 500+1?')+
-    out2('Ordine esecutivo','Va all\'amministrazione, che deve eseguirlo.','ocra','La proposta si ferma','Sotto la maggioranza non se ne fa nulla.')+
-    '<div class="cap-grp">⬇️ L\'ordine del giorno del Consiglio</div>'+
-    step('Amministrazione','Carica l\'ODG — una volta','Ogni punto arriva in automatico nella bacheca di ogni palazzina, come votazione.')+arw+
-    step('Delegato','Porta l\'ODG nella palazzina','Apre i punti, si discute (anche con sondaggi), la palazzina vota.')+arw+
-    dec('Ogni punto: la palazzina raggiunge il 500+1?')+
-    out2('Mandato','Il delegato porta questa posizione al Consiglio.','ocra','Astenuta','Senza maggioranza la palazzina pesa come astenuta.')+arw+
-    step('Al Consiglio','Si sommano i voleri delle palazzine','A millesimi generali di tutto il condominio.')+arw+
-    dec('Un\'opzione raggiunge il 500+1 generale?')+
-    out2('Risultato deciso','È la decisione del Consiglio.','bad','Assemblea generale','Il punto va al voto di tutti i condòmini.')+
-    '<div style="margin-top:22px;padding:13px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;font-size:13.5px;color:var(--hint)"><b style="color:var(--txt)">In breve:</b> ogni palazzina è padrona a casa propria e manda il suo delegato al Consiglio solo con ciò che ha davvero deciso. Dove la palazzina non decide, decide l\'assemblea di tutti.</div>'+
+    '<div class="page-top"><button class="page-x" id="cf-x">×</button><h2 class="page-h">Come funziona'+(hub&&hub!=='home'?' · '+TITLES[hub]:'')+'</h2></div>'+
+    body+
     '<button class="btn-primary" id="cf-go" style="margin-top:18px">Ho capito</button>'+
     '</div>';
   document.body.appendChild(p);
