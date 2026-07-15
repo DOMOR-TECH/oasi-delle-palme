@@ -185,6 +185,7 @@
   <div id="view-odg" class="hide"></div>
   <div id="view-ordini" class="hide"></div>
   <div id="view-admin" class="hide"></div>
+  <footer id="app-footer" class="hide" style="text-align:center;padding:18px 14px calc(16px + env(safe-area-inset-bottom,0px));border-top:.5px solid var(--line);margin-top:20px"><button class="src-link" id="foot-cf">Come funziona →</button></footer>
 </div>
 
 <nav id="nav" style="display:none"></nav>
@@ -196,7 +197,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const sb = createClient(window.SUPA_URL, window.SUPA_KEY);
 const DEMO = location.search.indexOf('demo')>=0;  // ?demo=1 → prova l'interfaccia senza login (dati finti, niente email)
-const APP_VERSION = 'v111';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
+const APP_VERSION = 'v112';   // mostrata in "I miei dati"; tienila allineata a CACHE in sw.js
 const VAPID_PUBLIC = 'BE36pywDqgkv7C2IMRojjCei_DMZ6m28-SP5qin1QyKugzBBsrc4PMxwpxxcYS74Uo9s4bq0L73QuO5RTM5fedo';  // chiave push pubblica (Web Push)
 
 let userId=null, userNome=null, userUnita=null, userEmail=null, userStato=null, isAdmin=false, reports=[], comments=[], avvisi=[], userMorosita=null, analisiAcqua=[], compitiOggi=[], compitiStorico=[], presenze=[], magazzino=[], richieste=[], openThreads={}, curArea='', adminMode=false, prenotazioniTennis=[], curGiornoTennis=0, tornei=[], iscrizioniTorneo=[], partiteTorneo=[], openCal={}, prenotazioniSala=[], pacchi=[], annunci=[], openAnnunci={};   // curArea vuoto = nessun luogo scelto; adminMode = "vista admin" attiva (default OFF: l'admin vive come residente); curGiornoTennis 0=oggi 1=domani; openCal = tornei col calendario espanso
@@ -310,7 +311,7 @@ function pillStato(area,sid){
   if(reports.some(function(r){return r.area===area&&r.servizio===sid&&isOpen(r)}))return 'problema';
   var l=latestP(area,sid);return (l&&l.stato==='ok')?'ok':'todo';
 }
-function setApp(on){$('nav').style.display=on?'flex':'none'; if(on)buildNav(); if(!on){$('user-badge').classList.add('hide'); $('subnav').style.display='none';}}
+function setApp(on){$('nav').style.display=on?'flex':'none'; if(on)buildNav(); if(!on){$('user-badge').classList.add('hide'); $('subnav').style.display='none';} var ft=$('app-footer'); if(ft){ ft.classList.toggle('hide',!on); if(on){ var fb=$('foot-cf'); if(fb) fb.onclick=comeFunziona; } }}
 
 // Pallino rosso col numero di richieste IN ATTESA sul tab Admin
 async function updateAdminBadge(){
@@ -643,6 +644,41 @@ function presentazione(){
   document.body.appendChild(p);
   function close(){p.remove()}
   $('pres-x').onclick=close; $('pres-go').onclick=close;
+}
+
+/* ---------- PAGINA: COME FUNZIONA (flusso decisioni / delegati) ---------- */
+function comeFunziona(){
+  var ex=document.getElementById('page-cf'); if(ex) ex.remove();
+  var p=document.createElement('div'); p.className='page'; p.id='page-cf';
+  function step(kick,title,desc){ return '<div style="background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:12px;padding:11px 13px"><div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">'+kick+'</div><div style="font-size:15px;font-weight:650;margin-top:1px">'+title+'</div>'+(desc?'<div style="font-size:13px;color:var(--hint);margin-top:3px">'+desc+'</div>':'')+'</div>'; }
+  var arw='<div style="width:2px;height:16px;background:var(--line);margin:5px auto"></div>';
+  function dec(t){ return '<div style="background:var(--ocrabg);border:1.5px solid var(--ocra);color:var(--ocra);font-weight:700;font-size:13.5px;padding:9px 16px;border-radius:999px;text-align:center;margin:2px auto;max-width:96%">'+t+'</div>'; }
+  function out2(okT,okD,badCls,badT,badD){ var bc=(badCls==='bad'?'--bad':'--ocra'), bb=(badCls==='bad'?'--badbg':'--ocrabg');
+    return '<div style="display:flex;gap:10px;margin-top:6px">'+
+     '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:800;color:var(--ok);text-align:center;margin:4px 0">SÌ ↓</div><div style="background:var(--okbg);border:1.5px solid var(--ok);border-radius:11px;padding:10px 12px"><div style="font-weight:700;font-size:14px;color:var(--ok)">'+okT+'</div><div style="font-size:12.5px;color:var(--hint);margin-top:2px">'+okD+'</div></div></div>'+
+     '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:800;color:var('+bc+');text-align:center;margin:4px 0">NO ↓</div><div style="background:var('+bb+');border:1.5px solid var('+bc+');border-radius:11px;padding:10px 12px"><div style="font-weight:700;font-size:14px;color:var('+bc+')">'+badT+'</div><div style="font-size:12.5px;color:var(--hint);margin-top:2px">'+badD+'</div></div></div></div>'; }
+  p.innerHTML='<div class="page-in">'+
+    '<div class="page-top"><button class="page-x" id="cf-x">×</button><h2 class="page-h">Come funziona</h2></div>'+
+    '<p class="lead">Qui le decisioni partono <b>dalla tua palazzina</b>. Il <b>delegato</b> non decide: è l\'<b>ambasciatore</b> che porta ciò che la palazzina ha votato. Si vota sempre a <b>millesimi</b>, in modo palese.</p>'+
+    '<div class="cap-grp">⬆️ Un\'idea o un problema della tua palazzina</div>'+
+    step('Delegato o vice','Apre una votazione','Es. cambiare le piante nei pilotis. Ogni palazzina ha il suo spazio riservato.')+arw+
+    step('La palazzina','Vota — a millesimi di palazzina','')+arw+
+    dec('La palazzina raggiunge il 500+1?')+
+    out2('Ordine esecutivo','Va all\'amministrazione, che deve eseguirlo.','ocra','La proposta si ferma','Sotto la maggioranza non se ne fa nulla.')+
+    '<div class="cap-grp">⬇️ L\'ordine del giorno del Consiglio</div>'+
+    step('Amministrazione','Carica l\'ODG — una volta','Ogni punto arriva in automatico nella bacheca di ogni palazzina, come votazione.')+arw+
+    step('Delegato','Porta l\'ODG nella palazzina','Apre i punti, si discute (anche con sondaggi), la palazzina vota.')+arw+
+    dec('Ogni punto: la palazzina raggiunge il 500+1?')+
+    out2('Mandato','Il delegato porta questa posizione al Consiglio.','ocra','Astenuta','Senza maggioranza la palazzina pesa come astenuta.')+arw+
+    step('Al Consiglio','Si sommano i voleri delle palazzine','A millesimi generali di tutto il condominio.')+arw+
+    dec('Un\'opzione raggiunge il 500+1 generale?')+
+    out2('Risultato deciso','È la decisione del Consiglio.','bad','Assemblea generale','Il punto va al voto di tutti i condòmini.')+
+    '<div style="margin-top:22px;padding:13px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;font-size:13.5px;color:var(--hint)"><b style="color:var(--txt)">In breve:</b> ogni palazzina è padrona a casa propria e manda il suo delegato al Consiglio solo con ciò che ha davvero deciso. Dove la palazzina non decide, decide l\'assemblea di tutti.</div>'+
+    '<button class="btn-primary" id="cf-go" style="margin-top:18px">Ho capito</button>'+
+    '</div>';
+  document.body.appendChild(p);
+  function close(){p.remove()}
+  document.getElementById('cf-x').onclick=close; document.getElementById('cf-go').onclick=close;
 }
 
 /* ---------- PAGINA: CONTRATTO / CAPITOLATO ---------- */
