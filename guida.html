@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0A6F60">
+<title>Oasi delle Palme — Guida all'uso</title>
+<style>
+  :root{
+    --sand:#F6F5F1; --surface:#FCFBF8; --surface-2:#FFFFFF;
+    --ink:#22201B; --muted:#5F5A4F; --faint:#8A8577;
+    --brand:#0A6F60; --brand-deep:#0B5A4E; --brand-soft:#E4F0ED;
+    --line:#E7E2D6; --line-2:#EFEBE0;
+    --grad-a:#0A6F60; --grad-b:#2F6E2C;
+    --glass:rgba(255,255,255,.86);
+    /* stati capitolato */
+    --st-ok:#0A6F60; --st-bad:#A03127; --st-todo:#59625E; --st-ocra:#7A5E12;
+    /* aree */
+    --a-controllo:#0A6F60; --a-comunita:#9E4526; --a-piscina:#08678F;
+    --a-tennis:#8A6410; --a-feste:#2F6E2C; --a-pacchi:#5F5346; --a-admin:#4A4A55;
+    --shadow:0 1px 0 rgba(34,32,27,.04), 0 14px 34px -24px rgba(34,32,27,.4);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --r-s:12px; --r-m:18px; --r-l:26px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --sand:#101E1A; --surface:#16241F; --surface-2:#1A2A25;
+      --ink:#ECE7DB; --muted:#A9B6AE; --faint:#7D8B83;
+      --brand:#4FC7B2; --brand-deep:#3BB59E; --brand-soft:#123A33;
+      --line:#25352F; --line-2:#213029; --grad-a:#0A5348; --grad-b:#1E4A1C;
+      --glass:rgba(20,34,29,.78);
+      --st-ok:#4FC7B2; --st-bad:#E0806F; --st-todo:#9FB0A8; --st-ocra:#D3A741;
+      --a-controllo:#4FC7B2; --a-comunita:#D67E56; --a-piscina:#5FB6DC;
+      --a-tennis:#D3A741; --a-feste:#6FB86A; --a-pacchi:#B4A594; --a-admin:#9CA0B4;
+      --shadow:0 1px 0 rgba(0,0,0,.2), 0 16px 34px -22px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"]{
+    --sand:#101E1A; --surface:#16241F; --surface-2:#1A2A25; --ink:#ECE7DB; --muted:#A9B6AE; --faint:#7D8B83;
+    --brand:#4FC7B2; --brand-deep:#3BB59E; --brand-soft:#123A33; --line:#25352F; --line-2:#213029;
+    --grad-a:#0A5348; --grad-b:#1E4A1C; --glass:rgba(20,34,29,.78);
+    --st-ok:#4FC7B2; --st-bad:#E0806F; --st-todo:#9FB0A8; --st-ocra:#D3A741;
+    --a-controllo:#4FC7B2; --a-comunita:#D67E56; --a-piscina:#5FB6DC; --a-tennis:#D3A741; --a-feste:#6FB86A; --a-pacchi:#B4A594; --a-admin:#9CA0B4;
+  }
+  :root[data-theme="light"]{
+    --sand:#F6F5F1; --surface:#FCFBF8; --surface-2:#FFFFFF; --ink:#22201B; --muted:#5F5A4F; --faint:#8A8577;
+    --brand:#0A6F60; --brand-deep:#0B5A4E; --brand-soft:#E4F0ED; --line:#E7E2D6; --line-2:#EFEBE0;
+    --grad-a:#0A6F60; --grad-b:#2F6E2C; --glass:rgba(255,255,255,.86);
+    --st-ok:#0A6F60; --st-bad:#A03127; --st-todo:#59625E; --st-ocra:#7A5E12;
+    --a-controllo:#0A6F60; --a-comunita:#9E4526; --a-piscina:#08678F; --a-tennis:#8A6410; --a-feste:#2F6E2C; --a-pacchi:#5F5346; --a-admin:#4A4A55;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--sand);color:var(--ink);font-family:var(--sans);font-size:18px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  h1,h2,h3,h4{font-family:var(--serif);font-weight:600;text-wrap:balance;letter-spacing:-.01em;margin:0}
+  p{margin:0}
+  a{color:var(--brand);text-decoration:none}
+  .kicker{font-family:var(--sans);font-size:.7rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+
+  /* ---------- HERO ---------- */
+  .hero{position:relative;overflow:hidden;color:#F4F7F3;background:linear-gradient(155deg,var(--grad-a),var(--grad-b));
+    border-bottom:1px solid var(--line)}
+  .hero .sun{position:absolute;top:-120px;right:-70px;width:380px;height:380px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,241,206,.5),rgba(255,241,206,0) 62%);pointer-events:none}
+  .hero-in{position:relative;max-width:1000px;margin:0 auto;padding:60px 24px 74px}
+  .hero .kicker{color:rgba(244,247,243,.9)}
+  .hero h1{font-size:clamp(2.3rem,5.4vw,3.7rem);line-height:1.03;color:#fff;margin-top:16px;max-width:16ch}
+  .hero .sub{font-family:var(--serif);font-style:italic;font-size:1.3rem;color:#EAF3EC;margin-top:12px}
+  .hero .lead{max-width:52ch;margin-top:18px;color:rgba(244,247,243,.94);font-size:1.12rem}
+  .hero .meta{margin-top:24px;font-size:.9rem;color:rgba(244,247,243,.8)}
+
+  /* ---------- LAYOUT ---------- */
+  .shell{max-width:1000px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:212px 1fr;gap:46px;align-items:start}
+  nav.toc{position:sticky;top:20px;align-self:start;padding:24px 0;font-size:.95rem}
+  nav.toc .kicker{color:var(--faint);display:block;margin:18px 0 8px}
+  nav.toc a{display:block;color:var(--muted);padding:5px 0;border-left:2px solid transparent;padding-left:12px;margin-left:-2px}
+  nav.toc a:hover{color:var(--brand);border-color:var(--brand)}
+  main{padding:24px 0 80px;min-width:0}
+
+  section{padding:34px 0;border-top:1px solid var(--line-2)}
+  section:first-child{border-top:none}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--sans);font-size:.72rem;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--acc,var(--brand))}
+  .eyebrow .dot{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:15px;
+    background:var(--accbg,var(--brand-soft))}
+  h2.sec{font-size:clamp(1.5rem,3vw,2.05rem);margin-top:14px}
+  h3.sub{font-size:1.24rem;margin-top:30px}
+  section > p, .col > p{color:var(--ink);margin-top:14px;max-width:64ch}
+  .muted{color:var(--muted)}
+  .lead-p{font-size:1.12rem;color:var(--muted);margin-top:12px;max-width:64ch}
+
+  .row{display:grid;grid-template-columns:1fr 300px;gap:34px;align-items:start;margin-top:22px}
+  .row.rev{grid-template-columns:300px 1fr}
+  @media (max-width:880px){.row,.row.rev{grid-template-columns:1fr}}
+
+  /* steps */
+  ol.steps{list-style:none;counter-reset:s;padding:0;margin:20px 0 0;display:flex;flex-direction:column;gap:12px}
+  ol.steps li{counter-increment:s;position:relative;padding:14px 16px 14px 54px;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r-s)}
+  ol.steps li::before{content:counter(s);position:absolute;left:14px;top:13px;width:28px;height:28px;border-radius:8px;
+    background:var(--acc,var(--brand));color:#fff;font-family:var(--serif);font-weight:700;display:grid;place-items:center;font-size:.95rem}
+  ol.steps li b{display:block}
+  ol.steps li span{color:var(--muted);font-size:.98rem}
+
+  ul.plain{margin:16px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+  ul.plain li{position:relative;padding-left:26px;color:var(--ink)}
+  ul.plain li::before{content:"";position:absolute;left:6px;top:.62em;width:7px;height:7px;border-radius:50%;background:var(--acc,var(--brand))}
+  ul.plain li b{color:var(--ink)}
+
+  /* callouts */
+  .note{margin-top:20px;padding:16px 18px;border-radius:var(--r-s);background:var(--brand-soft);
+    border:1px solid var(--line);font-size:.98rem}
+  .note b{color:var(--brand-deep)}
+  .role{margin-top:18px;padding:16px 18px;border-left:4px solid var(--acc,var(--brand));background:var(--surface);
+    border:1px solid var(--line);border-radius:0 var(--r-s) var(--r-s) 0}
+  .role .who{font-family:var(--sans);font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--acc,var(--brand))}
+
+  /* state legend */
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+  .stpill{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;font-size:.92rem;font-weight:600;
+    border:1.5px solid var(--c);color:var(--c);background:transparent}
+  .stpill .g{font-weight:700}
+
+  /* ---------- PHONE MOCKUP ---------- */
+  .phone{width:300px;max-width:100%;margin:0 auto;border-radius:32px;background:var(--surface);border:1px solid var(--line);
+    box-shadow:var(--shadow);overflow:hidden;font-size:13px;line-height:1.4}
+  .phone .cap{font-family:var(--sans);font-size:.78rem;color:var(--faint);text-align:center;padding:8px;background:var(--surface-2);
+    border-top:1px solid var(--line-2)}
+  .ph-head{background:linear-gradient(150deg,var(--grad-a),var(--grad-b));padding:14px 12px 20px}
+  .ph-glass{background:var(--glass);border:1px solid rgba(255,255,255,.5);border-radius:16px;padding:9px 11px;
+    display:flex;align-items:center;gap:9px;color:var(--ink);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .ph-glass .logo{width:26px;height:26px;border-radius:8px;background:var(--brand-soft);display:grid;place-items:center;font-size:14px}
+  .ph-glass .nm{font-family:var(--serif);font-weight:600;font-size:15px;line-height:1}
+  .ph-glass .un{font-size:10.5px;color:var(--muted)}
+  .ph-glass .av{margin-left:auto;width:26px;height:26px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+  .ph-body{padding:12px}
+  .ph-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .ph-chip{font-size:11px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--surface-2)}
+  .ph-chip.on{background:var(--brand-soft);border-color:transparent;color:var(--brand-deep);font-weight:700}
+  .ph-title{font-family:var(--serif);font-weight:600;font-size:17px;display:flex;align-items:center;gap:6px}
+  .ph-desc{color:var(--muted);font-size:11.5px;margin:2px 0 12px}
+  .ph-card{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:11px;margin-bottom:9px}
+  .ph-nav{display:flex;justify-content:space-around;border-top:1px solid var(--line-2);padding:8px 4px;background:var(--surface)}
+  .ph-nav div{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;color:var(--faint)}
+  .ph-nav div.on{color:var(--brand)}
+  .ph-nav .ic{font-size:15px}
+  .tile{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:11px;margin-bottom:9px}
+  .tile .q{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;flex:none;
+    background:var(--tbg,var(--brand-soft))}
+  .tile .h{font-family:var(--serif);font-weight:600;font-size:14px}
+  .tile .s{color:var(--muted);font-size:11px}
+  .btn-mini{display:inline-block;padding:6px 12px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--brand);color:var(--brand);background:transparent}
+  .btn-mini.solid{background:var(--brand);color:#fff;border-color:transparent}
+  .barwrap{height:7px;border-radius:5px;background:var(--line-2);overflow:hidden;margin:4px 0}
+  .bar{height:100%;background:var(--a-comunita);border-radius:5px}
+
+  footer{border-top:1px solid var(--line);background:var(--sand);padding:36px 24px;text-align:center;color:var(--faint);font-size:.9rem}
+  footer b{color:var(--ink)}
+  .toggle{position:fixed;right:16px;bottom:16px;z-index:50;background:var(--surface);border:1px solid var(--line);
+    color:var(--ink);border-radius:999px;padding:9px 15px;font-size:.85rem;cursor:pointer;box-shadow:var(--shadow);font-family:var(--sans)}
+
+  @media (max-width:880px){
+    .shell{grid-template-columns:1fr;gap:0}
+    nav.toc{position:static;border-bottom:1px solid var(--line);padding:14px 0;
+      display:flex;flex-wrap:wrap;gap:4px 14px}
+    nav.toc .kicker{display:none}
+    nav.toc a{border-left:none;padding-left:0;margin:0}
+  }
+  @media print{
+    .toc,.toggle{display:none}
+    .shell{grid-template-columns:1fr;display:block}
+    body{font-size:11pt}
+    section{page-break-inside:avoid}
+    .hero{color:#000;background:none;border-bottom:2px solid #0A6F60}
+    .hero .kicker,.hero h1,.hero .sub,.hero .lead,.hero .meta{color:#000}
+  }
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="sun"></div>
+  <div class="hero-in">
+    <span class="kicker">Guida all'uso · Via Cina 451, Roma</span>
+    <h1>Oasi delle Palme</h1>
+    <p class="sub">Siamo tutti custodi.</p>
+    <p class="lead">Tutto quello che l'app sa fare, spiegato passo passo — per il condòmino e per ogni ruolo del vicinato. Più siamo a usarla, meglio funziona.</p>
+    <p class="meta">Documento d'uso completo · aggiornato luglio 2026</p>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Indice">
+    <span class="kicker">Per iniziare</span>
+    <a href="#entrare">Entrare nell'app</a>
+    <a href="#orientarsi">Orientarsi</a>
+    <span class="kicker">Le sezioni</span>
+    <a href="#controllo">Controllo</a>
+    <a href="#comunita">Comunità</a>
+    <a href="#piscina">Piscina</a>
+    <a href="#tennis">Tennis</a>
+    <a href="#pacchi">Pacchi</a>
+    <a href="#dati">I miei dati</a>
+    <span class="kicker">I ruoli</span>
+    <a href="#delegato">Delegato e vice</a>
+    <a href="#bagnino">Bagnino e gestore</a>
+    <a href="#custode">Custode</a>
+    <a href="#amministratore">Amministratore</a>
+    <a href="#admin">Admin</a>
+    <a href="#ospite">Avvocato e ospite</a>
+  </nav>
+
+  <main>
+
+    <!-- INTRO -->
+    <section>
+      <h2 class="sec">Un solo posto per il vicinato</h2>
+      <p class="lead-p">L'Oasi delle Palme è la casa di tante famiglie. L'app le mette tutte intorno allo stesso tavolo: si controlla insieme che i servizi comuni siano fatti davvero, si vota, si prenota il campo o la sala, si tiene d'occhio la piscina e si ritirano i pacchi. Nessuno comanda: ogni voce conta e porta il tuo nome.</p>
+      <p>Funziona dal telefono, di giorno e di notte (si scurisce da sola la sera), con testi grandi e un tocco per ogni azione. Questa guida ti accompagna in ogni sezione. Se vuoi solo l'essenziale, in fondo a ogni schermata dell'app trovi il pulsante <b>«Come funziona →»</b> con la spiegazione di quella pagina.</p>
+    </section>
+
+    <!-- ENTRARE -->
+    <section id="entrare">
+      <div class="eyebrow" style="--acc:var(--brand);--accbg:var(--brand-soft)"><span class="dot">🔑</span> Per iniziare</div>
+      <h2 class="sec">Entrare nell'app</h2>
+      <div class="row">
+        <div class="col">
+          <p>Si entra solo con la propria email: nessuna password da ricordare. La prima volta scegli la tua unità una volta sola, poi l'app ti riconosce.</p>
+          <ol class="steps">
+            <li><b>Apri l'indirizzo</b><span>Vai su oasidellepalme.com dal telefono.</span></li>
+            <li><b>Scrivi la tua email</b><span>Ricevi un codice o un link di accesso nella posta. Nessuna password.</span></li>
+            <li><b>Scegli la tua unità</b><span>Palazzina e interno, una volta sola. Se la casa è già di un familiare, ti unisci come comproprietario.</span></li>
+            <li><b>Aspetta l'approvazione</b><span>L'amministrazione conferma che sei un residente. Poi l'app è tua.</span></li>
+          </ol>
+          <div class="note"><b>Più account per la stessa casa.</b> Marito, moglie, figli possono avere ognuno il proprio accesso sulla stessa unità. La firma è il <b>nome dell'unità</b> e il <b>voto è uno per unità</b>: si decide in famiglia, ma pesa una volta sola.</div>
+          <div class="note"><b>Installala come app e attiva le notifiche.</b> Dal browser scegli «Aggiungi alla schermata Home»: così avrai l'icona 🌴 e potrai ricevere gli avvisi. Poi, dal menu «I miei dati», tocca <b>🔔 Attiva notifiche</b> (su iPhone funzionano solo con l'app installata sulla Home).</div>
+        </div>
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">🌴</span><div><div class="nm">Oasi delle Palme</div><div class="un">Benvenuto</div></div></div></div>
+            <div class="ph-body">
+              <div class="ph-card"><b>Entra con la tua email</b><div style="color:var(--muted);font-size:11.5px;margin-top:4px">Ti mandiamo un accesso. Niente password.</div>
+                <div style="margin-top:9px;border:1px solid var(--line);border-radius:9px;padding:8px;color:var(--faint);font-size:12px">nome@email.it</div>
+                <div style="margin-top:9px" class="btn-mini solid">Ricevi l'accesso</div>
+              </div>
+              <div style="color:var(--muted);font-size:11px;text-align:center">Prima volta? Dopo scegli la tua unità.</div>
+            </div>
+            <div class="cap">Accesso — solo con l'email</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ORIENTARSI -->
+    <section id="orientarsi">
+      <div class="eyebrow" style="--acc:var(--brand);--accbg:var(--brand-soft)"><span class="dot">🧭</span> Per iniziare</div>
+      <h2 class="sec">Orientarsi in tre secondi</h2>
+      <div class="row rev">
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">🌴</span><div><div class="nm">Oasi delle Palme</div><div class="un">Pal. I · int 09</div></div><span class="av">CL</span></div></div>
+            <div class="ph-body">
+              <div style="font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:700;margin-bottom:8px">I TUOI SPAZI</div>
+              <div class="tile"><span class="q" style="--tbg:#F4E7DF">🏛️</span><div><div class="h">Comunità</div><div class="s">3 annunci da leggere</div></div></div>
+              <div class="tile"><span class="q" style="--tbg:#E0EDF3">💧</span><div><div class="h">Piscina</div><div class="s">Vasca aperta</div></div></div>
+              <div class="tile"><span class="q" style="--tbg:#F2ECD8">🎾</span><div><div class="h">Tennis</div><div class="s">Prenota un campo</div></div></div>
+              <div class="tile"><span class="q" style="--tbg:#E4F0ED">🌿</span><div><div class="h">Controllo</div><div class="s">Controlla e segnala</div></div></div>
+            </div>
+            <div class="ph-nav">
+              <div class="on"><span class="ic">🏠</span>Home</div><div><span class="ic">📣</span>Comunità</div>
+              <div><span class="ic">💧</span>Piscina</div><div><span class="ic">🎾</span>Tennis</div>
+              <div><span class="ic">🌿</span>Controllo</div><div><span class="ic">📦</span>Pacchi</div>
+            </div>
+            <div class="cap">Home — «I tuoi spazi»</div>
+          </div>
+        </div>
+        <div class="col">
+          <p>Ogni schermata è fatta uguale, così non ti perdi mai:</p>
+          <ul class="plain">
+            <li><b>In alto</b> la fascia verde con il nome dell'Oasi e, a destra, la tua iniziale: toccala per aprire <b>«I miei dati»</b>.</li>
+            <li><b>La Home</b> mostra «I tuoi spazi»: le sei aree, ognuna col suo colore, e sotto «Oggi» ciò che ti riguarda.</li>
+            <li><b>In basso</b> la barra per saltare tra le aree: Home, Comunità, Piscina, Tennis, Controllo, Pacchi.</li>
+            <li><b>Il pallino rosso</b> su un'icona segnala qualcosa di nuovo per te (per esempio annunci non letti).</li>
+          </ul>
+          <div class="note">Ogni area ha il suo <b>colore</b>: verde per il Controllo, terracotta per la Comunità, blu per la Piscina, oro per il Tennis, marrone per i Pacchi. Ti orienti a colpo d'occhio.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTROLLO -->
+    <section id="controllo">
+      <div class="eyebrow" style="--acc:var(--a-controllo);--accbg:#E4F0ED"><span class="dot">🌿</span> Le sezioni</div>
+      <h2 class="sec">Controllo — il verde e i servizi, curati da tutti</h2>
+      <p class="lead-p">Qui si verifica insieme che i lavori previsti dai contratti (verde, strade, piscina) siano fatti davvero. Non serve essere esperti: guardi, e se qualcosa non va lo segnali con una foto.</p>
+      <div class="row">
+        <div class="col">
+          <h3 class="sub">Controllare una zona</h3>
+          <ol class="steps" style="--acc:var(--a-controllo)">
+            <li><b>Scegli «Dove ti trovi ora»</b><span>La collina, la piscina, il tennis, le strade o la tua palazzina.</span></li>
+            <li><b>Guarda cosa è previsto oggi</b><span>Vedi solo i servizi la cui «finestra» è aperta adesso, con la scadenza («entro…»).</span></li>
+            <li><b>Tutto a posto? Non fare nulla</b><span>Se un lavoro è stato fatto, lo confermi; se manca, lo segnali.</span></li>
+            <li><b>Segnala con una foto</b><span>Tocca «Segnala», scrivi cosa non va (puoi anche dettare a voce) e allega una foto.</span></li>
+          </ol>
+          <h3 class="sub">I quattro stati</h3>
+          <p class="muted">Ogni servizio, nella sua finestra di tempo, può essere:</p>
+          <div class="legend">
+            <span class="stpill" style="--c:var(--st-ok)"><span class="g">✓</span> Fatto</span>
+            <span class="stpill" style="--c:var(--st-bad)"><span class="g">!</span> Problema</span>
+            <span class="stpill" style="--c:var(--st-todo)"><span class="g">○</span> Finestra aperta</span>
+            <span class="stpill" style="--c:var(--st-ocra)"><span class="g">◐</span> Scaduta, non controllata</span>
+          </div>
+          <div class="note"><b>«Scaduta, non controllata» (ocra).</b> Se nessuno guarda in tempo, la finestra si chiude e il lavoro vale come <b>fatto ma non confermato</b>. Nessuna accusa a nessuno: il controllo è nostro, e la scadenza è un termine. Più siamo a guardare, meno finestre restano ocra.</div>
+        </div>
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">🌿</span><div><div class="nm">Controllo</div><div class="un">Zona piscina</div></div></div></div>
+            <div class="ph-body">
+              <div class="ph-chips"><span class="ph-chip on">Attuali · 6</span><span class="ph-chip">Problematici · 0</span><span class="ph-chip">Chiusi · 3</span></div>
+              <div class="ph-card">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                  <div><b>Irrigazione aree verdi</b><div style="font-size:10px;color:var(--muted);background:var(--line-2);display:inline-block;padding:2px 7px;border-radius:6px;margin-top:4px">House &amp; Garden</div></div>
+                  <span class="btn-mini">Segnala</span>
+                </div>
+                <div style="margin-top:8px;font-size:11.5px"><span style="color:var(--st-todo);font-weight:700">○ Finestra aperta</span> · giornaliera · <b>oggi</b></div>
+                <div style="margin-top:4px;font-size:11px;color:var(--brand)">📄 Capitolato HG, pag. 5</div>
+              </div>
+              <div class="ph-card">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                  <div><b>Pulizia prato recinzione</b></div><span class="btn-mini">Segnala</span>
+                </div>
+                <div style="margin-top:8px;font-size:11.5px"><span style="color:var(--st-todo);font-weight:700">○ Finestra aperta</span> · giornaliera · <b>oggi</b></div>
+              </div>
+            </div>
+            <div class="cap">Controllo — i servizi della zona</div>
+          </div>
+        </div>
+      </div>
+      <h3 class="sub">Le altre schede del Controllo</h3>
+      <ul class="plain" style="--acc:var(--a-controllo)">
+        <li><b>Mappa</b> — la piantina del complesso colorata per stato: dove tutto va (verde), dove c'è un problema (rosso), dove nessuno ha guardato (ocra).</li>
+        <li><b>Dossier</b> — il riepilogo dei problemi aperti, con le eventuali <b>penali di contratto</b>. È l'anteprima del riepilogo che arriva all'amministrazione.</li>
+        <li><b>Avvisi</b> — per gli imprevisti <b>fuori contratto</b> (ascensore, citofoni, un guasto elettrico): lo apre chi è abilitato, e si chiude quando è risolto.</li>
+      </ul>
+    </section>
+
+    <!-- COMUNITA -->
+    <section id="comunita">
+      <div class="eyebrow" style="--acc:var(--a-comunita);--accbg:#F4E7DF"><span class="dot">🏛️</span> Le sezioni</div>
+      <h2 class="sec">Comunità — annunci, voti e la voce della palazzina</h2>
+      <p class="lead-p">Il cuore sociale dell'app: qui leggi le comunicazioni, partecipi alle decisioni e prenoti gli spazi per le feste. Quattro schede: <b>Bacheca</b>, <b>Voti</b>, <b>ODG</b>, <b>Feste</b>.</p>
+      <div class="row rev">
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">📣</span><div><div class="nm">Comunità</div><div class="un">Voti</div></div></div></div>
+            <div class="ph-body">
+              <div class="ph-chips"><span class="ph-chip">Bacheca</span><span class="ph-chip on">Voti</span><span class="ph-chip">ODG</span><span class="ph-chip">Feste</span></div>
+              <div class="ph-card">
+                <b>Valutare altre ditte per il verde?</b>
+                <div style="font-size:10.5px;color:var(--muted);margin:3px 0 8px">4 voti · un voto per unità</div>
+                <div style="display:flex;gap:6px;margin-bottom:9px"><span class="btn-mini solid">Sì</span><span class="btn-mini">No</span><span class="btn-mini">Astenuto</span></div>
+                <div style="font-size:11px;display:flex;justify-content:space-between"><span>Sì</span><span class="muted">2 unità</span></div>
+                <div class="barwrap"><div class="bar" style="width:64%"></div></div>
+                <div style="font-size:11px;display:flex;justify-content:space-between"><span>No</span><span class="muted">1 unità</span></div>
+                <div class="barwrap"><div class="bar" style="width:30%;background:var(--st-todo)"></div></div>
+              </div>
+            </div>
+            <div class="cap">Voti — un voto per unità</div>
+          </div>
+        </div>
+        <div class="col">
+          <ul class="plain" style="--acc:var(--a-comunita)">
+            <li><b>Bacheca</b> — gli annunci dell'amministrazione (assemblee, disinfestazioni, auguri). Si aprono a fisarmonica; il pallino rosso segna quelli non letti.</li>
+            <li><b>Voti</b> — i sondaggi della comunità. Tocchi la tua risposta e vedi subito il risultato, sempre <b>a millesimi</b>. Un voto per unità.</li>
+            <li><b>ODG</b> — l'ordine del giorno del Consiglio dei Delegati: ogni punto diventa un voto della tua palazzina (ne parliamo nel ruolo <a href="#delegato">Delegato</a>).</li>
+            <li><b>Feste</b> — prenoti sala, collina o area piscina per un evento privato, con le regole d'uso in chiaro e la dichiarazione di responsabilità.</li>
+          </ul>
+          <div class="note"><b>Proporre un sondaggio.</b> Con «+ Proponi un sondaggio» scrivi una domanda e le risposte una a una (Sì/No/Astenuto o le opzioni che vuoi). L'amministrazione lo rende visibile a tutti.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PISCINA -->
+    <section id="piscina">
+      <div class="eyebrow" style="--acc:var(--a-piscina);--accbg:#E0EDF3"><span class="dot">💧</span> Le sezioni</div>
+      <h2 class="sec">Piscina — l'estate, organizzata</h2>
+      <p class="lead-p">Compare da sola in stagione (metà giugno – metà settembre). Vedi la qualità dell'acqua, se la vasca è aperta e quante persone ci sono.</p>
+      <div class="row">
+        <div class="col">
+          <ul class="plain" style="--acc:var(--a-piscina)">
+            <li><b>Qualità dell'acqua</b> — cloro, pH e temperatura dell'ultimo controllo, con foto e firma del bagnino. Se il test della finestra (mattina/pomeriggio) manca, appaiono <b>trattini rossi</b>.</li>
+            <li><b>Accesso alla vasca</b> — la vasca è aperta solo quando c'è un bagnino in servizio. Ad apertura, tocchi <b>«Sono in piscina»</b> per fare il check-in (puoi aggiungere fino a 2 ospiti).</li>
+            <li><b>Capienza</b> — il contatore mostra quante persone ci sono. Sopra una certa soglia l'app avvisa; con precedenza ai residenti.</li>
+            <li><b>Magazzino</b> — cosa si acquista per la piscina (in sola lettura per te).</li>
+          </ul>
+          <div class="note"><b>Vasca chiusa?</b> Vuol dire che nessun bagnino è ancora entrato in servizio. Non è un errore dell'app: potrai entrare quando la vasca viene aperta.</div>
+        </div>
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">💧</span><div><div class="nm">Piscina</div><div class="un">Qualità e accesso</div></div></div></div>
+            <div class="ph-body">
+              <div style="font-size:10px;letter-spacing:.1em;color:var(--faint);font-weight:700;margin-bottom:6px">QUALITÀ DELL'ACQUA</div>
+              <div class="ph-card" style="display:flex;justify-content:space-around;text-align:center">
+                <div><div style="font-size:10px;color:var(--muted)">Cloro</div><div style="font-weight:700;color:var(--st-ok)">0,8</div><div style="font-size:9px;color:var(--faint)">mg/l</div></div>
+                <div><div style="font-size:10px;color:var(--muted)">pH</div><div style="font-weight:700;color:var(--st-ok)">7,3</div></div>
+                <div><div style="font-size:10px;color:var(--muted)">Temp.</div><div style="font-weight:700;color:var(--st-ok)">26°</div></div>
+              </div>
+              <div style="font-size:10px;letter-spacing:.1em;color:var(--faint);font-weight:700;margin:10px 0 6px">ACCESSO IN PISCINA</div>
+              <div class="ph-card" style="text-align:center">
+                <div style="font-weight:700;font-family:var(--serif);font-size:15px">Vasca aperta · 12 / 90</div>
+                <div style="margin-top:8px" class="btn-mini solid">Sono in piscina</div>
+              </div>
+            </div>
+            <div class="cap">Piscina — quando la vasca è aperta</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TENNIS -->
+    <section id="tennis">
+      <div class="eyebrow" style="--acc:var(--a-tennis);--accbg:#F2ECD8"><span class="dot">🎾</span> Le sezioni</div>
+      <h2 class="sec">Tennis — il campo in un tocco</h2>
+      <div class="row rev">
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">🎾</span><div><div class="nm">Tennis</div><div class="un">Prenota il campo</div></div></div></div>
+            <div class="ph-body">
+              <div class="ph-chips"><span class="ph-chip on">Prenota</span><span class="ph-chip">Tornei</span></div>
+              <div style="display:flex;gap:6px;margin-bottom:9px"><span class="ph-chip on" style="flex:1;text-align:center;background:#F2ECD8;color:#7A5810">Oggi</span><span class="ph-chip" style="flex:1;text-align:center">Domani</span></div>
+              <div class="ph-card" style="display:flex;justify-content:space-between;align-items:center"><div><b>08:00 – 09:00</b><div style="font-size:11px;color:var(--brand)">libero</div></div><span class="btn-mini">Prenota</span></div>
+              <div class="ph-card" style="display:flex;justify-content:space-between;align-items:center"><div><b>09:00 – 10:00</b><div style="font-size:11px;color:var(--muted)">Bianchi Ada (C/05)</div></div><span style="font-size:11px;color:var(--faint)">occupato</span></div>
+              <div class="ph-card" style="opacity:.6;display:flex;justify-content:space-between;align-items:center"><div><b>14:00 – 15:00</b></div><span style="font-size:11px;color:var(--faint)">chiuso 14–16</span></div>
+            </div>
+            <div class="cap">Tennis — slot di un'ora</div>
+          </div>
+        </div>
+        <div class="col">
+          <p>Prenoti uno slot da un'ora, per oggi o domani, nel rispetto del Regolamento (Art. 32): <b>massimo una prenotazione al giorno</b> a persona, e in estate il campo è chiuso dalle 14 alle 16.</p>
+          <ol class="steps" style="--acc:var(--a-tennis)">
+            <li><b>Scegli Oggi o Domani</b></li>
+            <li><b>Trova uno slot «libero»</b><span>Quelli occupati mostrano chi ha prenotato.</span></li>
+            <li><b>Tocca «Prenota»</b><span>Comparirai col tuo nome. Puoi annullare quando vuoi e liberare l'ora.</span></li>
+          </ol>
+          <div class="note"><b>Tornei.</b> Nella scheda «Tornei» ti iscrivi agli eventi, indichi la tua abilità (1–10) per formare gironi equilibrati e segui il calendario e la classifica, aggiornata dopo ogni partita.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PACCHI -->
+    <section id="pacchi">
+      <div class="eyebrow" style="--acc:var(--a-pacchi);--accbg:#ECE7DE"><span class="dot">📦</span> Le sezioni</div>
+      <h2 class="sec">Pacchi — nessun pacco perso</h2>
+      <p class="lead-p">Quando arriva un pacco per te, il custode lo registra e tu ricevi l'avviso in app: lo ritiri quando vuoi, con tutto tracciato.</p>
+      <ul class="plain" style="--acc:var(--a-pacchi)">
+        <li>Vedi <b>solo i tuoi</b> pacchi (la privacy è garantita): quanti ne hai in custodia e da quando.</li>
+        <li>Un <b>badge 📦</b> sull'icona ti avvisa quando c'è qualcosa da ritirare.</li>
+        <li>Quando ritiri, il pacco viene <b>segnato come consegnato</b> — da te o dal custode.</li>
+      </ul>
+    </section>
+
+    <!-- DATI -->
+    <section id="dati">
+      <div class="eyebrow" style="--acc:var(--brand);--accbg:var(--brand-soft)"><span class="dot">👤</span> Le sezioni</div>
+      <h2 class="sec">I miei dati</h2>
+      <p class="lead-p">Toccando la tua iniziale in alto a destra apri il tuo profilo.</p>
+      <ul class="plain">
+        <li><b>Chi sei</b> — nome, unità, stato dell'account.</li>
+        <li><b>La tua posizione contabile</b> — quanto risulti «a saldo» dal bilancio consuntivo. È un dato che <b>include quote a scadere</b>, non necessariamente arretrati: fa fede l'estratto conto dell'amministrazione. Ognuno vede <b>solo la propria</b> unità.</li>
+        <li><b>🔔 Attiva notifiche</b> — per ricevere gli avvisi importanti.</li>
+        <li><b>Esci</b> e <b>Elimina l'account</b> — se elimini, la tua unità torna libera, ma <b>le segnalazioni che hai inviato restano</b> (col tuo nome): sono prove condivise della comunità.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== RUOLI ===================== -->
+    <section>
+      <h2 class="sec">I ruoli del vicinato</h2>
+      <p class="lead-p">L'app è una sola: le funzioni in più compaiono a seconda di chi sei. Ecco cosa vede e cosa fa ciascun ruolo, oltre a tutto quello del condòmino.</p>
+    </section>
+
+    <!-- DELEGATO -->
+    <section id="delegato">
+      <div class="eyebrow" style="--acc:var(--a-comunita);--accbg:#F4E7DF"><span class="dot">🏛️</span> I ruoli</div>
+      <h2 class="sec">Delegato e vice — la voce della palazzina</h2>
+      <p class="lead-p">Il delegato è l'<b>ambasciatore</b> della sua palazzina: non decide al posto degli altri, porta ciò che la palazzina ha votato. Il vice ha esattamente le stesse funzioni. È il cuore dell'app.</p>
+      <div class="row">
+        <div class="col">
+          <h3 class="sub">⬆️ Dal basso — le cose della palazzina</h3>
+          <p class="muted">Materie interne (per esempio: cambiare le piante ai pilotis di una palazzina).</p>
+          <ol class="steps" style="--acc:var(--a-comunita)">
+            <li><b>Apri un voto di palazzina</b><span>Nella sezione «Pal. X — voti di palazzina», solo tu (o il vice) puoi aprirlo.</span></li>
+            <li><b>La palazzina vota</b><span>A millesimi di palazzina. Chi appartiene alla palazzina riceve la notifica.</span></li>
+            <li><b>Se supera la metà (500+1) → Ordine esecutivo</b><span>Con «Trasmetti ordine esecutivo» la decisione arriva all'amministrazione, che deve eseguirla.</span></li>
+            <li><b>Se non la supera → decade</b><span>La proposta si ferma lì: non va in assemblea.</span></li>
+          </ol>
+        </div>
+        <div class="col">
+          <h3 class="sub">⬇️ Dall'alto — le cose del condominio</h3>
+          <p class="muted">L'ordine del giorno del Consiglio, che riguarda tutti.</p>
+          <ol class="steps" style="--acc:var(--a-comunita)">
+            <li><b>Ricevi l'ODG</b><span>L'amministrazione lo carica una volta; a te arriva la notifica.</span></li>
+            <li><b>Gestisci la discussione</b><span>Puoi aprire dei dibattiti nella palazzina per approfondire un punto.</span></li>
+            <li><b>Raccogli il voto punto per punto</b><span>Ogni punto diventa una votazione della palazzina.</span></li>
+            <li><b>Porti il mandato al Consiglio</b><span>L'app produce il rapporto documentato dei voleri della tua palazzina.</span></li>
+          </ol>
+        </div>
+      </div>
+      <div class="note"><b>Perché conta.</b> Così ogni decisione è tracciata e nasce dalla palazzina, non da una persona sola. La voce arriva dove serve, e nulla si perde per strada.</div>
+    </section>
+
+    <!-- BAGNINO -->
+    <section id="bagnino">
+      <div class="eyebrow" style="--acc:var(--a-piscina);--accbg:#E0EDF3"><span class="dot">💧</span> I ruoli</div>
+      <h2 class="sec">Bagnino e gestore — la piscina</h2>
+      <p class="lead-p">Entrando con l'account dedicato, il bagnino e il gestore vedono <b>solo la Piscina</b>, con gli strumenti operativi (anche fuori stagione, per l'inverno).</p>
+      <div class="row rev">
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">💧</span><div><div class="nm">Piscina</div><div class="un">Bagnino</div></div></div></div>
+            <div class="ph-body">
+              <div class="ph-card"><b>Presenze · 12 in vasca</b><div style="margin-top:8px" class="btn-mini solid">Sono in vasca</div></div>
+              <div style="font-size:10px;letter-spacing:.1em;color:var(--faint);font-weight:700;margin:4px 0 6px">I TUOI COMPITI DI OGGI</div>
+              <div class="ph-card" style="display:flex;justify-content:space-between;align-items:center"><span>Robot serale</span><span class="btn-mini">Fatto</span></div>
+              <div class="ph-card" style="display:flex;justify-content:space-between;align-items:center"><span>Controlavaggio <span style="color:var(--st-ocra);font-size:10px">! in ritardo</span></span><span class="btn-mini">Fatto</span></div>
+            </div>
+            <div class="cap">Piscina — vista del bagnino</div>
+          </div>
+        </div>
+        <div class="col">
+          <ul class="plain" style="--acc:var(--a-piscina)">
+            <li><b>Apre e chiude la vasca</b> — «Sono in vasca» la apre (la capienza sale), «Esco dalla vasca» chiude la giornata. Senza bagnino la vasca resta chiusa.</li>
+            <li><b>Registra l'analisi dell'acqua</b> — cloro, pH, temperatura, con foto, mattina e pomeriggio.</li>
+            <li><b>Compiti a cadenza</b> — le mansioni del giorno (mattonato, robot, aspiratore, controlavaggio…) con lo storico firmato. Quelle scadute restano segnate finché non fatte.</li>
+            <li><b>Magazzino e richieste</b> — registra i prodotti e invia le richieste di materiale.</li>
+          </ul>
+          <div class="role" style="--acc:var(--a-piscina)"><span class="who">Solo il gestore</span><p style="margin-top:6px">Il gestore <b>conferma</b> le richieste del bagnino: una volta confermate, entrano nel riepilogo settimanale che arriva all'amministrazione.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CUSTODE -->
+    <section id="custode">
+      <div class="eyebrow" style="--acc:var(--a-pacchi);--accbg:#ECE7DE"><span class="dot">📦</span> I ruoli</div>
+      <h2 class="sec">Custode — l'occhio dei condòmini</h2>
+      <p class="lead-p">Il custode conosce tutto il complesso: può segnalare in ogni area e gestisce i pacchi.</p>
+      <ol class="steps" style="--acc:var(--a-pacchi)">
+        <li><b>Registra un pacco in arrivo</b><span>Cerca il destinatario per cognome o unità, aggiunge una nota e la foto dell'etichetta.</span></li>
+        <li><b>«🔎 Leggi destinatario» (automatico)</b><span>Dalla foto dell'etichetta, l'app propone da sola il destinatario; il custode conferma.</span></li>
+        <li><b>Il condòmino riceve l'avviso</b><span>E ritira quando vuole; il pacco viene segnato consegnato.</span></li>
+      </ol>
+      <div class="note">Il custode può anche <b>aprire segnalazioni</b> di controllo e avvisi in qualsiasi zona: è gli occhi in più della comunità.</div>
+    </section>
+
+    <!-- AMMINISTRATORE -->
+    <section id="amministratore">
+      <div class="eyebrow" style="--acc:var(--a-admin);--accbg:#E9E9EE"><span class="dot">🛠️</span> I ruoli</div>
+      <h2 class="sec">Amministratore — chi esegue</h2>
+      <p class="lead-p">L'amministratore non è un condòmino e non vota. Riceve le decisioni e ne rende conto.</p>
+      <ul class="plain" style="--acc:var(--a-admin)">
+        <li><b>Carica l'ordine del giorno</b> — una volta sola; l'app lo diffonde a ogni palazzina.</li>
+        <li><b>Riceve gli ordini esecutivi</b> — in una casella dedicata, con lo stato <b>da eseguire → in corso → eseguito</b>. Aggiornare lo stato è trasparenza e prova del lavoro fatto.</li>
+        <li><b>Riceve il riepilogo settimanale</b> — problemi aperti, eventuali penali e richieste della piscina, via email.</li>
+      </ul>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="admin">
+      <div class="eyebrow" style="--acc:var(--a-admin);--accbg:#E9E9EE"><span class="dot">⚙️</span> I ruoli</div>
+      <h2 class="sec">Admin — chi tiene in ordine la comunità</h2>
+      <p class="lead-p">L'amministratore dell'app (super o sub) usa un <b>interruttore</b>: normalmente vive da residente, e quando serve passa alla «vista amministratore».</p>
+      <div class="row">
+        <div class="col">
+          <ul class="plain" style="--acc:var(--a-admin)">
+            <li><b>Approva i residenti</b> — chi si registra entra dopo una conferma. Può nominare altri <b>subadmin</b>.</li>
+            <li><b>Accessi speciali</b> — crea gli account non-condòmini: custode, bagnino, gestore, avvocato, ospite.</li>
+            <li><b>Delegati di palazzina</b> — assegna delegato e vice per ognuna delle 14 palazzine.</li>
+            <li><b>Pubblica gli annunci</b> in Bacheca e può metterli «in evidenza».</li>
+            <li><b>Supervisione</b> — vede i voti e gli ordini di tutte le palazzine, e lo storico degli accessi.</li>
+          </ul>
+        </div>
+        <div class="col">
+          <div class="phone">
+            <div class="ph-head"><div class="ph-glass"><span class="logo">⚙️</span><div><div class="nm">Amministrazione</div><div class="un">Vista admin</div></div></div></div>
+            <div class="ph-body">
+              <div class="ph-chips"><span class="ph-chip on">In attesa</span><span class="ph-chip">Approvati</span><span class="ph-chip">Speciali</span><span class="ph-chip">Logs</span></div>
+              <div class="ph-card" style="display:flex;justify-content:space-between;align-items:center"><div><b>Rossi Maria</b><div style="font-size:11px;color:var(--muted)">Pal. D · int 12</div></div><div style="display:flex;gap:5px"><span class="btn-mini solid">Approva</span></div></div>
+              <div class="ph-card" style="display:flex;justify-content:space-between;align-items:center"><div><b>Verdi Luca</b><div style="font-size:11px;color:var(--muted)">Pal. A · int 03</div></div><div style="display:flex;gap:5px"><span class="btn-mini solid">Approva</span></div></div>
+            </div>
+            <div class="cap">Admin — approvazione residenti</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- OSPITE -->
+    <section id="ospite">
+      <div class="eyebrow" style="--acc:var(--brand);--accbg:var(--brand-soft)"><span class="dot">👁️</span> I ruoli</div>
+      <h2 class="sec">Avvocato e ospite — sola lettura</h2>
+      <p class="lead-p">Alcuni accessi servono solo a <b>guardare</b>: l'avvocato che segue una pratica, o un ospite/tecnico a cui si mostra l'app. Vedono tutto ma non toccano nulla — nessuna segnalazione, nessun voto.</p>
+    </section>
+
+    <!-- CHIUSURA -->
+    <section>
+      <h2 class="sec">Un promemoria per tutti</h2>
+      <ul class="plain">
+        <li><b>Guarda quando puoi.</b> Ogni finestra controllata in tempo è una cosa in meno lasciata al caso.</li>
+        <li><b>Segnala con calma e una foto.</b> Una prova vale più di mille parole; e resta, col tuo nome.</li>
+        <li><b>Partecipa ai voti.</b> A millesimi, un voto per unità: è così che la comunità decide davvero.</li>
+        <li><b>Più siamo, meglio siamo.</b> L'app dà il meglio di sé quando ci siamo tutti.</li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <b>Oasi delle Palme</b> — Via Cina 451, Roma · Guida all'uso · <a href="https://oasidellepalme.com">oasidellepalme.com</a><br>
+  Siamo tutti custodi.
+</footer>
+
+<button class="toggle" id="tgl" aria-label="Cambia tema">🌙 Tema</button>
+<script>
+  (function(){
+    var b=document.getElementById('tgl');
+    b.addEventListener('click',function(){
+      var r=document.documentElement;
+      var cur=r.getAttribute('data-theme');
+      if(!cur){cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+      r.setAttribute('data-theme', cur==='dark'?'light':'dark');
+    });
+  })();
+</script>
+</body>
+</html>
